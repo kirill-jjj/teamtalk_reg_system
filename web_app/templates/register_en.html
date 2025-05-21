@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ s.title }} - {{ server_name_from_env }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f9f9f9; color: #333; }
+        .container { max-width: 600px; margin: 20px auto; padding: 20px; background-color: #fff; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #0056b3; text-align: center; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="password"] { width: calc(100% - 22px); padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button[type="submit"] { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button[type="submit"]:hover { background-color: #0056b3; }
+        .message { padding: 10px; margin-bottom: 15px; border-radius: 4px; }
+        .message.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .message.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .message.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .download-section p { margin: 10px 0; }
+        .download-section a { color: #007bff; text-decoration: none; }
+        .download-section a:hover { text-decoration: underline; }
+        #countdown-timer { font-weight: bold; }
+        .intro-text { text-align: center; margin-bottom: 20px;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ s.header }}</h1>
+
+        {% if show_form %}
+        <p class="intro-text">{{ s.intro_p1 }} "<strong>{{ server_name_from_env }}</strong>", {{ s.intro_p2 }}</p>
+        {% endif %}
+
+        {% if message %}
+            <div class="message {% if registration_complete and 'success' in message.lower() %}success{% elif 'error' in message.lower() or 'failed' in message.lower() or 'taken' in message.lower() or 'required' in message.lower() or 'invalid' in message.lower() %}error{% else %}info{% endif %}">
+                <p><strong>{{ message | safe }}</strong></p>
+            </div>
+        {% endif %}
+        {% if additional_message_info %}
+            <div class="message info">
+                <p><em>{{ additional_message_info }}</em></p>
+            </div>
+        {% endif %}
+
+        {% if show_form %}
+            {% if not registration_complete or message == s.msg_required_fields or message == s.msg_username_taken %}
+            <form method="POST" action="{{ url_for('web_registration.register_page') }}">
+                <div>
+                    <label for="username">{{ s.username_label }}</label>
+                    <input type="text" id="username" name="username" required value="{{ request.form.username if request and request.form else '' }}">
+                </div>
+                <div>
+                    <label for="password">{{ s.password_label }}</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit">{{ s.register_button }}</button>
+            </form>
+            {% endif %}
+        {% endif %}
+
+
+        {% if registration_complete and (tt_link or download_tt_token or download_client_zip_token) %}
+        <div id="download-section">
+            <hr>
+            <p>{{ s.download_time_info|safe }}</p>
+            {% if tt_link %}
+            <p><strong>{{ s.quick_connect_link_text }}</strong> <a href="{{ tt_link }}" target="_blank">{{ tt_link }}</a></p>
+            {% endif %}
+            {% if download_tt_token and actual_tt_filename_for_user %}
+            <p><a href="{{ url_for('web_registration.download_tt_file', token=download_tt_token) }}">{{ s.download_tt_file_text }} ({{ actual_tt_filename_for_user }})</a></p>
+            {% endif %}
+            {% if download_client_zip_token and actual_client_zip_filename_for_user %}
+            <p><a href="{{ url_for('web_registration.download_client_zip_file', token=download_client_zip_token) }}">{{ s.download_client_zip_text }} ({{ actual_client_zip_filename_for_user }})</a></p>
+            {% endif %}
+        </div>
+        <script>
+            function startCountdown(durationSeconds, displayElementId, lang) {
+                let timer = durationSeconds;
+                const displayElement = document.getElementById(displayElementId);
+                if (!displayElement) return;
+
+                function updateDisplay() {
+                    if (timer < 0) {
+                        displayElement.textContent = (lang === "ru" ? "истекло" : "expired");
+                        // Optionally hide or disable download links here
+                        return;
+                    }
+
+                    const minutes = Math.floor(timer / 60);
+                    const seconds = timer % 60;
+                    const paddedSeconds = seconds < 10 ? '0' + seconds : seconds;
+
+                    displayElement.textContent = minutes + ":" + paddedSeconds;
+                }
+
+                updateDisplay(); 
+
+                const intervalId = setInterval(function () {
+                    timer--;
+                    updateDisplay();
+
+                    if (timer < 0) {
+                        clearInterval(intervalId);
+                    }
+                }, 1000); 
+            }
+
+            window.onload = function () {
+                const currentLang = document.documentElement.lang || "en"; 
+                const initialSeconds = 10 * 60; // 10 minutes
+                // The span id in the HTML is "countdown-timer"
+                startCountdown(initialSeconds, 'countdown-timer', currentLang); 
+            };
+        </script>
+        {% endif %}
+    </div>
+</body>
+</html>
