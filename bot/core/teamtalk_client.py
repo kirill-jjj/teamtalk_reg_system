@@ -20,16 +20,22 @@ ttstr_sdk = None
 # PyTalk Bot Instance
 pytalk_bot = pytalk.TeamTalkBot(client_name=config.CLIENT_NAME)
 
-
 async def initialize_sdk_objects():
     global TeamTalkSDK, ttstr_sdk
-    if pytalk_bot.teamtalks and pytalk_bot.teamtalks._tt:
+    if pytalk_bot.teamtalks and hasattr(pytalk_bot.teamtalks[-1], '_tt') and pytalk_bot.teamtalks[-1]._tt:
         TeamTalkSDK = pytalk.sdk
         ttstr_sdk = TeamTalkSDK.ttstr
         logger.info("TeamTalk SDK object and ttstr initialized globally from core client.")
         return True
     else:
-        logger.error("Failed to initialize TeamTalk SDK object: No active server connection in pytalk_bot or _tt is not available.")
+        if not pytalk_bot.teamtalks:
+            logger.error("Failed to initialize TeamTalk SDK: pytalk_bot.teamtalks list is empty.")
+        elif not hasattr(pytalk_bot.teamtalks[-1], '_tt'):
+            logger.error("Failed to initialize TeamTalk SDK: Last server instance in pytalk_bot.teamtalks does not have '_tt' attribute.")
+        elif not pytalk_bot.teamtalks[-1]._tt:
+            logger.error("Failed to initialize TeamTalk SDK: Last server instance's '_tt' attribute is None or False.")
+        else:
+            logger.error("Failed to initialize TeamTalk SDK object: No active server connection in pytalk_bot or _tt is not available for an unknown reason.")
         return False
 
 async def check_username_exists(username: str) -> bool:
