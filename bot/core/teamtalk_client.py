@@ -196,17 +196,25 @@ async def connect_to_teamtalk_server():
     )
     try:
         await pytalk_bot.add_server(server_info_pytalk) # This internally connects and logs in
-        if pytalk_bot.teamtalks and pytalk_bot.teamtalks.logged_in:
+        # Assuming add_server appends the instance and we're interested in the last added one.
+        # Also ensure teamtalks is not empty before accessing.
+        if pytalk_bot.teamtalks and pytalk_bot.teamtalks[-1].logged_in:
             logger.info(f"Successfully connected and logged into TeamTalk server: {config.HOST_NAME}")
             if await initialize_sdk_objects(): # Initialize SDK objects after connection
                  return True
             else:
                  return False # SDK init failed
         else:
-            logger.error(f"Failed to connect or login to TeamTalk server: {config.HOST_NAME} via PyTalk.")
+            # Log more details if teamtalks is empty or last instance is not logged in
+            if not pytalk_bot.teamtalks:
+                logger.error(f"Failed to connect or login: pytalk_bot.teamtalks list is empty after add_server for {config.HOST_NAME}.")
+            elif not pytalk_bot.teamtalks[-1].logged_in:
+                 logger.error(f"Failed to connect or login: Last server instance for {config.HOST_NAME} is not logged_in.")
+            else:
+                 logger.error(f"Failed to connect or login to TeamTalk server: {config.HOST_NAME} via PyTalk for an unknown reason.")
             return False
     except Exception as e:
-        logger.error(f"Error adding/connecting to TeamTalk server via PyTalk: {e}")
+        logger.error(f"Error adding/connecting to TeamTalk server via PyTalk: {e}", exc_info=True)
         return False
 
 async def shutdown_pytalk_bot():
