@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="{{ 'ru' if s.title == 'Выберите язык' else 'en' }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ s.choose_lang_title }}</title>
+<style>
+    body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+    h1 { color: #0056b3; }
+    p { margin-bottom: 10px; }
+    a { color: #007bff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+</style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ s.choose_lang_header }} "{{ server_name_from_env }}"!</h1>
+        <p><a href="{{ url_for('web_registration.set_language', lang_code='en') }}">{{ s.choose_lang_english }}</a></p>
+        <p><a href="{{ url_for('web_registration.set_language', lang_code='ru') }}">{{ s.choose_lang_russian }}</a></p>
+    </div>
+</body>
+</html>
