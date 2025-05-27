@@ -270,8 +270,8 @@ async def register_page():
                 additional_message_info = "Error creating client ZIP." # Update user
         elif success and core_config.TEAMTALK_CLIENT_TEMPLATE_DIR and not _base_client_zip_path_on_disk:
             logger.warning("TEAMTALK_CLIENT_TEMPLATE_DIR is set, but base client ZIP was not found or path is invalid. Skipping client ZIP generation for web user.")
-            additional_message_info = "Client ZIP download is currently unavailable."
-
+            additional_message_info = strings["msg_client_zip_unavailable"]
+            
 
         return render_template(template_name,
                                message=display_message,

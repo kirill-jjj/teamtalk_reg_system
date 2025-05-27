@@ -80,6 +80,7 @@ def get_flask_strings(lang_code_numeric_str: str): # lang_code_numeric_str is "0
             "choose_lang_header": "Добро пожаловать на регистрацию на сервере",
             "choose_lang_english": "English 🇬🇧",
             "choose_lang_russian": "Русский 🇷🇺",
+            "msg_client_zip_unavailable": "Скачивание ZIP-архива клиента в данный момент недоступно",
         }
     else: # English (default)
         return {
@@ -108,8 +109,8 @@ def get_flask_strings(lang_code_numeric_str: str): # lang_code_numeric_str is "0
             "choose_lang_header": "Welcome to server registration",
             "choose_lang_english": "English 🇬🇧",
             "choose_lang_russian": "Русский 🇷🇺",
+                        "msg_client_zip_unavailable": "Client ZIP download is currently unavailable."
         }
-
 # Helper to get admin language based on config for TG bot internal messages
 def get_admin_lang_code():
     from .config import ENV_LANG_NUMERIC
