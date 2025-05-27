@@ -44,28 +44,18 @@ async def run_telegram_bot() -> AiogramBot: # Функция теперь воз
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
-    # Register handlers
 
-    # Передаем bot_instance в хендлеры
-    dp.message.register(
-        lambda msg, state: asyncio.create_task(reg_handlers.start_command_handler(msg, state, bot_instance)),
-        Command("start")
-    )
+    # Register handlers
+    dp.message.register(reg_handlers.start_command_handler, Command("start"))
     dp.callback_query.register(
-        lambda cb_query, state: asyncio.create_task(reg_handlers.language_selection_handler(cb_query, state, bot_instance)),
+        reg_handlers.language_selection_handler,
         RegistrationStates.choosing_language,
         lambda c: c.data.startswith('set_lang_tg:')
     )
-    dp.message.register(
-        lambda msg, state: asyncio.create_task(reg_handlers.username_handler(msg, state, bot_instance)),
-        RegistrationStates.awaiting_username
-    )
-    dp.message.register(
-        lambda msg, state: asyncio.create_task(reg_handlers.password_handler(msg, state, bot_instance)),
-        RegistrationStates.awaiting_password
-    )
+    dp.message.register(reg_handlers.username_handler, RegistrationStates.awaiting_username)
+    dp.message.register(reg_handlers.password_handler, RegistrationStates.awaiting_password)
     dp.callback_query.register(
-        lambda cb_query, state: asyncio.create_task(reg_handlers.admin_verification_handler(cb_query, state, bot_instance)),
+        reg_handlers.admin_verification_handler,
         lambda query: query.data.startswith("verify_reg:")
     )
 
