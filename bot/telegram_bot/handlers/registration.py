@@ -269,7 +269,7 @@ async def _process_actual_registration(
             safe_server_name_for_file = "".join(c if c.isalnum() or c in (' ', '_', '-') else '_' for c in config.SERVER_NAME).rstrip()
             if not safe_server_name_for_file: safe_server_name_for_file = "TeamTalk_Server" # Default filename part
             
-            tt_buffered_file = BufferedInputFile(tt_file_bytes, filename=f"{safe_server_name_for_file}_{username_val}.tt")
+            tt_buffered_file = BufferedInputFile(tt_file_bytes, filename=f"{safe_server_name_for_file}.tt")
 
             try:
                 await bot.send_document(user_id_val, document=tt_buffered_file, caption=s["tt_file_caption"])
