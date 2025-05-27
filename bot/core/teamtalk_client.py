@@ -38,17 +38,28 @@ async def initialize_sdk_objects():
             logger.error("Failed to initialize TeamTalk SDK object: No active server connection in pytalk_bot or _tt is not available for an unknown reason.")
         return False
 
-async def check_username_exists(username: str) -> bool:
+# В начале файла bot/core/teamtalk_client.py, если еще не импортировано:
+from typing import Optional 
+# ... (остальные импорты)
+
+async def check_username_exists(username: str) -> Optional[bool]: # Изменен тип возвращаемого значения
     if not TeamTalkSDK or not ttstr_sdk:
         logger.error("TeamTalk SDK not initialized in check_username_exists.")
-        return True # Fail safe: assume exists if SDK is broken
+        return None # Ошибка, а не "имя занято"
 
     try:
-        if not pytalk_bot.teamtalks or not pytalk_bot.teamtalks.logged_in:
-            logger.warning("Not connected to TeamTalk server in check_username_exists.")
-            return True # Fail safe: assume exists if not connected
+        if not pytalk_bot.teamtalks: # Проверяем, существует ли список и он не пуст
+            logger.warning("No active TeamTalk server connections in check_username_exists (teamtalks list is empty).")
+            return None # Ошибка
 
-        user_accounts_sdk_list = await pytalk_bot.teamtalks.list_user_accounts()
+        # Предполагаем, что используется первое (или единственное) соединение
+        active_server_instance = pytalk_bot.teamtalks[0] 
+        
+        if not active_server_instance.logged_in:
+            logger.warning(f"Not logged in to TeamTalk server {active_server_instance.info.host} in check_username_exists.")
+            return None # Ошибка
+
+        user_accounts_sdk_list = await active_server_instance.list_user_accounts() # Вызов у экземпляра сервера
 
         for account_pytalk_obj in user_accounts_sdk_list:
             # Check if the object from pytalk has the underlying SDK structure
@@ -57,19 +68,22 @@ async def check_username_exists(username: str) -> bool:
                 existing_username_bytes = account_pytalk_obj._account.szUsername
                 existing_username = ttstr_sdk(existing_username_bytes) # Use ttstr_sdk for conversion
                 if existing_username.strip().lower() == username.strip().lower():
-                    return True
+                    return True # Имя занято
             else:
                 # Fallback for older pytalk or different structure
                 # Or if pytalk directly returns string usernames in its objects
                 if hasattr(account_pytalk_obj, 'username') and isinstance(account_pytalk_obj.username, str):
                     if account_pytalk_obj.username.strip().lower() == username.strip().lower():
-                        return True
+                        return True # Имя занято
                 else:
                     logger.warning(f"UserAccount object {type(account_pytalk_obj)} from pytalk doesn't have expected SDK structure or direct username attribute.")
-        return False
+        return False # Имя свободно
+    except IndexError: # Если pytalk_bot.teamtalks[0] вызовет IndexError (список пуст после первой проверки)
+        logger.error("No active TeamTalk server connections in check_username_exists (IndexError).")
+        return None # Ошибка
     except Exception as e:
         logger.error(f"Error checking username existence for '{username}': {e}")
-        return True # Fail safe
+        return None # Ошибка
 
 async def perform_teamtalk_registration(
     username_str: str,
