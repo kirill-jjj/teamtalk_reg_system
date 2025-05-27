@@ -96,11 +96,19 @@ async def perform_teamtalk_registration(
         logger.error("TeamTalk SDK (TeamTalkSDK or ttstr_sdk) not initialized for registration.")
         return False, "MODULE_UNAVAILABLE", None, None
 
-    if not pytalk_bot.teamtalks or not pytalk_bot.teamtalks.logged_in:
-        logger.error("TeamTalk bot (pytalk_bot) is not connected to any server for registration.")
+    if not pytalk_bot.teamtalks: # Проверяем, что список экземпляров сервера не пуст
+        logger.error("TeamTalk bot (pytalk_bot) has no active server connections (teamtalks list is empty) for registration.")
+        return False, "MODULE_UNAVAILABLE", None, None
+    
+    # Предполагаем, что используется первое (или единственное) соединение
+    active_server_instance = pytalk_bot.teamtalks[0]
+
+    if not active_server_instance.logged_in:
+        logger.error(f"TeamTalk bot (pytalk_bot) is not logged in to server {active_server_instance.info.host} for registration.")
         return False, "MODULE_UNAVAILABLE", None, None
 
-    tt_instance_raw_sdk = pytalk_bot.teamtalks._tt # Access underlying SDK instance from pytalk
+    # tt_instance_raw_sdk = pytalk_bot.teamtalks._tt # Старый некорректный доступ
+    tt_instance_raw_sdk = active_server_instance._tt # Доступ к _tt через экземпляр сервера
 
     # SDK Enums and Classes
     UserRight = TeamTalkSDK.UserRight
@@ -158,7 +166,7 @@ async def perform_teamtalk_registration(
             broadcast_message_sdk_obj = TextMessage()
             broadcast_message_sdk_obj.nMsgType = TextMsgType.MSGTYPE_BROADCAST
             broadcast_message_sdk_obj.szMessage = ttstr_sdk(broadcast_text_tt)
-            TeamTalkSDK._DoTextMessage(tt_instance_raw_sdk, broadcast_message_sdk_obj)
+            TeamTalkSDK._DoTextMessage(tt_instance_raw_sdk, broadcast_message_sdk_obj) # Используем тот же tt_instance_raw_sdk
             logger.info(f"Broadcast message for user '{username_str}' sent to server.")
         except Exception as e_broadcast:
             logger.error(f"Failed to send broadcast message for user '{username_str}': {e_broadcast}")
@@ -200,6 +208,9 @@ async def perform_teamtalk_registration(
         # Assuming success here as per original logic. Robust implementation would confirm with CMD_SUCCESS.
         return True, "REG_SUCCESS", tt_file_content_val, tt_link_val
 
+    except IndexError: # Если pytalk_bot.teamtalks[0] вызовет IndexError
+        logger.error("TeamTalk bot (pytalk_bot) has no active server connections (IndexError) for registration.")
+        return False, "MODULE_UNAVAILABLE", None, None
     except Exception as e_reg:
         logger.exception(f"General error during SDK registration for user {username_str}: {e_reg}")
         return False, f"UNEXPECTED_ERROR:{str(e_reg)}", None, None
