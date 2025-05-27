@@ -64,14 +64,24 @@ async def username_handler(message: types.Message, state: FSMContext, bot: Aiogr
 
     logger.debug(f"Validating username from Telegram: '{username}' for user {message.from_user.id}")
 
-    if await tt_client.check_username_exists(username):
+    username_check_result = await tt_client.check_username_exists(username)
+
+    if username_check_result is True:
         await message.reply(s["username_taken"])
         # Stay in the same state to allow user to try another username
         await state.set_state(RegistrationStates.awaiting_username)
-    else:
+    elif username_check_result is False:
         await state.update_data(name=username)
         await message.reply(s["prompt_password"])
         await state.set_state(RegistrationStates.awaiting_password)
+    else: # username_check_result is None, meaning an error occurred during check
+        logger.error(f"Failed to check username existence for '{username}' due to an internal error.")
+        # Используем более общую ошибку или добавляем новую строку локализации
+        await message.reply(s["reg_failed_admin_or_later"] + " (Error checking username availability)")
+        # Оставляем пользователя в том же состоянии, чтобы он мог попробовать ввести имя еще раз,
+        # или можно сбросить состояние, если это более уместно.
+        await state.set_state(RegistrationStates.awaiting_username)
+
 
 async def password_handler(message: types.Message, state: FSMContext, bot: AiogramBot):
     user_tg_id = message.from_user.id
