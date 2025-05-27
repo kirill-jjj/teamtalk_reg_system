@@ -221,7 +221,7 @@ async def register_page():
             
             # .tt file
             actual_tt_filename_on_server = f"{safe_server_name}_{username}_{secrets.token_hex(4)}.tt"
-            actual_tt_filename_for_user = f"{safe_server_name}_{username}.tt" # User-friendly name
+            actual_tt_filename_for_user = f"{safe_server_name}.tt" # User-friendly name
             
             download_tt_token = generate_random_token()
             while download_tt_token in _download_tokens: download_tt_token = generate_random_token()
