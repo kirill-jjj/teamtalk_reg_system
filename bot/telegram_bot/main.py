@@ -31,10 +31,19 @@ async def on_my_login(server: pytalk.server.Server): # type: ignore
 
 @tt_client.pytalk_bot.event
 async def on_message(message: PyTalkMessage):
-    logger.info(f"Received TeamTalk message via PyTalk: '{message.content}' from user '{message.user.username}' in channel '{message.channel.name if message.channel else 'DM/Broadcast'}'")
+    channel_name_info = "DM/Broadcast"
+    if hasattr(message, 'channel') and message.channel:
+        channel_name_info = message.channel.name
+    elif isinstance(message, PyTalkMessage) and not hasattr(message, 'channel'):
+        pass
+        
+    logger.info(
+        f"Received TeamTalk message via PyTalk: '{message.content}' "
+        f"from user '{message.user.username if message.user else 'Unknown User'}' " # Добавил проверку на message.user
+        f"in {channel_name_info}"
+    )
     # Если нужно будет отправлять сообщения админам из этого хендлера,
     # экземпляр aiogram_bot нужно будет передавать сюда (например, через замыкание или класс)
-
 
 # --- Aiogram Bot Setup and Run ---
 async def run_telegram_bot() -> AiogramBot: # Функция теперь возвращает экземпляр бота
