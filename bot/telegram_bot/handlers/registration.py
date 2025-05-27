@@ -38,7 +38,7 @@ async def start_command_handler(message: types.Message, state: FSMContext, bot: 
     await state.set_state(RegistrationStates.choosing_language)
 
 async def language_selection_handler(callback_query: types.CallbackQuery, state: FSMContext, bot: AiogramBot):
-    user_lang_code = callback_query.data.split(':')
+    user_lang_code = callback_query.data.split(':')[1]
     await state.update_data(user_tg_lang=user_lang_code)
 
     s = get_tg_strings(user_lang_code)
