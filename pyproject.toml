@@ -6,7 +6,7 @@ authors = [
     {name = "Kirill", email = "kirillkolovi@gmail.com"},
 ]
 requires-python = ">=3.11"
-license = {text = "GPL-3.0-only"} 
+license = {file = "LICENSE"}
 readme = "README.md"
 
 # Основные зависимости проекта (будут установлены последние версии)
@@ -29,3 +29,7 @@ Repository = "https://github.com/kirill-jjj/teamtalk_reg_system"
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 backend-path = "."
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bot*"]
+exclude = ["locales*"]
