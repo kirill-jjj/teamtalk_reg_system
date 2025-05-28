@@ -11,7 +11,6 @@ from .handlers import registration as reg_handlers
 from .handlers import admin as admin_handlers
 from ..core import config, database
 from ..core import teamtalk_client as tt_client
-from ..core.localization import get_tg_strings
 from pytalk.message import Message as PyTalkMessage
 from .states import RegistrationStates
 

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="{{ current_lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ _("TeamTalk Registration") }} - {{ server_name_from_env }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f9f9f9; color: #333; }
+        .container { max-width: 600px; margin: 20px auto; padding: 20px; background-color: #fff; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #0056b3; text-align: center; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="password"] { width: calc(100% - 22px); padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button[type="submit"] { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button[type="submit"]:hover { background-color: #0056b3; }
+        .message { padding: 10px; margin-bottom: 15px; border-radius: 4px; }
+        .message.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .message.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .message.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .download-section p { margin: 10px 0; }
+        .download-section a { color: #007bff; text-decoration: none; }
+        .download-section a:hover { text-decoration: underline; }
+        #countdown-timer { font-weight: bold; }
+        .intro-text { text-align: center; margin-bottom: 20px;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ _("TeamTalk Registration") }}</h1>
+
+        {% if show_form %}
+        <p class="intro-text">{{ _("If you want to register on the server") }} "<strong>{{ server_name_from_env }}</strong>", {{ _("please fill out the form below.") }}</p>
+        {% endif %}
+
+        {% if message %}
+            <div class="message {{ message_class }}">
+                <p><strong>{{ message | safe }}</strong></p>
+            </div>
+        {% endif %}
+        {% if additional_message_info %}
+            <div class="message info"> {# Assuming additional info is always 'info' class for now #}
+                <p><em>{{ additional_message_info }}</em></p>
+            </div>
+        {% endif %}
+
+        {% if show_form %}
+            <form method="POST" action="{{ url_for('web_registration.register_page') }}">
+                <div>
+                    <label for="username">{{ _("Username:") }}</label>
+                    <input type="text" id="username" name="username" required value="{{ request.form.username if request and request.form else '' }}">
+                </div>
+                <div>
+                    <label for="password">{{ _("Password:") }}</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit">{{ _("Register") }}</button>
+            </form>
+        {% endif %}
+
+
+        {% if registration_complete and (tt_link or download_tt_token or download_client_zip_token) %}
+        <div id="download-section">
+            <hr>
+            <p>{{ _("You have <span id=\"countdown-timer\">10:00</span> to download your .tt file, client or use the quick connect link.")|safe }}</p>
+            {% if tt_link %}
+            <p><strong>{{ _("Quick Connect Link:") }}</strong> <a href="{{ tt_link }}" target="_blank">{{ tt_link }}</a></p>
+            {% endif %}
+            {% if download_tt_token and actual_tt_filename_for_user %}
+            <p><a href="{{ url_for('web_registration.download_tt_file', token=download_tt_token) }}">{{ _("Download .tt file") }} ({{ actual_tt_filename_for_user }})</a></p>
+            {% endif %}
+            {% if download_client_zip_token and actual_client_zip_filename_for_user %}
+            <p><a href="{{ url_for('web_registration.download_client_zip_file', token=download_client_zip_token) }}">{{ _("Download pre-configured TeamTalk Client (ZIP)") }} ({{ actual_client_zip_filename_for_user }})</a></p>
+            {% endif %}
+        </div>
+        <script>
+            function getRussianPlural(number, one, few, many) { // This function is only used if lang is 'ru'
+                number = Math.abs(number);
+                number %= 100;
+                if (number >= 5 && number <= 20) { return many; }
+                number %= 10;
+                if (number === 1) { return one; }
+                if (number >= 2 && number <= 4) { return few; }
+                return many;
+            }
+
+            function startCountdown(durationSeconds, displayElementId, lang) {
+                let timer = durationSeconds;
+                const displayElement = document.getElementById(displayElementId);
+                if (!displayElement) return;
+
+                const expiredStr = "{{ _('expired') }}";
+                const secStr = "{{ _('second') }}"; // For n=1
+                const secsFewStr = "{{ _('seconds_few') }}"; // For n=2,3,4
+                const secsManyStr = "{{ _('seconds') }}"; // For n=0,5+ or default
+
+                function updateDisplay() {
+                    if (timer < 0) {
+                        displayElement.textContent = expiredStr;
+                        return;
+                    }
+
+                    const minutes = Math.floor(timer / 60);
+                    const seconds = timer % 60;
+                    
+                    if (lang === "ru") {
+                        const paddedSeconds = seconds < 10 && minutes > 0 ? '0' + seconds : seconds;
+                        if (minutes > 0) {
+                             displayElement.textContent = minutes + ":" + paddedSeconds;
+                        } else {
+                            displayElement.textContent = seconds + " " + getRussianPlural(seconds, secStr, secsFewStr, secsManyStr);
+                        }
+                    } else { 
+                        const paddedSeconds = seconds < 10 ? '0' + seconds : seconds;
+                        displayElement.textContent = minutes + ":" + paddedSeconds;
+                    }
+                }
+                updateDisplay();
+                const intervalId = setInterval(function () {
+                    timer--;
+                    updateDisplay();
+                    if (timer < 0) {
+                        clearInterval(intervalId);
+                    }
+                }, 1000);
+            }
+
+            window.onload = function () {
+                const currentLang = document.documentElement.lang || "en";
+                const initialSeconds = 10 * 60; 
+                startCountdown(initialSeconds, 'countdown-timer', currentLang);
+            };
+        </script>
+        {% endif %}
+    </div>
+</body>
+</html>

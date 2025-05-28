@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="{{ 'ru' if s.title == 'Выберите язык' else 'en' }}">
+<html lang="{{ session.get('user_web_lang', 'en') }}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ s.choose_lang_title }}</title>
+<title>{{ _("Choose Language") }}</title>
 <style>
     body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
     h1 { color: #0056b3; }
@@ -15,9 +15,9 @@
 </head>
 <body>
     <div class="container">
-        <h1>{{ s.choose_lang_header }} "{{ server_name_from_env }}"!</h1>
-        <p><a href="{{ url_for('web_registration.set_language', lang_code='en') }}">{{ s.choose_lang_english }}</a></p>
-        <p><a href="{{ url_for('web_registration.set_language', lang_code='ru') }}">{{ s.choose_lang_russian }}</a></p>
+        <h1>{{ _("Welcome to server registration") }} "{{ server_name_from_env }}"!</h1>
+        <p><a href="{{ url_for('web_registration.set_language', lang_code='en') }}">{{ _("English 🇬🇧") }}</a></p>
+        <p><a href="{{ url_for('web_registration.set_language', lang_code='ru') }}">{{ _("Русский 🇷🇺") }}</a></p>
     </div>
 </body>
 </html>
