@@ -117,3 +117,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+# Compiled gettext files
+**/LC_MESSAGES/*.mo
