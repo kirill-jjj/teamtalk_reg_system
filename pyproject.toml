@@ -1,0 +1,31 @@
+[project]
+name = "teamtalk-reg-system"
+version = "0.2.0" 
+description = "Telegram bot and Flask web app for TeamTalk server self-registration."
+authors = [
+    {name = "Kirill", email = "kirillkolovi@gmail.com"},
+]
+requires-python = ">=3.11"
+license = {text = "GPL-3.0-only"} 
+readme = "README.md"
+
+# Основные зависимости проекта (будут установлены последние версии)
+dependencies = [
+    "aiogram",
+    "py-talk-ex",
+    "python-dotenv",
+    "SQLAlchemy",
+    "aiosqlite",
+    "Flask",
+    "Babel",
+]
+
+[project.urls]
+Homepage = "https://github.com/kirill-jjj/teamtalk_reg_system"
+Repository = "https://github.com/kirill-jjj/teamtalk_reg_system"
+"Bug Tracker" = "https://github.com/kirill-jjj/teamtalk_reg_system/issues"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+backend-path = "."

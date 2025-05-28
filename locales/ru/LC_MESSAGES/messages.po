@@ -2,7 +2,7 @@
 # Copyright (C) 2025 Kirill
 # This file is distributed under the same license as the teamtalk_reg_system
 # project.
-# Kirill <your_email@example.com>, 2025.
+# Kirill <kirillkolovi@gmail.com>, 2025.
 #
 msgid ""
 msgstr ""
