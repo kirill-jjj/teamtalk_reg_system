@@ -28,8 +28,6 @@ share/python-wheels/
 MANIFEST
 
 # PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller buildstk_reg_system/ the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
 
@@ -52,18 +50,22 @@ coverage.xml
 .pytest_cache/
 
 # Translations
-*.mo
-*.pot
+#*.mo # Закомментируем общую, так как есть более специфичная ниже
+*.pot # .pot файлы обычно коммитят, т.к. это шаблон для переводчиков
 
 # Django stuff:
 *.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
+# local_settings.py # Если не используется, можно убрать
+db.sqlite3 # Если имя твоей БД другое, измени
+db.sqlite3-journal # И его журнал
 
 # Flask stuff:
 instance/
 .webassets-cache
+# Добавим папки для генерируемых файлов Flask
+bot/web_app/generated_files/
+bot/web_app/generated_zips/
+
 
 # Scrapy stuff:
 .scrapy
@@ -117,5 +119,13 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
 # Compiled gettext files
 **/LC_MESSAGES/*.mo
+
+# SQLite database file for the bot
+users.db # Игнорируем файл базы данных
+users.db-journal
+
+uv cache
+.uv_cache/
