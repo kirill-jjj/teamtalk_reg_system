@@ -237,7 +237,9 @@ async def _process_actual_registration(
 
             try:
                 await bot.send_document(user_id_val, document=tt_buffered_file, caption=_("Your .tt file for quick connection"))
-                await bot.send_message(user_id_val, f"{_('Or use this TT link:\n')}`{tt_link_val}`", parse_mode="Markdown")
+                link_text_part = _('Or use this TT link:\n')
+                message_content = f"{link_text_part}`{tt_link_val}`"
+                await bot.send_message(user_id_val, message_content, parse_mode="Markdown")
             except Exception as e_send:
                 logger.error(f"Error sending .tt file or link to user {user_id_val}: {e_send}")
                 await bot.send_message(user_id_val, "Could not send the .tt file or link. Please contact an admin.") # Эту строку тоже можно вынести в .po
