@@ -28,7 +28,8 @@
     <div class="container">
         <h1>{{ _("TeamTalk Registration") }}</h1>
 
-        {# Language selection section - always visible #}
+        {% if not language_forced %}
+        {# Language selection section - only visible if language is not forced by config #}
         <div class="lang-select-section">
             <h2>{{ _("Select Language:") }}</h2>
             <form method="POST" action="{{ url_for('set_language_and_reload') }}">
@@ -45,6 +46,7 @@
                 <button type="submit">{{ _("Set Language") }}</button>
             </form>
         </div>
+        {% endif %}
 
         {# Main registration form and content - now always visible, unless registration is complete #}
         {% if not registration_complete %}

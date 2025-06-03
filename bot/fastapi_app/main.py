@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path # Added for base_dir
 from bot.core.localization import get_translator, DEFAULT_LANG_CODE
+from bot.core.config import FORCE_USER_LANG # Import FORCE_USER_LANG
 
 logger = logging.getLogger(__name__) # Reverted
 
@@ -15,9 +16,33 @@ app.state.registered_ips = set()
 
 # --- Jinja2 Context Processor for i18n ---
 def i18n_context_processor(request: Request):
-    lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
-    translator = get_translator(lang_code)
-    return {"_": translator}
+    language_forced = False
+    translator = None
+    final_lang_code = DEFAULT_LANG_CODE # Initialize with default
+
+    if FORCE_USER_LANG and FORCE_USER_LANG.strip():
+        forced_lang_code = FORCE_USER_LANG.strip()
+        _forced_lang_translator = get_translator(forced_lang_code)
+        # Validate if the language is genuinely available
+        original_string = "Username:" # A common string that should be translated
+        translated_string = _forced_lang_translator(original_string)
+
+        if translated_string != original_string:
+            logger.debug(f"Forcing web language to '{forced_lang_code}' based on config.")
+            translator = _forced_lang_translator
+            language_forced = True
+            final_lang_code = forced_lang_code
+        else:
+            logger.warning(f"FORCE_USER_LANG was set to '{forced_lang_code}', but this language pack seems unavailable or incomplete for web. Falling back.")
+            # Fallback logic will be handled by the else block or default initialization
+
+    if not translator: # If not forced or forced language was invalid
+        cookie_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
+        translator = get_translator(cookie_lang_code)
+        final_lang_code = cookie_lang_code
+        language_forced = False # Ensure it's false if we fell back or it was never set
+
+    return {"_": translator, "language_forced": language_forced, "current_lang": final_lang_code}
 
 app.state.templates = Jinja2Templates(
     directory="bot/fastapi_app/templates",

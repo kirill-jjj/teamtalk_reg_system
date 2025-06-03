@@ -17,6 +17,7 @@ from bot.fastapi_app.utils import (
 )
 from bot.utils.file_generator import generate_tt_file_content, generate_tt_link # Added new import
 from bot.core.localization import get_translator, DEFAULT_LANG_CODE, get_available_languages_for_display
+from bot.core.config import FORCE_USER_LANG # Import FORCE_USER_LANG
 from bot.core import config as core_config # Changed import
 from bot.core import teamtalk_client # Added
 import logging # Reverted
@@ -33,20 +34,43 @@ async def set_language_and_reload(request: Request, lang_code: str = Form(...)):
 
 @router.get("/register")
 async def register_page_get(request: Request):
-    user_lang_code = request.cookies.get("user_web_lang") # Can be None
-    translator = get_translator(user_lang_code if user_lang_code else DEFAULT_LANG_CODE)
+    effective_lang_code = DEFAULT_LANG_CODE
+    language_is_forced = False
+
+    if FORCE_USER_LANG and FORCE_USER_LANG.strip():
+        _forced_translator = get_translator(FORCE_USER_LANG.strip())
+        original_string = "Username:" # Test string for validation
+        translated_string = _forced_translator(original_string)
+        if translated_string != original_string:
+            effective_lang_code = FORCE_USER_LANG.strip()
+            language_is_forced = True # Used to decide if we should even check cookies
+            logger.info(f"Web: Language forced to {effective_lang_code} by config.")
+        else:
+            logger.warning(f"Web: FORCE_USER_LANG set to '{FORCE_USER_LANG.strip()}' but seems invalid/incomplete. Falling back.")
+            # Fallback to cookie or default
+            effective_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
+    else:
+        # No force, use cookie or default
+        effective_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
+
+    translator = get_translator(effective_lang_code)
     available_languages = get_available_languages_for_display()
     
     # Prepare context for the template.
+    # The global context processor already adds 'current_lang' and 'language_forced'.
+    # We set 'current_lang' here mainly for any direct use within this function,
+    # and to ensure the template has it if the global context processor was bypassed,
+    # though with Jinja2, the global one should take precedence or be the one used.
     # The template will decide whether to show language selection or the form.
     context = {
         "request": request,
         "title": translator("registration_title"), # Page title
         "message": "", 
         "show_form": True, # Main form is now always shown initially, template handles visibility post-registration
-        "current_lang": user_lang_code,
+        "current_lang": effective_lang_code, # Reflects forced or cookie lang
         "server_name_from_env": request.app.state.cached_server_name,
         "available_languages": available_languages,
+        # 'language_forced' will be available globally from the context_processor.
         # Ensure other necessary variables for the template are included if it's a success page,
         # but for initial GET or after lang set, these might not be relevant.
         # The existing POST /register handler populates these for success/error states.

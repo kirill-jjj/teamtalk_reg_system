@@ -9,6 +9,7 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BufferedInputFile
 
 from ...core import config, database, teamtalk_client as tt_client
+from ...core.config import FORCE_USER_LANG # Import FORCE_USER_LANG
 from ...core.localization import get_translator, get_admin_lang_code, get_available_languages_for_display
 from ..states import RegistrationStates
 from ...utils.file_generator import generate_tt_file_content, generate_tt_link
@@ -26,8 +27,26 @@ async def start_command_handler(message: types.Message, state: FSMContext, bot: 
         await state.clear()
         return
 
+    # Check for forced language
+    if FORCE_USER_LANG and FORCE_USER_LANG.strip():
+        forced_lang_code = FORCE_USER_LANG.strip()
+        _forced_lang_translator = get_translator(forced_lang_code)
+        # Validate if the language is genuinely available
+        # by checking if a known string translates differently from its ID
+        original_string = "Hello! Please enter a username for registration."
+        translated_string = _forced_lang_translator(original_string)
+
+        if translated_string != original_string:
+            logger.info(f"Forcing language to '{forced_lang_code}' for user {telegram_id} based on config.")
+            await state.update_data(user_tg_lang=forced_lang_code)
+            await message.reply(_forced_lang_translator(original_string)) # Send translated message
+            await state.set_state(RegistrationStates.awaiting_username)
+            return
+        else:
+            logger.warning(f"FORCE_USER_LANG was set to '{forced_lang_code}', but this language pack seems unavailable or incomplete. Proceeding with language selection.")
+
     # Используем английский по умолчанию для первого сообщения выбора языка
-    _ = get_translator('en') 
+    _ = get_translator('en')
 
     available_langs = get_available_languages_for_display()
     inline_keyboard_buttons = []
