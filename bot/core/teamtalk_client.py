@@ -1,6 +1,7 @@
 import logging
 import pytalk
-from pytalk.enums import TeamTalkServerInfo as PyTalkServerInfo
+from pytalk.enums import TeamTalkServerInfo as PyTalkServerInfo, UserType as PyTalkUserType
+from pytalk.permission import Permission as PyTalkPermission
 from pytalk.message import Message as PyTalkMessage
 from typing import Optional, Tuple, Dict, TYPE_CHECKING
 
@@ -79,78 +80,79 @@ async def check_username_exists(username: str) -> Optional[bool]:
 async def perform_teamtalk_registration(
     username_str: str,
     password_str: str,
-    nickname_str: Optional[str] = None, # Added
+    nickname_str: Optional[str] = None,
     source_info: Optional[Dict] = None,
-    aiogram_bot_instance: Optional['AiogramBot'] = None 
+    aiogram_bot_instance: Optional['AiogramBot'] = None
 ) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
 
-    if not TeamTalkSDK or not ttstr_sdk:
-        logger.error("TeamTalk SDK (TeamTalkSDK or ttstr_sdk) not initialized for registration.")
-        return False, "MODULE_UNAVAILABLE", None, None
+    # Removed TeamTalkSDK and ttstr_sdk global checks here, as pytalk handles SDK interactions.
+    # We rely on pytalk_bot and its active_server_instance for operations.
 
-    if not pytalk_bot.teamtalks: 
+    if not pytalk_bot.teamtalks:
         logger.error("TeamTalk bot (pytalk_bot) has no active server connections (teamtalks list is empty) for registration.")
         return False, "MODULE_UNAVAILABLE", None, None
-    
+
     active_server_instance = pytalk_bot.teamtalks[0]
 
     if not active_server_instance.logged_in:
         logger.error(f"TeamTalk bot (pytalk_bot) is not logged in to server {active_server_instance.info.host} for registration.")
         return False, "MODULE_UNAVAILABLE", None, None
 
-    tt_instance_raw_sdk = active_server_instance._tt
+    # Construct user rights from config
+    pytalk_user_rights = 0
+    for right_string in config.TEAMTALK_DEFAULT_USER_RIGHTS:
+        try:
+            permission_flag = getattr(PyTalkPermission, right_string.upper())
+            pytalk_user_rights |= permission_flag
+        except AttributeError:
+            logger.warning(f"Invalid user right string '{right_string}' in config.TEAMTALK_DEFAULT_USER_RIGHTS. Skipping.")
+        except Exception as e_perm:
+            logger.error(f"Error processing permission string '{right_string}': {e_perm}")
 
-    UserRight = TeamTalkSDK.UserRight
-    UserAccount = TeamTalkSDK.UserAccount
-    SDKUserType = TeamTalkSDK.UserType
-    TextMessage = TeamTalkSDK.TextMessage
-    TextMsgType = TeamTalkSDK.TextMsgType
-
-    custom_user_rights = (
-        UserRight.USERRIGHT_MULTI_LOGIN | UserRight.USERRIGHT_VIEW_ALL_USERS |
-        UserRight.USERRIGHT_CREATE_TEMPORARY_CHANNEL | UserRight.USERRIGHT_UPLOAD_FILES |
-        UserRight.USERRIGHT_DOWNLOAD_FILES | UserRight.USERRIGHT_TRANSMIT_VOICE |
-        UserRight.USERRIGHT_TRANSMIT_VIDEOCAPTURE | UserRight.USERRIGHT_TRANSMIT_DESKTOP |
-        UserRight.USERRIGHT_TRANSMIT_DESKTOPINPUT | UserRight.USERRIGHT_TRANSMIT_MEDIAFILE |
-        UserRight.USERRIGHT_TEXTMESSAGE_USER | UserRight.USERRIGHT_TEXTMESSAGE_CHANNEL
-    )
 
     try:
         # final_nickname is for .tt files and links, not for the server account itself.
         final_nickname = nickname_str if nickname_str and nickname_str.strip() else username_str
         logger.info(f"Attempting to register TT User. Username: '{username_str}', Nickname for files/links: '{final_nickname}', Source: {source_info}")
-        user_account_obj = UserAccount()
-        user_account_obj.szUsername = ttstr_sdk(username_str)
-        user_account_obj.szPassword = ttstr_sdk(password_str)
 
-        # Nickname for the TeamTalk server account will always be the same as the username.
-        # The custom nickname (if any, from nickname_str / final_nickname) is used for .tt files and links only.
-        logger.info(f"Setting TeamTalk server account nickname for '{username_str}' to be the same as the username.")
-        user_account_obj.szNickname = ttstr_sdk(username_str) # Explicitly set to username for server account
-
-        user_account_obj.uUserType = SDKUserType.USERTYPE_DEFAULT
-        user_account_obj.uUserRights = custom_user_rights
-
-        result_code_cmd_id = TeamTalkSDK._DoNewUserAccount(tt_instance_raw_sdk, user_account_obj)
+        # Create user account using pytalk
+        # Note: pytalk is expected to handle string encoding (like ttstr_sdk did previously for these params)
+        # The nickname on the server account itself is handled by pytalk, typically defaulting to username if not specified.
+        # If a specific server-side nickname different from username is needed, pytalk's create_user_account would need a nickname param.
+        # For now, assuming server account nickname will be username, and final_nickname is for client-side files.
         
-        if result_code_cmd_id == -1: 
-            logger.error(f"SDK Client-Side Registration Error for user {username_str}. cmdID: {result_code_cmd_id}.")
-            return False, "REG_FAILED_SDK_CLIENT", None, None
+        success_from_pytalk = active_server_instance.create_user_account(
+            username=username_str,
+            password=password_str,
+            usertype=PyTalkUserType.DEFAULT, # Using imported PyTalkUserType
+            user_rights=pytalk_user_rights,
+            note="" # Optional note for the user account
+        )
 
-        logger.info(f"User {username_str} registration command sent to server (cmdID: {result_code_cmd_id}). Assuming eventual success or failure via server events.")
+        if not success_from_pytalk:
+            logger.error(f"PyTalk Registration Error for user {username_str}. create_user_account returned False.")
+            # It's possible pytalk already logged more details if it has internal logging for this failure.
+            return False, "REG_FAILED_PYTALK", None, None
 
-        try:
-            admin_lang_code = get_admin_lang_code()
-            _ = get_translator(admin_lang_code) 
-            broadcast_text_tt = _("User {} was registered.").format(username_str)
+        logger.info(f"User {username_str} registration successful via PyTalk.")
 
-            broadcast_message_sdk_obj = TextMessage()
-            broadcast_message_sdk_obj.nMsgType = TextMsgType.MSGTYPE_BROADCAST
-            broadcast_message_sdk_obj.szMessage = ttstr_sdk(broadcast_text_tt)
-            TeamTalkSDK._DoTextMessage(tt_instance_raw_sdk, broadcast_message_sdk_obj)
-            logger.info(f"Broadcast message for user '{username_str}' sent to server.")
-        except Exception as e_broadcast:
-            logger.error(f"Failed to send broadcast message for user '{username_str}': {e_broadcast}")
+        if config.REGISTRATION_BROADCAST_ENABLED:
+            try:
+                admin_lang_code = get_admin_lang_code()
+                _ = get_translator(admin_lang_code)
+                broadcast_text_tt = _("User {} was registered.").format(username_str)
+
+                # Send broadcast message using pytalk
+                # Assuming active_server_instance.server.send_message handles encoding
+                if active_server_instance.server:
+                    active_server_instance.server.send_message(broadcast_text_tt)
+                    logger.info(f"Broadcast message for user '{username_str}' sent to server via PyTalk.")
+                else:
+                    logger.warning(f"Cannot send broadcast for '{username_str}': active_server_instance.server is None.")
+            except Exception as e_broadcast:
+                logger.error(f"Failed to send broadcast message for user '{username_str}' via PyTalk: {e_broadcast}")
+        else:
+            logger.info(f"Registration broadcast is disabled. Skipping for user '{username_str}'.")
 
         if aiogram_bot_instance and config.ADMIN_IDS and source_info:
             _admin_tg = get_translator(get_admin_lang_code()) 

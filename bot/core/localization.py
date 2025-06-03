@@ -125,13 +125,14 @@ def get_admin_lang_code() -> str:
     """
     global translations, DEFAULT_LANG_CODE, CFG_ADMIN_LANG
 
-    # CFG_ADMIN_LANG is the language code string from config (e.g., "en", "ru")
-    admin_lang = CFG_ADMIN_LANG
+    # CFG_ADMIN_LANG is the language code string from config (e.g., "en", "RU")
+    admin_lang_from_config = CFG_ADMIN_LANG
+    normalized_admin_lang = admin_lang_from_config.lower() # Convert to lowercase, e.g., "ru"
 
-    if admin_lang in translations:
-        return admin_lang
+    if normalized_admin_lang in translations:
+        return normalized_admin_lang # Return the lowercase version
     else:
-        logger.warning(f"Admin language '{admin_lang}' from config is not available. "
+        logger.warning(f"Admin language '{admin_lang_from_config}' (normalized to '{normalized_admin_lang}') from config is not available. "
                        f"Falling back to default language '{DEFAULT_LANG_CODE}'. "
                        f"Available languages: {list(translations.keys())}")
         return DEFAULT_LANG_CODE

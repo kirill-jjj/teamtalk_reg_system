@@ -123,7 +123,7 @@ dmypy.json
 **/LC_MESSAGES/*.mo
 
 # SQLite database file for the bot
-users.db # Игнорируем файл базы данных
+users.db
 users.db-journal
 
 uv cache
