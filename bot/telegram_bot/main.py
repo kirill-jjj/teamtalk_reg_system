@@ -1,6 +1,8 @@
 import asyncio
-import logging
+import logging # Reverted
 import pytalk
+
+logger = logging.getLogger(__name__) # Reverted
 
 from aiogram import Bot as AiogramBot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -8,25 +10,23 @@ from aiogram.filters import Command
 from aiogram.fsm.storage.base import StorageKey
 
 from .handlers import registration as reg_handlers
+# Import the router from registration.py
+from .handlers.registration import router as registration_router
 from .handlers import admin as admin_handlers
 from ..core import config, database
 from ..core import teamtalk_client as tt_client
 from pytalk.message import Message as PyTalkMessage
 from .states import RegistrationStates
 
-logger = logging.getLogger(__name__)
-
-# Глобальная переменная aiogram_bot здесь больше не нужна,
-# экземпляр будет создаваться и возвращаться функцией run_telegram_bot
 
 # --- PyTalk Event Handlers ---
 @tt_client.pytalk_bot.event
 async def on_ready():
-    logger.info("PyTalk Bot is ready (event received in telegram_bot.main).")
+    logger.info("PyTalk Bot is ready (event received in telegram_bot.main).") # Removed await
 
 @tt_client.pytalk_bot.event
 async def on_my_login(server: pytalk.server.Server): # type: ignore
-    logger.info(f"Successfully logged into TeamTalk server via PyTalk: {server.info.host} (event in telegram_bot.main)")
+    logger.info(f"Successfully logged into TeamTalk server via PyTalk: {server.info.host} (event in telegram_bot.main)") # Removed await
 
 @tt_client.pytalk_bot.event
 async def on_message(message: PyTalkMessage):
@@ -36,7 +36,7 @@ async def on_message(message: PyTalkMessage):
     elif isinstance(message, PyTalkMessage) and not hasattr(message, 'channel'):
         pass
         
-    logger.info(
+    logger.info( # Removed await
         f"Received TeamTalk message via PyTalk: '{message.content}' "
         f"from user '{message.user.username if message.user else 'Unknown User'}' " # Добавил проверку на message.user
         f"in {channel_name_info}"
@@ -67,32 +67,19 @@ async def run_telegram_bot() -> AiogramBot: # Функция теперь воз
         lambda query: query.data.startswith("verify_reg:")
     )
 
+    # Include the new router from registration.py (for nickname handlers)
+    dp.include_router(registration_router)
+
     admin_handlers.register_admin_handlers(dp)
 
-    logger.info("Telegram Bot Dispatcher configured. Starting polling...")
+    logger.info("Telegram Bot Dispatcher configured. Starting polling...") # Removed await
     
     try:
-        # Запускаем polling в фоновом режиме, чтобы функция могла вернуть bot_instance
-        # Для этого создадим задачу для polling
-        # Важно: dp.start_polling блокирует, поэтому его нельзя просто await здесь, если мы хотим вернуть bot_instance до завершения polling
-        # Однако, для простоты и учитывая, что run_telegram_bot вызывается как задача в run.py,
-        # можно оставить start_polling как есть, а экземпляр бота получить до его вызова.
-        # Но для передачи в Flask, лучше создать его до start_polling.
-
-        # Запуск start_polling будет осуществлен из run.py в отдельной задаче.
-        # Здесь мы только настраиваем dp и возвращаем bot_instance.
-        # Фактический запуск polling будет в asyncio.create_task(dp.start_polling(...)) в run.py
-        
-        # Для корректной работы FSMContext в admin_verification_handler, если он вызывается из другого потока (Flask)
-        # и использует тот же storage, ключ должен быть правильно сформирован.
-        # StorageKey(bot_id=bot_instance.id, user_id=user_tg_id_val, chat_id=user_tg_id_val)
-        # Это больше относится к handler'у, но важно помнить про контекст FSM.
-
-        # Возвращаем настроенный Dispatcher и экземпляр бота
+        # This function prepares the bot and dispatcher; polling is initiated by run.py.
         return bot_instance, dp
     
     except Exception as e: # Хотя start_polling здесь не вызывается, оставим для общей структуры
-        logger.exception("Error during Telegram bot setup (before polling):")
+        logger.exception("Error during Telegram bot setup (before polling):", exc_info=True) # Removed await
         # Если здесь произойдет ошибка, то bot_instance может не вернуться.
         # Это должно быть обработано в run.py
         raise # Перевыбрасываем исключение
@@ -104,18 +91,18 @@ async def start_telegram_polling(bot_instance: AiogramBot, dp: Dispatcher):
         await dp.start_polling(bot_instance, allowed_updates=dp.resolve_used_update_types())
     finally:
         await bot_instance.session.close()
-        logger.info("Telegram Bot polling stopped and session closed.")
+        logger.info("Telegram Bot polling stopped and session closed.") # Removed await
         # Закрытие DB и PyTalk теперь будет в main finally блоке в run.py
 
 async def start_pytalk_bot_internals():
-    logger.info("Starting PyTalk bot internal event processing...")
+    logger.info("Starting PyTalk bot internal event processing...") # Removed await
     try:
         async with tt_client.pytalk_bot:
             if not await tt_client.connect_to_teamtalk_server():
-                logger.error("Failed to connect to TeamTalk server. PyTalk event processing might not work correctly.")
+                logger.error("Failed to connect to TeamTalk server. PyTalk event processing might not work correctly.") # Removed await
             await tt_client.pytalk_bot._start()
             
     except Exception as e:
-        logger.exception("Exception in PyTalk bot internal processing loop:")
+        logger.exception("Exception in PyTalk bot internal processing loop:", exc_info=True) # Removed await
     finally:
-        logger.info("PyTalk bot internal event processing stopped.")
+        logger.info("PyTalk bot internal event processing stopped.") # Removed await

@@ -1,0 +1,197 @@
+# Translations template for PROJECT.
+# Copyright (C) 2025 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2025-06-02 21:41+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: bot/core/teamtalk_client.py:136
+#, python-brace-format
+msgid "User {} was registered."
+msgstr ""
+
+#: bot/fastapi_app/routers/registration.py:223
+msgid "registration_successful_message"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:6
+#: bot/fastapi_app/templates/register.html:29
+msgid "TeamTalk Registration"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:33
+msgid "Select Language:"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:36
+msgid "Language:"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:42
+msgid "Set Language"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:48
+msgid "If you want to register on the server"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:48
+msgid "please fill out the form below."
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:63
+msgid "Username:"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:67
+msgid "Password:"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:72
+msgid "Show Password"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:74
+msgid "Register"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:87
+msgid ""
+"You have <span id='countdown-timer'>10:00</span> to download your .tt "
+"file, client or use the quick connect link."
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:89
+msgid "Quick Connect Link:"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:92
+msgid "Download .tt file"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:95
+msgid "Download pre-configured TeamTalk Client (ZIP)"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:114
+msgid "expired"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:115
+msgid "second"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:116
+msgid "seconds_few"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html:117
+msgid "seconds"
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+msgid "Please choose your language:"
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+msgid "Language set successfully."
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+msgid "Hello! Please enter a username for registration."
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+msgid "Sorry, this username is already taken. Please choose another username."
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+msgid "Now enter a password."
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+msgid "Registration error. Please try again later or contact an administrator."
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+msgid ""
+"You have already registered one TeamTalk account from this Telegram "
+"account. Only one registration is allowed."
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+msgid "Registration request sent to administrators. Please wait for approval."
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+#, python-brace-format
+msgid "User {} successfully registered."
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+msgid "Your .tt file for quick connection"
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+msgid "Or use this TT link:\n"
+msgstr ""
+
+#: bot/core/teamtalk_client.py:155
+#, python-brace-format
+msgid "👤 Client language: {}"
+msgstr ""
+
+#: bot/core/teamtalk_client.py:160
+#, python-brace-format
+msgid "📱 Via Telegram: {} (ID: {})"
+msgstr ""
+
+#: bot/core/teamtalk_client.py:163
+#, python-brace-format
+msgid "🌐 Via Web: IP {}"
+msgstr ""
+
+#: bot/core/localization.py
+msgid "self_language_name_native"
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+msgid "Yes"
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+msgid "No (use username)"
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+#, python-brace-format
+msgid "Your username will be '{username}'. Would you like to set a different nickname? If not, your nickname will be the same as your username."
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+msgid "Please enter your desired nickname."
+msgstr ""
+
+#: bot/telegram_bot/handlers/registration.py
+msgid "Nickname:"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html
+msgid "Nickname (optional):"
+msgstr ""
+
+#: bot/fastapi_app/templates/register.html
+msgid "Defaults to username if blank"
+msgstr ""

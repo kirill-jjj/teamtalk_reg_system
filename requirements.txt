@@ -1,6 +1,0 @@
-aiogram
-py-talk-ex
-python-dotenv
-SQLAlchemy
-aiosqlite
-Flask

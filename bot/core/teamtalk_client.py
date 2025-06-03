@@ -5,8 +5,7 @@ from pytalk.message import Message as PyTalkMessage
 from typing import Optional, Tuple, Dict, TYPE_CHECKING
 
 from . import config
-# from .localization import get_tg_strings, get_admin_lang_code # Старый импорт
-from .localization import get_translator, get_admin_lang_code # Новый импорт
+from .localization import get_translator, get_admin_lang_code
 from ..utils.file_generator import generate_tt_file_content, generate_tt_link
 
 if TYPE_CHECKING:
@@ -14,7 +13,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Global SDK Objects - initialized in on_ready
+# Global SDK Objects
 TeamTalkSDK = None
 ttstr_sdk = None
 
@@ -80,6 +79,7 @@ async def check_username_exists(username: str) -> Optional[bool]:
 async def perform_teamtalk_registration(
     username_str: str,
     password_str: str,
+    nickname_str: Optional[str] = None, # Added
     source_info: Optional[Dict] = None,
     aiogram_bot_instance: Optional['AiogramBot'] = None 
 ) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
@@ -116,10 +116,18 @@ async def perform_teamtalk_registration(
     )
 
     try:
-        logger.info(f"Attempting to register TT User. Username: '{username_str}', Source: {source_info}")
+        # final_nickname is for .tt files and links, not for the server account itself.
+        final_nickname = nickname_str if nickname_str and nickname_str.strip() else username_str
+        logger.info(f"Attempting to register TT User. Username: '{username_str}', Nickname for files/links: '{final_nickname}', Source: {source_info}")
         user_account_obj = UserAccount()
         user_account_obj.szUsername = ttstr_sdk(username_str)
         user_account_obj.szPassword = ttstr_sdk(password_str)
+
+        # Nickname for the TeamTalk server account will always be the same as the username.
+        # The custom nickname (if any, from nickname_str / final_nickname) is used for .tt files and links only.
+        logger.info(f"Setting TeamTalk server account nickname for '{username_str}' to be the same as the username.")
+        user_account_obj.szNickname = ttstr_sdk(username_str) # Explicitly set to username for server account
+
         user_account_obj.uUserType = SDKUserType.USERTYPE_DEFAULT
         user_account_obj.uUserRights = custom_user_rights
 
@@ -152,18 +160,15 @@ async def perform_teamtalk_registration(
             reg_type = source_info.get('type', 'Unknown')
             user_client_lang_code_for_source = source_info.get('user_lang', 'en') 
             lang_emoji = "🇬🇧" if user_client_lang_code_for_source == 'en' else "🇷🇺"
-            # Эту строку тоже можно локализовать, если нужно: "Client language:"
-            admin_notification_message += f"👤 Язык клиента: {lang_emoji}\n" 
+            admin_notification_message += _admin_tg("👤 Client language: {}").format(lang_emoji) + "\n"
 
             if reg_type == 'telegram':
                 tg_user_id_val = source_info.get('telegram_id', 'N/A')
                 tg_full_name_val = source_info.get('telegram_full_name', 'N/A')
-                # "Via Telegram:"
-                admin_notification_message += f"📱 Через Telegram: {tg_full_name_val} (ID: {tg_user_id_val})\n"
+                admin_notification_message += _admin_tg("📱 Via Telegram: {} (ID: {})").format(tg_full_name_val, tg_user_id_val) + "\n"
             elif reg_type == 'web':
                 ip_address_val = source_info.get('ip_address', 'N/A')
-                # "Via Web: IP "
-                admin_notification_message += f"🌐 Через Web: IP {ip_address_val}\n"
+                admin_notification_message += _admin_tg("🌐 Via Web: IP {}").format(ip_address_val) + "\n"
             
             for admin_id_val_notify in config.ADMIN_IDS:
                 try:
@@ -173,11 +178,13 @@ async def perform_teamtalk_registration(
         
         tt_file_content_val = generate_tt_file_content(
             config.SERVER_NAME, config.HOST_NAME, config.TCP_PORT, config.UDP_PORT,
-            config.ENCRYPTED, username_str, password_str
+            config.ENCRYPTED, username_str, password_str,
+            final_nickname # Added
         )
         tt_link_val = generate_tt_link(
             config.HOST_NAME, config.TCP_PORT, config.UDP_PORT,
-            config.ENCRYPTED, username_str, password_str
+            config.ENCRYPTED, username_str, password_str,
+            final_nickname # Added
         )
         return True, "REG_SUCCESS", tt_file_content_val, tt_link_val
 

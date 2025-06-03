@@ -62,9 +62,8 @@ db.sqlite3-journal # И его журнал
 # Flask stuff:
 instance/
 .webassets-cache
-# Добавим папки для генерируемых файлов Flask
-bot/web_app/generated_files/
-bot/web_app/generated_zips/
+# bot/web_app/generated_files/ # Removed as bot/web_app is deleted
+# bot/web_app/generated_zips/  # Removed as bot/web_app is deleted
 
 
 # Scrapy stuff:

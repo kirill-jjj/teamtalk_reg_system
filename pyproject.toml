@@ -1,7 +1,7 @@
 [project]
 name = "teamtalk-reg-system"
-version = "0.2.0" 
-description = "Telegram bot and Flask web app for TeamTalk server self-registration."
+version = "0.2.0"
+description = "Telegram bot and FastAPI web app for TeamTalk server self-registration."
 authors = [
     {name = "Kirill", email = "kirillkolovi@gmail.com"},
 ]
@@ -9,15 +9,26 @@ requires-python = ">=3.11"
 license = {file = "LICENSE"}
 readme = "README.md"
 
-# Основные зависимости проекта (будут установлены последние версии)
+# Основные зависимости проекта
 dependencies = [
     "aiogram",
     "py-talk-ex",
     "python-dotenv",
     "SQLAlchemy",
     "aiosqlite",
-    "Flask",
+    "fastapi",
+    "uvicorn[standard]",
     "Babel",
+    "Jinja2",
+    "python-multipart", # Added for FastAPI form parsing
+    "aiofiles==24.1.0",  # Changed
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
 ]
 
 [project.urls]

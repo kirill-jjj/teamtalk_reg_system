@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: teamtalk_reg_system 0.1\n"
 "Report-Msgid-Bugs-To: your_email@example.com\n"
-"POT-Creation-Date: 2025-05-28 05:40+0500\n"
+"POT-Creation-Date: 2025-06-02 21:41+0000\n"
 "PO-Revision-Date: 2025-05-28 05:45+0500\n"
 "Last-Translator: Kirill <your_email@example.com>\n"
 "Language: ru\n"
@@ -20,45 +20,117 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.17.0\n"
 
-#: bot/core/teamtalk_client.py:137
+#: bot/core/teamtalk_client.py:136
 #, python-brace-format
 msgid "User {} was registered."
 msgstr "Пользователь {} был зарегистрирован."
 
-#: bot/telegram_bot/handlers/registration.py:35
+#: bot/fastapi_app/templates/register.html:6
+#: bot/fastapi_app/templates/register.html:29
+msgid "TeamTalk Registration"
+msgstr "Регистрация в TeamTalk"
+
+#: bot/fastapi_app/templates/register.html:33
+msgid "Select Language:"
+msgstr "Выберите язык:"
+
+#: bot/fastapi_app/templates/register.html:36
+msgid "Language:"
+msgstr "Язык:"
+
+#: bot/fastapi_app/templates/register.html:42
+msgid "Set Language"
+msgstr "Установить язык"
+
+#: bot/fastapi_app/templates/register.html:48
+msgid "If you want to register on the server"
+msgstr "Если вы хотите зарегистрироваться на сервере"
+
+#: bot/fastapi_app/templates/register.html:48
+msgid "please fill out the form below."
+msgstr "пожалуйста, заполните форму ниже."
+
+#: bot/fastapi_app/templates/register.html:63
+msgid "Username:"
+msgstr "Имя пользователя:"
+
+#: bot/fastapi_app/templates/register.html:67
+msgid "Password:"
+msgstr "Пароль:"
+
+#: bot/fastapi_app/templates/register.html:72
+msgid "Show Password"
+msgstr "Показать пароль"
+
+#: bot/fastapi_app/templates/register.html:74
+msgid "Register"
+msgstr "Зарегистрироваться"
+
+#: bot/fastapi_app/templates/register.html:87
+msgid ""
+"You have <span id='countdown-timer'>10:00</span> to download your .tt "
+"file, client or use the quick connect link."
+msgstr ""
+"У вас есть <span id=\"countdown-timer\">10:00</span>, чтобы скачать ваш "
+".tt файл, клиент или использовать ссылку для быстрого подключения."
+
+#: bot/fastapi_app/templates/register.html:89
+msgid "Quick Connect Link:"
+msgstr "Ссылка для быстрого подключения:"
+
+#: bot/fastapi_app/templates/register.html:92
+msgid "Download .tt file"
+msgstr "Скачать .tt файл"
+
+#: bot/fastapi_app/templates/register.html:95
+msgid "Download pre-configured TeamTalk Client (ZIP)"
+msgstr "Скачать преднастроенный клиент TeamTalk (ZIP)"
+
+#: bot/fastapi_app/templates/register.html:114
+msgid "expired"
+msgstr "истекло"
+
+#: bot/fastapi_app/templates/register.html:115
+msgid "second"
+msgstr "секунда"
+
+#: bot/fastapi_app/templates/register.html:116
+msgid "seconds_few"
+msgstr "секунды"
+
+#: bot/fastapi_app/templates/register.html:117
+msgid "seconds"
+msgstr "секунд"
+
+#: bot/telegram_bot/handlers/registration.py
 msgid "Please choose your language:"
 msgstr "Пожалуйста, выберите ваш язык:"
 
-#: bot/telegram_bot/handlers/registration.py:43
-msgid "Language set to English."
-msgstr "Язык установлен на Русский."
+#: bot/telegram_bot/handlers/registration.py
+msgid "Language set successfully."
+msgstr "Язык успешно установлен."
 
-#: bot/telegram_bot/handlers/registration.py:45
-#: bot/telegram_bot/handlers/registration.py:60
+#: bot/telegram_bot/handlers/registration.py
 msgid "Hello! Please enter a username for registration."
 msgstr "Привет! Пожалуйста, введите имя пользователя для регистрации."
 
-#: bot/telegram_bot/handlers/registration.py:68
-#: bot/web_app/routes/registration.py:184
+#: bot/telegram_bot/handlers/registration.py
 msgid "Sorry, this username is already taken. Please choose another username."
 msgstr ""
 "Извините, это имя пользователя уже занято. Пожалуйста, выберите другое "
 "имя."
 
-#: bot/telegram_bot/handlers/registration.py:72
+#: bot/telegram_bot/handlers/registration.py
 msgid "Now enter a password."
 msgstr "Теперь введите пароль."
 
-#: bot/telegram_bot/handlers/registration.py:76
-#: bot/telegram_bot/handlers/registration.py:222
-#: bot/telegram_bot/handlers/registration.py:245
-#: bot/web_app/routes/registration.py:187
+#: bot/telegram_bot/handlers/registration.py
 msgid "Registration error. Please try again later or contact an administrator."
 msgstr ""
 "Ошибка регистрации. Пожалуйста, попробуйте позже или свяжитесь с "
 "администратором."
 
-#: bot/telegram_bot/handlers/registration.py:87
+#: bot/telegram_bot/handlers/registration.py
 msgid ""
 "You have already registered one TeamTalk account from this Telegram "
 "account. Only one registration is allowed."
@@ -66,146 +138,130 @@ msgstr ""
 "Вы уже зарегистрировали одну учетную запись TeamTalk с этого Telegram "
 "аккаунта. Разрешена только одна регистрация."
 
-#: bot/telegram_bot/handlers/registration.py:130
+#: bot/telegram_bot/handlers/registration.py
 msgid "Registration request sent to administrators. Please wait for approval."
 msgstr "Запрос на регистрацию отправлен администраторам. Ожидайте подтверждения."
 
-#: bot/telegram_bot/handlers/registration.py:229
+#: bot/telegram_bot/handlers/registration.py
 #, python-brace-format
 msgid "User {} successfully registered."
 msgstr "Пользователь {} успешно зарегистрирован."
 
-#: bot/telegram_bot/handlers/registration.py:239
+#: bot/telegram_bot/handlers/registration.py
 msgid "Your .tt file for quick connection"
 msgstr "Ваш .tt файл для быстрого подключения"
 
-#: bot/telegram_bot/handlers/registration.py:240
+#: bot/telegram_bot/handlers/registration.py
 msgid "Or use this TT link:\n"
 msgstr "Или используйте эту TT ссылку:\n"
 
-#: bot/web_app/routes/registration.py:155
-msgid "Registration module not fully initialized."
-msgstr "Модуль регистрации не полностью инициализирован."
+#: bot/core/teamtalk_client.py:155
+#, python-brace-format
+msgid "👤 Client language: {}"
+msgstr "👤 Язык клиента: {}"
 
-#: bot/web_app/routes/registration.py:162
-#: bot/web_app/routes/registration.py:170
-msgid ""
-"An account has already been registered from your IP address. Only one "
-"registration per IP is allowed."
+#: bot/core/teamtalk_client.py:160
+#, python-brace-format
+msgid "📱 Via Telegram: {} (ID: {})"
+msgstr "📱 Через Telegram: {} (ID: {})"
+
+#: bot/core/teamtalk_client.py:163
+#, python-brace-format
+msgid "🌐 Via Web: IP {}"
+msgstr "🌐 Через Web: IP {}"
+
+#: bot/fastapi_app/routers/registration.py:223
+msgid "registration_successful_message"
 msgstr ""
-"С вашего IP-адреса уже была произведена регистрация. Разрешена только "
-"одна регистрация на IP-адрес."
+"Вы успешно зарегистрированы! Теперь вы "
+"можете скачать файлы для подключения."
 
-#: bot/web_app/routes/registration.py:179
-msgid "Username and password are required."
-msgstr "Имя пользователя и пароль обязательны."
+#: bot/core/localization.py
+msgid "self_language_name_native"
+msgstr "Русский"
 
-#: bot/web_app/routes/registration.py:196
-msgid "User "
-msgstr "Пользователь "
+#: bot/telegram_bot/handlers/registration.py
+msgid "Yes"
+msgstr "Да"
 
-#: bot/web_app/routes/registration.py:196
-msgid " successfully registered!"
-msgstr " успешно зарегистрирован!"
+#: bot/telegram_bot/handlers/registration.py
+msgid "No (use username)"
+msgstr "Нет (использовать имя пользователя)"
 
-#: bot/web_app/routes/registration.py:223
-msgid "Please wait, generating client ZIP archive..."
-msgstr "Пожалуйста, подождите, генерируется ZIP-архив клиента..."
+#: bot/telegram_bot/handlers/registration.py
+#, python-brace-format
+msgid "Your username will be '{username}'. Would you like to set a different nickname? If not, your nickname will be the same as your username."
+msgstr "Ваше имя пользователя будет '{username}'. Хотите установить другой никнейм? Если нет, ваш никнейм будет таким же, как имя пользователя."
 
-#: bot/web_app/routes/registration.py:242
-msgid "Error creating client ZIP."
-msgstr "Ошибка при создании ZIP-архива клиента."
+#: bot/telegram_bot/handlers/registration.py
+msgid "Please enter your desired nickname."
+msgstr "Пожалуйста, введите желаемый никнейм."
 
-#: bot/web_app/routes/registration.py:244
-msgid "Client ZIP download is currently unavailable."
-msgstr "Скачивание ZIP-архива клиента в данный момент недоступно."
+#: bot/telegram_bot/handlers/registration.py
+msgid "Nickname:"
+msgstr "Никнейм:"
 
-#: bot/web_app/routes/registration.py:247
-msgid ""
-"Registration failed. The username might be invalid or an internal error "
-"occurred."
-msgstr ""
-"Ошибка регистрации. Имя пользователя может быть неверным или произошла "
-"внутренняя ошибка."
+#: bot/fastapi_app/templates/register.html
+msgid "Nickname (optional):"
+msgstr "Никнейм (необязательно):"
 
-#: bot/web_app/routes/registration.py:251
-msgid "An unexpected error occurred during registration: "
-msgstr "Произошла непредвиденная ошибка во время регистрации: "
+#: bot/fastapi_app/templates/register.html
+msgid "Defaults to username if blank"
+msgstr "По умолчанию имя пользователя, если оставить пустым"
 
-#: bot/web_app/templates/choose_lang.html:6
-msgid "Choose Language"
-msgstr "Выберите язык"
+#~ msgid "Registration module not fully initialized."
+#~ msgstr "Модуль регистрации не полностью инициализирован."
 
-#: bot/web_app/templates/choose_lang.html:18
-msgid "Welcome to server registration"
-msgstr "Добро пожаловать на регистрацию на сервере"
+#~ msgid ""
+#~ "An account has already been registered"
+#~ " from your IP address. Only one "
+#~ "registration per IP is allowed."
+#~ msgstr ""
+#~ "С вашего IP-адреса уже была произведена"
+#~ " регистрация. Разрешена только одна "
+#~ "регистрация на IP-адрес."
 
-#: bot/web_app/templates/choose_lang.html:19
-msgid "English 🇬🇧"
-msgstr "English 🇬🇧"
+#~ msgid "Username and password are required."
+#~ msgstr "Имя пользователя и пароль обязательны."
 
-#: bot/web_app/templates/choose_lang.html:20
-msgid "Русский 🇷🇺"
-msgstr "Русский 🇷🇺"
+#~ msgid "User "
+#~ msgstr "Пользователь "
 
-#: bot/web_app/templates/register_unified.html:6
-#: bot/web_app/templates/register_unified.html:28
-msgid "TeamTalk Registration"
-msgstr "Регистрация в TeamTalk"
+#~ msgid " successfully registered!"
+#~ msgstr " успешно зарегистрирован!"
 
-#: bot/web_app/templates/register_unified.html:31
-msgid "If you want to register on the server"
-msgstr "Если вы хотите зарегистрироваться на сервере"
+#~ msgid "Please wait, generating client ZIP archive..."
+#~ msgstr "Пожалуйста, подождите, генерируется ZIP-архив клиента..."
 
-#: bot/web_app/templates/register_unified.html:31
-msgid "please fill out the form below."
-msgstr "пожалуйста, заполните форму ниже."
+#~ msgid "Error creating client ZIP."
+#~ msgstr "Ошибка при создании ZIP-архива клиента."
 
-#: bot/web_app/templates/register_unified.html:48
-msgid "Username:"
-msgstr "Имя пользователя:"
+#~ msgid "Client ZIP download is currently unavailable."
+#~ msgstr "Скачивание ZIP-архива клиента в данный момент недоступно."
 
-#: bot/web_app/templates/register_unified.html:52
-msgid "Password:"
-msgstr "Пароль:"
+#~ msgid ""
+#~ "Registration failed. The username might "
+#~ "be invalid or an internal error "
+#~ "occurred."
+#~ msgstr ""
+#~ "Ошибка регистрации. Имя пользователя может "
+#~ "быть неверным или произошла внутренняя "
+#~ "ошибка."
 
-#: bot/web_app/templates/register_unified.html:55
-msgid "Register"
-msgstr "Зарегистрироваться"
+#~ msgid "An unexpected error occurred during registration: "
+#~ msgstr "Произошла непредвиденная ошибка во время регистрации: "
 
-#: bot/web_app/templates/register_unified.html:63
-msgid ""
-"You have <span id=\"countdown-timer\">10:00</span> to download your .tt "
-"file, client or use the quick connect link."
-msgstr ""
-"У вас есть <span id=\"countdown-timer\">10:00</span>, чтобы скачать ваш "
-".tt файл, клиент или использовать ссылку для быстрого подключения."
+#~ msgid "Choose Language"
+#~ msgstr "Выберите язык"
 
-#: bot/web_app/templates/register_unified.html:65
-msgid "Quick Connect Link:"
-msgstr "Ссылка для быстрого подключения:"
+#~ msgid "Welcome to server registration"
+#~ msgstr "Добро пожаловать на регистрацию на сервере"
 
-#: bot/web_app/templates/register_unified.html:68
-msgid "Download .tt file"
-msgstr "Скачать .tt файл"
+#~ msgid "English 🇬🇧"
+#~ msgstr "English 🇬🇧"
 
-#: bot/web_app/templates/register_unified.html:71
-msgid "Download pre-configured TeamTalk Client (ZIP)"
-msgstr "Скачать преднастроенный клиент TeamTalk (ZIP)"
+#~ msgid "Русский 🇷🇺"
+#~ msgstr "Русский 🇷🇺"
 
-#: bot/web_app/templates/register_unified.html:90
-msgid "expired"
-msgstr "истекло"
-
-#: bot/web_app/templates/register_unified.html:91
-msgid "second"
-msgstr "секунда"
-
-#: bot/web_app/templates/register_unified.html:92
-msgid "seconds_few"
-msgstr "секунды"
-
-#: bot/web_app/templates/register_unified.html:93
-msgid "seconds"
-msgstr "секунд"
-
+#~ msgid "registration_successful_title"
+#~ msgstr "Регистрация успешна"

@@ -4,8 +4,6 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Integer, String
 from sqlalchemy.exc import IntegrityError as SQLAlchemyIntegrityError
 
-from .config import TG_BOT_TOKEN # just to ensure config is loaded, not used directly here
-
 logger = logging.getLogger(__name__)
 
 DB_NAME = "users.db"

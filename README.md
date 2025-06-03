@@ -11,7 +11,7 @@ By default, TeamTalk server administrators are solely responsible for creating n
 
 It allows users to register:
 *   Via a Telegram bot, with an optional admin approval step.
-*   Via a web page (Flask-based), with IP-based registration limiting.
+*   Via a web page (FastAPI-based), with IP-based registration limiting.
 
 ## Features
 
@@ -20,10 +20,10 @@ It allows users to register:
     *   Language selection (English/Russian).
     *   Optional admin approval for new registrations.
     *   Automatic generation and delivery of `.tt` connection files and quick-connect links.
-*   **Web Registration (Flask):**
-    *   Optional, can be enabled/disabled via configuration.
+*   **Web Registration (FastAPI):**
+    *   Optional, can be enabled/disabled via configuration (`WEB_REGISTRATION_ENABLED`).
     *   Language selection on the web page (English/Russian).
-    *   IP-based registration limiting (per Flask app session).
+    *   IP-based registration limiting.
     *   Automatic generation and delivery of `.tt` connection files and quick-connect links.
     *   Optional: Download pre-configured TeamTalk client (ZIP) if a template is provided.
 *   **Configuration:**
@@ -69,16 +69,21 @@ These instructions assume you have Python 3.11+ installed.
     Make sure `uv` is accessible in your PATH. You can check this by running `uv --version`.
 
 3.  **Install dependencies and set up the environment using `uv`:**
-    This command will create a virtual environment (if it doesn't exist) in a `.venv` folder within your project directory and install all dependencies from `requirements.txt`.
+    This command will create a virtual environment (e.g., in a `.venv` folder) if one doesn't exist, and then synchronize the environment with the dependencies specified in `pyproject.toml` (and potentially `uv.lock` if present).
     ```bash
     uv sync
     ```
+    To include development dependencies (like `pytest` for testing), use:
+    ```bash
+    uv sync --dev
+    ```
+    This ensures your environment has all necessary packages for both running the application and developing/testing it.
 
 4.  **Compile Localization Files**
 
     This project uses Babel for internationalization. To make sure all text strings are correctly displayed in the supported languages (English and Russian), you need to compile the localization files.
 
-    Activate your virtual environment if `uv sync` didn't do it for the current session (e.g., `source .venv/bin/activate` on Linux/macOS or `.\.venv\Scripts\activate` on Windows). Then run the following command from the root directory of the project:
+    Activate your virtual environment (e.g., `source .venv/bin/activate` on Linux/macOS or `.\.venv\Scripts\activate` on Windows if not already active). Then run the following command from the root directory of the project:
     ```bash
     pybabel compile -D messages -d locales
     ```
@@ -101,20 +106,24 @@ These instructions assume you have Python 3.11+ installed.
         *   `TG_BOT_TOKEN`: Your Telegram Bot Token.
         *   `ADMIN_IDS`: Telegram User IDs for bot administrators.
         *   TeamTalk server connection details (`HOST_NAME`, `PORT`, `USER_NAME`, `PASSWORD`).
-        *   Flask web registration settings (if enabled).
-        *   **Important:** Change `FLASK_SECRET_KEY` to a strong, random value if using web registration.
+        *   Web registration settings (if enabled, using variables like `WEB_APP_HOST`, `WEB_APP_PORT` which are now used by Uvicorn).
+        *   The `FLASK_SECRET_KEY` (now removed/commented in `.env.example`) is not directly used by FastAPI for session management in the same way. Secure practices for any session/cookie management in FastAPI should be ensured if custom session logic is added.
 
-6.  **Run the bot using `uv`:**
-    This command will run the `run.py` script within the `uv`-managed virtual environment.
+6.  **Run the application using `uv`:**
+    This command will run the `run.py` script within the `uv`-managed virtual environment. `run.py` now starts both the Telegram bot and the FastAPI web application (using Uvicorn).
     ```bash
     uv run python run.py
     ```
-    *(For Linux/macOS, if `run.py` has a shebang and is executable, `uv run ./run.py` might also work, but `uv run python run.py` is more universally compatible).*
+    The FastAPI application will be available at the host and port configured in your `.env` file (e.g., `http://127.0.0.1:5000`).
 
 ## Usage
 
 *   **Telegram Bot:** Start a chat with your bot and send the `/start` command.
-*   **Web Registration:** If enabled, navigate to `http://<FLASK_HOST>:<FLASK_PORT>/register` (or your configured URL) in your web browser.
+*   **Web Registration:** If enabled (`WEB_REGISTRATION_ENABLED=true` in `.env`), navigate to `http://<your_host>:<your_port>/register` (e.g., `http://127.0.0.1:5000/register`) in your web browser. The host and port are determined by `WEB_APP_HOST` and `WEB_APP_PORT` in your `.env` file.
+
+## Testing
+
+For instructions on how to run tests for the FastAPI application, please see `bot/fastapi_app/TESTING.md`.
 
 ## AI Contribution Note
 

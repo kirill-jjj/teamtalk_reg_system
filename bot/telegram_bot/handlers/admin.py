@@ -1,8 +1,8 @@
 # Placeholder for admin-specific command handlers for the Telegram bot
 # For example, commands to list users, manually trigger actions, etc.
-import logging
+import logging # Reverted
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__) # Reverted
 
 # Example (not implemented in current scope, just for structure):
 # from aiogram import types

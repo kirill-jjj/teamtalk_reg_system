@@ -1,19 +1,22 @@
 import asyncio
-import logging
-import threading
+import sys # Added for --test-run
+import logging # Added standard logging
 
+import uvicorn # Added for FastAPI
+
+from bot.fastapi_app.main import app as fastapi_app # Added FastAPI app instance
 from bot.core import config as core_config
-# Импортируем функции, а не глобальную переменную
 from bot.telegram_bot.main import run_telegram_bot, start_pytalk_bot_internals, start_telegram_polling
-from bot.web_app.main import create_flask_app, run_flask_app
 from bot.core.database import close_db_engine
 from bot.core.teamtalk_client import shutdown_pytalk_bot
+from pathlib import Path # For SSL path checking
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler()]
 )
+# Set levels for other libraries
 logging.getLogger("aiosqlite").setLevel(logging.WARNING)
 logging.getLogger("pytalk").setLevel(logging.INFO)
 logging.getLogger("PIL.PngImagePlugin").setLevel(logging.WARNING)
@@ -25,44 +28,81 @@ async def main():
     logger.info("Starting application...")
 
     tasks = []
-    actual_aiogram_bot_instance = None # Для хранения экземпляра бота
+    actual_aiogram_bot_instance = None
+    dp = None # Dispatcher
 
     try:
-        # Сначала настраиваем бота и получаем его экземпляр и диспетчер
+        # 1. Initialize Aiogram Bot and Dispatcher
         actual_aiogram_bot_instance, dp = await run_telegram_bot()
         
-        # Теперь создаем задачу для polling Telegram
-        telegram_polling_task = asyncio.create_task(
-            start_telegram_polling(actual_aiogram_bot_instance, dp), 
-            name="TelegramBotPolling"
-        )
-        tasks.append(telegram_polling_task)
+        # 2. Pass Bot instance to FastAPI app state
+        if actual_aiogram_bot_instance:
+            fastapi_app.state.aiogram_bot_instance = actual_aiogram_bot_instance
+            logger.info("Aiogram Bot instance passed to FastAPI app state.")
+        else:
+            logger.error("Failed to initialize Aiogram Bot. FastAPI might not function correctly regarding bot interactions.")
+
+        # 3. Configure Uvicorn server
+        ssl_config = {}
+        if core_config.WEB_APP_SSL_ENABLED: # Use new config name
+            key_path = Path(core_config.WEB_APP_SSL_KEY_PATH) # Use new config name
+            cert_path = Path(core_config.WEB_APP_SSL_CERT_PATH) # Use new config name
+            if key_path.exists() and cert_path.exists():
+                ssl_config["ssl_keyfile"] = str(key_path)
+                ssl_config["ssl_certfile"] = str(cert_path)
+                logger.info(f"SSL enabled for FastAPI. Key: {key_path}, Cert: {cert_path}")
+            else:
+                logger.warning(f"SSL enabled in config, but key/cert files not found. Key: {key_path}, Cert: {cert_path}. FastAPI will run without SSL.")
         
-        # Задача для PyTalk
+        uvicorn_config = uvicorn.Config(
+            app=fastapi_app,
+            host=core_config.WEB_APP_HOST, # Use new config name
+            port=core_config.WEB_APP_PORT, # Use new config name
+            loop="asyncio",
+            log_level="info", # You can adjust uvicorn's log level
+            **ssl_config
+        )
+        server = uvicorn.Server(config=uvicorn_config)
+
+        # 4. Define tasks to run concurrently
+        # Telegram polling task
+        if dp and actual_aiogram_bot_instance:
+             telegram_polling_task = asyncio.create_task(
+                start_telegram_polling(actual_aiogram_bot_instance, dp), 
+                name="TelegramBotPolling"
+            )
+             tasks.append(telegram_polling_task)
+        else:
+            logger.error("Dispatcher or Bot not initialized. Telegram polling will not start.")
+
         pytalk_task = asyncio.create_task(start_pytalk_bot_internals(), name="PyTalkBotInternals")
         tasks.append(pytalk_task)
+        
+        # FastAPI server task
+        fastapi_server_task = asyncio.create_task(server.serve(), name="FastAPIServer")
+        tasks.append(fastapi_server_task)
+        
+        logger.info(f"FastAPI app starting on http{'s' if ssl_config else ''}://{core_config.WEB_APP_HOST}:{core_config.WEB_APP_PORT}") # Use new config names
 
-        flask_thread = None
-        if core_config.FLASK_REGISTRATION_ENABLED:
-            logger.info("Flask registration is enabled. Initializing Flask app.")
-            
-            if actual_aiogram_bot_instance is None: # Дополнительная проверка
-                logger.error("Aiogram bot instance not properly initialized for Flask app. Flask notifications might fail.")
-            
-            loop = asyncio.get_running_loop()
-            flask_app = create_flask_app(actual_aiogram_bot_instance, loop) # Передаем экземпляр
-            
-            flask_thread = threading.Thread(target=run_flask_app, args=(flask_app,), daemon=True, name="FlaskThread")
-            flask_thread.start()
-            logger.info(f"Flask app started in a separate thread. Accessible at http://{core_config.FLASK_HOST}:{core_config.FLASK_PORT}/register") # Убрал /web_registration
-        else:
-            logger.info("Flask registration is disabled.")
+        # --- Test Run Logic ---
+        if "--test-run" in sys.argv:
+            logger.info("Test run: Initializations complete or error occurred before this point. Exiting.")
+            # The Uvicorn server task (fastapi_server_task) was created but not awaited directly here,
+            # it's part of asyncio.gather. For a test run, we don't want to run indefinitely.
+            # We can cancel the tasks created for a cleaner exit, though return will also work.
+            for task in tasks:
+                task.cancel()
+            # A brief moment to allow cancellations to register if needed, then exit.
+            await asyncio.sleep(0.1) 
+            return # Exit main function early
 
-        # Ожидаем завершения основных асинхронных задач
+        # Run all tasks concurrently
         await asyncio.gather(*tasks, return_exceptions=True)
 
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received. Shutting down...")
+    except asyncio.CancelledError:
+        logger.info("One or more tasks were cancelled, shutting down...")
     except Exception as e:
         logger.exception(f"Unhandled exception in main execution: {e}")
     finally:
@@ -80,11 +120,6 @@ async def main():
         await shutdown_pytalk_bot()
         await close_db_engine()
         
-        # Flask-поток является daemon, он завершится вместе с основным потоком.
-        # cleanup_flask_resources вызывается в finally блока run_flask_app.
-        if flask_thread and flask_thread.is_alive():
-             logger.info("Flask thread is a daemon and will terminate with the main application.")
-
         logger.info("Application shutdown complete.")
 
 
@@ -92,7 +127,12 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("Application terminated by user (Ctrl+C in asyncio.run).")
+        # Using print here as logger might not be available or configured if asyncio.run(main()) fails very early
+        print("Application terminated by user (Ctrl+C in asyncio.run).") 
     except Exception as e:
-        logger.critical(f"Critical error during asyncio.run: {e}", exc_info=True)
-        
+        # Using print for critical errors during asyncio.run if logger itself might be part of the problem
+        print(f"CRITICAL: Critical error during asyncio.run: {e}", file=sys.stderr)
+        # Optionally, try to log with a fallback basic logger if the main one failed or wasn't set up
+        # logging.basicConfig(level=logging.CRITICAL, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        # logging.getLogger("run_critical").critical(f"Critical error during asyncio.run: {e}", exc_info=True)
+        # For this task, direct print to stderr is simplest for bootstrap errors.

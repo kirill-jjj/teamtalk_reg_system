@@ -5,6 +5,10 @@ from dotenv import load_dotenv, find_dotenv
 
 logger = logging.getLogger(__name__)
 
+# --- Constants for Environment Variable Names and Defaults ---
+GENERATED_FILE_TTL_SECONDS_ENV_VAR_NAME: str = "GENERATED_FILE_TTL_SECONDS"
+DEFAULT_TTL_SECONDS: int = 600
+
 # Load .env file
 dotenv_path = find_dotenv()
 if dotenv_path:
@@ -13,7 +17,6 @@ if dotenv_path:
 else:
     logger.error("Could not find .env file. Please ensure it exists.")
     # Consider exiting or using hardcoded defaults if .env is critical
-    # exit(1)
 
 # Telegram Bot Configuration
 TG_BOT_TOKEN: Optional[str] = os.getenv("TG_BOT_TOKEN")
@@ -33,30 +36,36 @@ SERVER_NAME: str = os.getenv("SERVER_NAME", "TeamTalk Server")
 
 # Registration Settings
 VERIFY_REGISTRATION_STR: str = os.getenv("VERIFY_REGISTRATION", "0")
-ENV_LANG_NUMERIC: str = os.getenv("LANG", "0") # Bot's default language setting
+CFG_ADMIN_LANG: str = os.getenv("LANG", "en")
 
-# Flask Web Registration Configuration
-FLASK_REGISTRATION_ENABLED_STR: str = os.getenv("FLASK_REGISTRATION_ENABLED", "0")
-FLASK_HOST: str = os.getenv("FLASK_HOST", "0.0.0.0")
-FLASK_PORT_STR: Optional[str] = os.getenv("FLASK_PORT") # Allow Flask port to be unset if Flask is disabled
-FLASK_SECRET_KEY: str = os.getenv("FLASK_SECRET_KEY", "default_secret_key_please_change")
+# Web Application (FastAPI) Configuration
+WEB_REGISTRATION_ENABLED_STR: str = os.getenv("WEB_REGISTRATION_ENABLED", "0") # Renamed from FLASK_REGISTRATION_ENABLED
+WEB_APP_HOST: str = os.getenv("WEB_APP_HOST", "0.0.0.0") # Renamed from FLASK_HOST
+WEB_APP_PORT_STR: Optional[str] = os.getenv("WEB_APP_PORT") # Renamed from FLASK_PORT
+# FLASK_SECRET_KEY is not used directly by FastAPI core.
 
-# Flask SSL (Optional)
-FLASK_SSL_ENABLED_STR: str = os.getenv("FLASK_SSL_ENABLED", "0")
-FLASK_SSL_CERT_PATH: Optional[str] = os.getenv("FLASK_SSL_CERT_PATH")
-FLASK_SSL_KEY_PATH: Optional[str] = os.getenv("FLASK_SSL_KEY_PATH")
+# Web Application SSL (Optional)
+WEB_APP_SSL_ENABLED_STR: str = os.getenv("WEB_APP_SSL_ENABLED", "0") # Renamed from FLASK_SSL_ENABLED
+WEB_APP_SSL_CERT_PATH: Optional[str] = os.getenv("WEB_APP_SSL_CERT_PATH") # Renamed
+WEB_APP_SSL_KEY_PATH: Optional[str] = os.getenv("WEB_APP_SSL_KEY_PATH") # Renamed
 
-# TeamTalk Client Template for Flask Downloads (Optional)
+# TeamTalk Client Template for Web Downloads (Optional)
 TEAMTALK_CLIENT_TEMPLATE_DIR: Optional[str] = os.getenv("TEAMTALK_CLIENT_TEMPLATE_DIR")
+
+# Generated File TTL
+GENERATED_FILE_TTL_SECONDS_STR: Optional[str] = os.getenv(
+    GENERATED_FILE_TTL_SECONDS_ENV_VAR_NAME, str(DEFAULT_TTL_SECONDS)
+)
 
 # --- Parsed and validated values ---
 TCP_PORT: int = 0
 UDP_PORT: int = 0
 ENCRYPTED: bool = False
 VERIFY_REGISTRATION: bool = False
-FLASK_REGISTRATION_ENABLED: bool = bool(int(FLASK_REGISTRATION_ENABLED_STR)) # Do this early
-FLASK_PORT: int = 0
-FLASK_SSL_ENABLED: bool = bool(int(FLASK_SSL_ENABLED_STR))
+WEB_REGISTRATION_ENABLED: bool = bool(int(WEB_REGISTRATION_ENABLED_STR)) # Renamed
+WEB_APP_PORT: int = 0 # Renamed
+WEB_APP_SSL_ENABLED: bool = bool(int(WEB_APP_SSL_ENABLED_STR)) # Renamed
+GENERATED_FILE_TTL_SECONDS: int = DEFAULT_TTL_SECONDS # Initialize with default
 
 # Validate and parse integer/boolean variables
 try:
@@ -73,10 +82,20 @@ try:
     ENCRYPTED = bool(int(ENCRYPTED_STR))
     VERIFY_REGISTRATION = bool(int(VERIFY_REGISTRATION_STR))
     
-    if FLASK_REGISTRATION_ENABLED:
-        if FLASK_PORT_STR and FLASK_PORT_STR.strip():
-            FLASK_PORT = int(FLASK_PORT_STR)
-        # If FLASK_PORT_STR is not set while FLASK_REGISTRATION_ENABLED, it will be caught by missing_vars
+    if WEB_REGISTRATION_ENABLED: # Renamed
+        if WEB_APP_PORT_STR and WEB_APP_PORT_STR.strip(): # Renamed
+            WEB_APP_PORT = int(WEB_APP_PORT_STR) # Renamed
+        # If WEB_APP_PORT_STR is not set while WEB_REGISTRATION_ENABLED, it will be caught by missing_vars
+
+    if GENERATED_FILE_TTL_SECONDS_STR and GENERATED_FILE_TTL_SECONDS_STR.strip():
+        try:
+            GENERATED_FILE_TTL_SECONDS = int(GENERATED_FILE_TTL_SECONDS_STR)
+        except ValueError:
+            logger.warning(
+                f"Invalid value for {GENERATED_FILE_TTL_SECONDS_ENV_VAR_NAME}: "
+                f"'{GENERATED_FILE_TTL_SECONDS_STR}'. Using default TTL: {DEFAULT_TTL_SECONDS} seconds."
+            )
+            GENERATED_FILE_TTL_SECONDS = DEFAULT_TTL_SECONDS # Fallback to default
 
 except ValueError as e:
     logger.error(f"Invalid value in environment variables: {e}. Please check your .env file.")
@@ -93,7 +112,6 @@ required_values_from_env = {
     # Add other variables here if they are absolutely mandatory and don't have safe defaults
 }
 if not ADMIN_IDS: # Example: if at least one admin ID is mandatory
-    # logger.warning("ADMIN_IDS is not set. Some admin functionalities might be unavailable.")
     pass # For now, let it be optional or handle elsewhere
 
 missing_vars = []
@@ -101,23 +119,21 @@ for key, value in required_values_from_env.items():
     if value is None or value.strip() == "": # Check for None or empty string
         missing_vars.append(key)
 
-if FLASK_REGISTRATION_ENABLED:
-    if FLASK_PORT_STR is None or FLASK_PORT_STR.strip() == "":
-        missing_vars.append("FLASK_PORT (when Flask is enabled)")
-    if FLASK_SECRET_KEY == "default_secret_key_please_change":
-        logger.warning("FLASK_SECRET_KEY is set to its default value. Please change it to a strong, random secret key for security.")
+if WEB_REGISTRATION_ENABLED: # Renamed
+    if WEB_APP_PORT_STR is None or WEB_APP_PORT_STR.strip() == "": # Renamed
+        missing_vars.append("WEB_APP_PORT (when Web registration is enabled)") # Renamed
 
-    if FLASK_SSL_ENABLED:
-        if not FLASK_SSL_CERT_PATH:
-            missing_vars.append("FLASK_SSL_CERT_PATH (when SSL is enabled)")
-        if not FLASK_SSL_KEY_PATH:
-            missing_vars.append("FLASK_SSL_KEY_PATH (when SSL is enabled)")
+    if WEB_APP_SSL_ENABLED: # Renamed
+        if not WEB_APP_SSL_CERT_PATH: # Renamed
+            missing_vars.append("WEB_APP_SSL_CERT_PATH (when SSL is enabled)") # Renamed
+        if not WEB_APP_SSL_KEY_PATH: # Renamed
+            missing_vars.append("WEB_APP_SSL_KEY_PATH (when SSL is enabled)") # Renamed
     
     # Warning for TEAMTALK_CLIENT_TEMPLATE_DIR validity (not a fatal error for missing_vars)
     if TEAMTALK_CLIENT_TEMPLATE_DIR and not os.path.isdir(TEAMTALK_CLIENT_TEMPLATE_DIR):
-        logger.warning(f"TEAMTALK_CLIENT_TEMPLATE_DIR '{TEAMTALK_CLIENT_TEMPLATE_DIR}' is set but not a valid directory. Client ZIP download via Flask may not work.")
-    elif FLASK_REGISTRATION_ENABLED and not TEAMTALK_CLIENT_TEMPLATE_DIR:
-         logger.info("TEAMTALK_CLIENT_TEMPLATE_DIR is not set. Client download feature via Flask will be unavailable.")
+        logger.warning(f"TEAMTALK_CLIENT_TEMPLATE_DIR '{TEAMTALK_CLIENT_TEMPLATE_DIR}' is set but not a valid directory. Client ZIP download via Web App may not work.") # Updated log
+    elif WEB_REGISTRATION_ENABLED and not TEAMTALK_CLIENT_TEMPLATE_DIR: # Renamed
+         logger.info("TEAMTALK_CLIENT_TEMPLATE_DIR is not set. Client download feature via Web App will be unavailable.") # Updated log
 
 if missing_vars:
     unique_missing_vars = sorted(list(set(missing_vars))) # Remove duplicates and sort
@@ -127,17 +143,5 @@ if missing_vars:
 # Final check for parsed ports if they were required
 if TCP_PORT_STR and TCP_PORT == 0: # If PORT was set in .env but parsed to 0 (e.g., "0" or invalid char then default)
     logger.error("PORT was set in .env but resulted in an invalid TCP_PORT value (0). Please check its value.")
-    # exit(1) # This might be too strict if PORT="0" is somehow valid for your TT server.
 
 logger.info("Configuration loaded successfully.")
-
-def get_server_config_for_flask() -> dict:
-    """Returns a dictionary of server configurations needed by Flask."""
-    return {
-        "SERVER_NAME": SERVER_NAME, # Display name from config
-        "HOST": HOST_NAME,
-        "TCP_PORT": TCP_PORT,
-        "UDP_PORT": UDP_PORT,
-        "ENCRYPTED": ENCRYPTED,
-        "LANG": ENV_LANG_NUMERIC # For default language on Flask page
-    }
