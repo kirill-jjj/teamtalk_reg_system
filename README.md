@@ -73,30 +73,25 @@ These instructions assume you have Python 3.11+ installed.
     ```bash
     uv sync
     ```
-    To include development dependencies (like `pytest` for testing), use:
-    ```bash
-    uv sync --dev
-    ```
-    This ensures your environment has all necessary packages for both running the application and developing/testing it.
 
 4.  **Compile Localization Files**
 
     This project uses Babel for internationalization. To make sure all text strings are correctly displayed in the supported languages (English and Russian), you need to compile the localization files.
 
-    Activate your virtual environment (e.g., `source .venv/bin/activate` on Linux/macOS or `.\.venv\Scripts\activate` on Windows if not already active). Then run the following command from the root directory of the project:
+    run the following command from the root directory of the project:
     ```bash
-    pybabel compile -D messages -d locales
+    uv run pybabel compile -D messages -d locales
     ```
     This will compile the `.po` files into `.mo` files, which are used by the application.
 
     *(Optional) If you make changes to the translatable strings in the Python code or Jinja2 templates, you'll need to update the translation files:*
     1.  *Extract messages to update the `.pot` template file:*
         ```bash
-        pybabel extract -F babel.cfg -o locales/messages.pot .
+        uv run pybabel extract -F babel.cfg -o locales/messages.pot .
         ```
     2.  *Update the language-specific `.po` files (e.g., for Russian):*
         ```bash
-        pybabel update -i locales/messages.pot -d locales -l ru
+        uv run pybabel update -i locales/messages.pot -d locales -l ru
         ```
     *After updating the `.po` files with translations, re-run the `compile` command.*
 
@@ -121,11 +116,8 @@ These instructions assume you have Python 3.11+ installed.
 *   **Telegram Bot:** Start a chat with your bot and send the `/start` command.
 *   **Web Registration:** If enabled (`WEB_REGISTRATION_ENABLED=true` in `.env`), navigate to `http://<your_host>:<your_port>/register` (e.g., `http://127.0.0.1:5000/register`) in your web browser. The host and port are determined by `WEB_APP_HOST` and `WEB_APP_PORT` in your `.env` file.
 
-## Testing
 
-For instructions on how to run tests for the FastAPI application, please see `bot/fastapi_app/TESTING.md`.
-
-## AI Contribution Note
+## Note
 
 Please be aware that approximately 60% of this project's codebase was generated with the assistance of Artificial Intelligence. While the code appears to function correctly and generally without bugs, you might encounter:
 

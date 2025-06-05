@@ -11,24 +11,17 @@ readme = "README.md"
 
 # Основные зависимости проекта
 dependencies = [
-    "aiogram",
-    "py-talk-ex",
-    "python-dotenv",
-    "SQLAlchemy",
-    "aiosqlite",
-    "fastapi",
-    "uvicorn[standard]",
-    "Babel",
-    "Jinja2",
-    "python-multipart", # Added for FastAPI form parsing
-    "aiofiles==24.1.0",  # Changed
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest",
-    "pytest-asyncio",
-    "httpx",
+    "aiogram ~=3.20.0",
+    "py-talk-ex ~=1.6.0",
+    "python-dotenv ~=1.1.0",
+    "SQLAlchemy ~=2.0.41",
+    "aiosqlite ~=0.21.0",
+    "fastapi ~=0.115",
+    "uvicorn[standard] ~=0.34.3",
+    "Babel ~=2.17.0",
+    "Jinja2 ~=3.1.6",
+    "python-multipart ~=0.0.20",
+    "aiofiles==24.1.0",
 ]
 
 [project.urls]
