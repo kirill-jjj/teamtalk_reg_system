@@ -49,6 +49,10 @@ WEB_APP_SSL_ENABLED_STR: str = os.getenv("WEB_APP_SSL_ENABLED", "0") # Renamed f
 WEB_APP_SSL_CERT_PATH: Optional[str] = os.getenv("WEB_APP_SSL_CERT_PATH") # Renamed
 WEB_APP_SSL_KEY_PATH: Optional[str] = os.getenv("WEB_APP_SSL_KEY_PATH") # Renamed
 
+# Web Application Proxy Configuration
+WEB_APP_FORWARDED_ALLOW_IPS_ENV_VAR_NAME: str = "WEB_APP_FORWARDED_ALLOW_IPS"
+WEB_APP_PROXY_HEADERS_ENV_VAR_NAME: str = "WEB_APP_PROXY_HEADERS"
+
 # TeamTalk Client Template for Web Downloads (Optional)
 TEAMTALK_CLIENT_TEMPLATE_DIR: Optional[str] = os.getenv("TEAMTALK_CLIENT_TEMPLATE_DIR")
 
@@ -69,6 +73,9 @@ TEAMTALK_DEFAULT_USER_RIGHTS_STR: str = os.getenv(TEAMTALK_DEFAULT_USER_RIGHTS_E
 REGISTRATION_BROADCAST_ENABLED_STR: str = os.getenv(REGISTRATION_BROADCAST_ENABLED_ENV_VAR_NAME, DEFAULT_REGISTRATION_BROADCAST_ENABLED_VALUE)
 FORCE_USER_LANG_STR: Optional[str] = os.getenv(FORCE_USER_LANG_ENV_VAR_NAME, "") # New variable read from env
 
+WEB_APP_FORWARDED_ALLOW_IPS_STR: str = os.getenv(WEB_APP_FORWARDED_ALLOW_IPS_ENV_VAR_NAME, "*")
+WEB_APP_PROXY_HEADERS_STR: str = os.getenv(WEB_APP_PROXY_HEADERS_ENV_VAR_NAME, "1")
+
 
 # --- Parsed and validated values ---
 TCP_PORT: int = 0
@@ -82,6 +89,8 @@ GENERATED_FILE_TTL_SECONDS: int = DEFAULT_TTL_SECONDS # Initialize with default
 TEAMTALK_DEFAULT_USER_RIGHTS: List[str] = []
 REGISTRATION_BROADCAST_ENABLED: bool = False
 FORCE_USER_LANG: str = FORCE_USER_LANG_STR.strip() # New parsed variable
+WEB_APP_FORWARDED_ALLOW_IPS: str | List[str] = "*" # Default initialization
+WEB_APP_PROXY_HEADERS: bool = True # Default initialization
 
 # Validate and parse integer/boolean variables
 try:
@@ -117,6 +126,28 @@ try:
                 f"'{GENERATED_FILE_TTL_SECONDS_STR}'. Using default TTL: {DEFAULT_TTL_SECONDS} seconds."
             )
             GENERATED_FILE_TTL_SECONDS = DEFAULT_TTL_SECONDS # Fallback to default
+
+    # Parse WEB_APP_FORWARDED_ALLOW_IPS
+    if WEB_APP_FORWARDED_ALLOW_IPS_STR == "*":
+        WEB_APP_FORWARDED_ALLOW_IPS = "*"
+    else:
+        WEB_APP_FORWARDED_ALLOW_IPS = [ip.strip() for ip in WEB_APP_FORWARDED_ALLOW_IPS_STR.split(',') if ip.strip()]
+        if not WEB_APP_FORWARDED_ALLOW_IPS: # If the list is empty after parsing (e.g., empty string or just commas)
+            WEB_APP_FORWARDED_ALLOW_IPS = "*" # Fallback to "*"
+            logger.warning(
+                f"{WEB_APP_FORWARDED_ALLOW_IPS_ENV_VAR_NAME} was set to an empty or invalid list. "
+                f"Defaulting to '*'. Original value: '{WEB_APP_FORWARDED_ALLOW_IPS_STR}'"
+            )
+
+    # Parse WEB_APP_PROXY_HEADERS
+    try:
+        WEB_APP_PROXY_HEADERS = bool(int(WEB_APP_PROXY_HEADERS_STR))
+    except ValueError:
+        logger.warning(
+            f"Invalid value for {WEB_APP_PROXY_HEADERS_ENV_VAR_NAME}: '{WEB_APP_PROXY_HEADERS_STR}'. "
+            f"Expected '0' or '1'. Using default: True."
+        )
+        WEB_APP_PROXY_HEADERS = True # Default to True on parsing error
 
 except ValueError as e:
     logger.error(f"Invalid value in environment variables: {e}. Please check your .env file.")

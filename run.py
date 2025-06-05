@@ -60,6 +60,8 @@ async def main():
             port=core_config.WEB_APP_PORT, # Use new config name
             loop="asyncio",
             log_level="info", # You can adjust uvicorn's log level
+            forwarded_allow_ips=core_config.WEB_APP_FORWARDED_ALLOW_IPS,
+            proxy_headers=core_config.WEB_APP_PROXY_HEADERS,
             **ssl_config
         )
         server = uvicorn.Server(config=uvicorn_config)
