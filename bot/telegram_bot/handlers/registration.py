@@ -21,32 +21,32 @@ request_id_counter = 0
 async def start_command_handler(message: types.Message, state: FSMContext, bot: AiogramBot):
     telegram_id = message.from_user.id
     # Используем язык администратора для сообщения "уже зарегистрирован", т.к. язык пользователя еще не выбран
-    _admin = get_translator(get_admin_lang_code())
+    _ = get_translator(get_admin_lang_code()) # Changed _admin to _
     if await database.is_telegram_id_registered(telegram_id):
-        await message.reply(_admin("You have already registered one TeamTalk account from this Telegram account. Only one registration is allowed."))
+        await message.reply(_("You have already registered one TeamTalk account from this Telegram account. Only one registration is allowed.")) # Updated to _
         await state.clear()
         return
 
     # Check for forced language
     if FORCE_USER_LANG and FORCE_USER_LANG.strip():
         forced_lang_code = FORCE_USER_LANG.strip()
-        _forced_lang_translator = get_translator(forced_lang_code)
+        _ = get_translator(forced_lang_code) # Changed _forced_lang_translator to _
         # Validate if the language is genuinely available
         # by checking if a known string translates differently from its ID
         original_string = "Hello! Please enter a username for registration."
-        translated_string = _forced_lang_translator(original_string)
+        translated_string = _(original_string) # Updated to _
 
-        if translated_string != original_string:
+        if translated_string != original_string: # This check implicitly uses the new _
             logger.info(f"Forcing language to '{forced_lang_code}' for user {telegram_id} based on config.")
             await state.update_data(user_tg_lang=forced_lang_code)
-            await message.reply(_forced_lang_translator(original_string)) # Send translated message
+            await message.reply(_(original_string)) # Send translated message, uses new _
             await state.set_state(RegistrationStates.awaiting_username)
             return
         else:
             logger.warning(f"FORCE_USER_LANG was set to '{forced_lang_code}', but this language pack seems unavailable or incomplete. Proceeding with language selection.")
 
     # Используем английский по умолчанию для первого сообщения выбора языка
-    _ = get_translator('en')
+    _ = get_translator('en') # This re-assignment is fine as it's a new logical block.
 
     available_langs = get_available_languages_for_display()
     inline_keyboard_buttons = []
@@ -149,12 +149,12 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, state:
     action_type, decision, request_id_str = callback_query.data.split(':')
     request_id = int(request_id_str)
 
-    _admin = get_translator(get_admin_lang_code()) 
+    _ = get_translator(get_admin_lang_code()) # Changed _admin to _, this is for admin-facing messages initially
 
     pending_reg_data = registration_requests.pop(request_id, None)
 
     if not pending_reg_data:
-        await callback_query.answer(_admin("Registration request not found or outdated."), show_alert=True)
+        await callback_query.answer(_("Registration request not found or outdated."), show_alert=True) # Uses admin _
         try: await callback_query.message.delete()
         except: pass
         return
@@ -166,45 +166,59 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, state:
     user_telegram_full_name = pending_reg_data.get("telegram_full_name", "N/A")
     nickname_val = pending_reg_data.get("nickname", username_val) # Get nickname, fallback to username
 
-    _user = get_translator(user_tg_lang_val) 
-
+    # _ is currently admin translator. For user message, we'll switch it.
     if await database.is_telegram_id_registered(user_tg_id_val):
-        await callback_query.answer(_admin("This Telegram account has already registered a TeamTalk account."), show_alert=True)
+        await callback_query.answer(_("This Telegram account has already registered a TeamTalk account."), show_alert=True) # Admin _
+
+        # Switch to user's language for the user notification
+        _ = get_translator(user_tg_lang_val)
         try: 
-            await bot.send_message(user_tg_id_val, _user("You have already registered one TeamTalk account from this Telegram account. Only one registration is allowed."))
+            await bot.send_message(user_tg_id_val, _("You have already registered one TeamTalk account from this Telegram account. Only one registration is allowed.")) # User _
         except Exception as e:
-            logger.warning(f"Could not notify user {user_tg_id_val} about being already registered: {e}", exc_info=True) # Removed await
+            logger.warning(f"Could not notify user {user_tg_id_val} about being already registered: {e}", exc_info=True)
         try: await callback_query.message.delete()
         except: pass
+        # Restore _ to admin translator if more admin operations followed, but here we return.
         return
 
+    # _ is still admin translator here if the above block wasn't entered or returned early.
+    # If it was entered and returned, this code isn't reached.
+    # If it was entered and the user message was sent, _ is user translator.
+    # This means we need to be careful. Let's ensure _ is admin translator before admin-specific answers.
+
     if decision == "yes":
-        # Строка "User {} registration approved." будет переведена _admin() если она есть в .po
-        await callback_query.answer(_admin("User {} registration approved.").format(username_val), show_alert=True)
+        _ = get_translator(get_admin_lang_code()) # Ensure _ is admin translator for this block
+        await callback_query.answer(_("User {} registration approved.").format(username_val), show_alert=True) # Admin _
+
         source_info = {
             "type": "telegram",
             "telegram_id": user_tg_id_val,
             "telegram_full_name": user_telegram_full_name, 
             "user_lang": user_tg_lang_val,
             "approved_by_admin": callback_query.from_user.id,
-            "nickname": nickname_val # Ensure source_info for _process_actual_registration includes nickname
+            "nickname": nickname_val
         }
-        # Pass nickname_val to _process_actual_registration
+        # _process_actual_registration will set its own _ based on user_lang_code from source_info
         await _process_actual_registration(user_tg_id_val, username_val, password_val_cb, nickname_val, source_info, None, bot)
         
+        _ = get_translator(user_tg_lang_val) # Switch to user's language for the user notification
         try:
-            await bot.send_message(user_tg_id_val, _user("Your registration has been approved by the administrator. You can now use TeamTalk."))
+            await bot.send_message(user_tg_id_val, _("Your registration has been approved by the administrator. You can now use TeamTalk.")) # User _
         except Exception as e:
-            logger.warning(f"Could not send approval notification to user {user_tg_id_val}: {e}", exc_info=True) # Removed await
+            logger.warning(f"Could not send approval notification to user {user_tg_id_val}: {e}", exc_info=True)
             
     elif decision == "no":
-        # Строка "User {} registration declined." будет переведена _admin()
-        await callback_query.answer(_admin("User {} registration declined.").format(username_val), show_alert=True)
-        try:
-            await bot.send_message(user_tg_id_val, _user("Your registration has been declined by the administrator."))
-        except Exception as e:
-            logger.warning(f"Could not send decline notification to user {user_tg_id_val}: {e}", exc_info=True) # Removed await
+        _ = get_translator(get_admin_lang_code()) # Ensure _ is admin translator
+        await callback_query.answer(_("User {} registration declined.").format(username_val), show_alert=True) # Admin _
 
+        _ = get_translator(user_tg_lang_val) # Switch to user's language for the user notification
+        try:
+            await bot.send_message(user_tg_id_val, _("Your registration has been declined by the administrator.")) # User _
+        except Exception as e:
+            logger.warning(f"Could not send decline notification to user {user_tg_id_val}: {e}", exc_info=True)
+
+    # No specific language needed for edit_reply_markup, but _ would be user translator if execution flowed through one of the decision blocks.
+    # If it skipped them (e.g. new decision type), _ would be admin. This is fine.
     try:
         await callback_query.message.edit_reply_markup(reply_markup=None)
     except Exception as e:
@@ -290,7 +304,7 @@ async def _handle_registration_continuation(
     message_or_callback_query: types.Message | types.CallbackQuery # To reply or answer
 ):
     """Helper function to continue registration process after nickname is known."""
-    _ = get_translator(user_lang_code) # User's chosen language
+    _user_translator = get_translator(user_lang_code) # User's chosen language, store with a distinct name first
 
     if config.VERIFY_REGISTRATION:
         global request_id_counter
@@ -307,22 +321,22 @@ async def _handle_registration_continuation(
         }
         logger.info(f"Storing registration request ID {request_id} for user {user_tg_id} ({username_value}, Nick: {nickname_value})")
 
-        _admin = get_translator(get_admin_lang_code()) # Admin's language for notification
+        _ = get_translator(get_admin_lang_code()) # Admin's language for notification, shadows previous _
 
         admin_message_text = (
-            f"{_admin('Registration request:')}\n"
-            f"{_admin('Username:')} {username_value}\n"
+            f"{_('Registration request:')}\n" # Uses admin _
+            f"{_('Username:')} {username_value}\n" # Uses admin _
         )
         if nickname_value != username_value: # Only show nickname if different
-            admin_message_text += f"{_admin('Nickname:')} {nickname_value}\n"
+            admin_message_text += f"{_('Nickname:')} {nickname_value}\n" # Uses admin _
         admin_message_text += (
-            f"{_admin('Telegram User:')} {user_full_name} (ID: {user_tg_id})\n"
-            f"{_admin('Approve registration?')}"
+            f"{_('Telegram User:')} {user_full_name} (ID: {user_tg_id})\n" # Uses admin _
+            f"{_('Approve registration?')}" # Uses admin _
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=_admin("Yes"), callback_data=f"verify_reg:yes:{request_id}"),
-             InlineKeyboardButton(text=_admin("No"), callback_data=f"verify_reg:no:{request_id}")]
+            [InlineKeyboardButton(text=_("Yes"), callback_data=f"verify_reg:yes:{request_id}"), # Uses admin _
+             InlineKeyboardButton(text=_("No"), callback_data=f"verify_reg:no:{request_id}")] # Uses admin _
         ])
 
         for admin_id_val in config.ADMIN_IDS:
@@ -331,7 +345,9 @@ async def _handle_registration_continuation(
             except Exception as e:
                 logger.error(f"Error sending verification request to admin {admin_id_val}: {e}", exc_info=True)
 
-        reply_text = _("Registration request sent to administrators. Please wait for approval.")
+        # Restore user translator for the user-facing message
+        _ = _user_translator
+        reply_text = _("Registration request sent to administrators. Please wait for approval.") # Uses user _
         if isinstance(message_or_callback_query, types.Message):
             await message_or_callback_query.answer(reply_text)
         elif isinstance(message_or_callback_query, types.CallbackQuery):

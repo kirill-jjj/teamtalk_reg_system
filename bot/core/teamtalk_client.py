@@ -154,22 +154,22 @@ async def perform_teamtalk_registration(
             logger.info(f"Registration broadcast is disabled. Skipping for user '{username_str}'.")
 
         if aiogram_bot_instance and config.ADMIN_IDS and source_info:
-            _admin_tg = get_translator(get_admin_lang_code()) 
+            _ = get_translator(get_admin_lang_code()) # Changed _admin_tg to _
             
-            admin_notification_message = f"📢 {_admin_tg('User {} was registered.').format(username_str)}\n"
+            admin_notification_message = f"📢 {_('User {} was registered.').format(username_str)}\n" # Updated to _
             
             reg_type = source_info.get('type', 'Unknown')
             user_client_lang_code_for_source = source_info.get('user_lang', 'en') 
             lang_emoji = "🇬🇧" if user_client_lang_code_for_source == 'en' else "🇷🇺"
-            admin_notification_message += _admin_tg("👤 Client language: {}").format(lang_emoji) + "\n"
+            admin_notification_message += _("👤 Client language: {}").format(lang_emoji) + "\n" # Updated to _
 
             if reg_type == 'telegram':
                 tg_user_id_val = source_info.get('telegram_id', 'N/A')
                 tg_full_name_val = source_info.get('telegram_full_name', 'N/A')
-                admin_notification_message += _admin_tg("📱 Via Telegram: {} (ID: {})").format(tg_full_name_val, tg_user_id_val) + "\n"
+                admin_notification_message += _("📱 Via Telegram: {} (ID: {})").format(tg_full_name_val, tg_user_id_val) + "\n" # Updated to _
             elif reg_type == 'web':
                 ip_address_val = source_info.get('ip_address', 'N/A')
-                admin_notification_message += _admin_tg("🌐 Via Web: IP {}").format(ip_address_val) + "\n"
+                admin_notification_message += _("🌐 Via Web: IP {}").format(ip_address_val) + "\n" # Updated to _
             
             for admin_id_val_notify in config.ADMIN_IDS:
                 try:
