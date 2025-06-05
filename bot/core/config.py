@@ -36,7 +36,7 @@ SERVER_NAME: str = os.getenv("SERVER_NAME", "TeamTalk Server")
 
 # Registration Settings
 VERIFY_REGISTRATION_STR: str = os.getenv("VERIFY_REGISTRATION", "0")
-CFG_ADMIN_LANG: str = os.getenv("LANG", "en")
+CFG_ADMIN_LANG: str = os.getenv("BOT_ADMIN_LANG", "en")
 
 # Web Application (FastAPI) Configuration
 WEB_REGISTRATION_ENABLED_STR: str = os.getenv("WEB_REGISTRATION_ENABLED", "0") # Renamed from FLASK_REGISTRATION_ENABLED

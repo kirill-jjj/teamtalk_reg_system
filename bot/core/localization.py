@@ -133,8 +133,12 @@ def get_admin_lang_code() -> str:
     global translations, DEFAULT_LANG_CODE, CFG_ADMIN_LANG
 
     # CFG_ADMIN_LANG is the language code string from config (e.g., "en", "RU")
-    admin_lang_from_config = CFG_ADMIN_LANG
-    normalized_admin_lang = admin_lang_from_config.lower() # Convert to lowercase, e.g., "ru"
+    admin_lang_from_config = CFG_ADMIN_LANG # This comes from config
+    if not admin_lang_from_config: # Should not happen given default in config
+        admin_lang_from_config = DEFAULT_LANG_CODE
+
+    # Normalize: take the first part of "en_US.UTF-8" -> "en", "ru_RU" -> "ru", "RU" -> "ru"
+    normalized_admin_lang = admin_lang_from_config.split('_')[0].split('.')[0].lower()
 
     if normalized_admin_lang in translations:
         return normalized_admin_lang # Return the lowercase version

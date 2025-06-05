@@ -142,10 +142,9 @@ async def perform_teamtalk_registration(
                 _ = get_translator(admin_lang_code)
                 broadcast_text_tt = _("User {} was registered.").format(username_str)
 
-                # Send broadcast message using pytalk
-                # Assuming active_server_instance.server.send_message handles encoding
+                # Encode message to bytes for PyTalk
                 if active_server_instance.server:
-                    active_server_instance.server.send_message(broadcast_text_tt)
+                    active_server_instance.server.send_message(broadcast_text_tt.encode('utf-8'))
                     logger.info(f"Broadcast message for user '{username_str}' sent to server via PyTalk.")
                 else:
                     logger.warning(f"Cannot send broadcast for '{username_str}': active_server_instance.server is None.")
