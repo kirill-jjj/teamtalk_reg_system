@@ -22,14 +22,14 @@ def i18n_context_processor(request: Request):
 
     if FORCE_USER_LANG and FORCE_USER_LANG.strip():
         forced_lang_code = FORCE_USER_LANG.strip()
-        _forced_lang_translator = get_translator(forced_lang_code)
+        _ = get_translator(forced_lang_code) # Changed _forced_lang_translator to _
         # Validate if the language is genuinely available
         original_string = "Username:" # A common string that should be translated
-        translated_string = _forced_lang_translator(original_string)
+        translated_string = _(original_string) # Updated to _
 
         if translated_string != original_string:
             logger.debug(f"Forcing web language to '{forced_lang_code}' based on config.")
-            translator = _forced_lang_translator
+            translator = _ # Updated from _forced_lang_translator
             language_forced = True
             final_lang_code = forced_lang_code
         else:
