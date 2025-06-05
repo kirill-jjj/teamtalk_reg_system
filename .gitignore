@@ -119,8 +119,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Compiled gettext files
+# Compiled gettext files and pot file
 **/LC_MESSAGES/*.mo
+messages.pot
 
 # SQLite database file for the bot
 users.db
