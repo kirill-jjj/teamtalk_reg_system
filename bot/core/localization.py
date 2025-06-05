@@ -49,9 +49,16 @@ def discover_available_languages() -> list[dict[str, str]]:
         else:
             logger.debug(f"Item {lang_code_dir} is not a directory, skipping.")
 
-    if not any(lang['code'] == DEFAULT_LANG_CODE for lang in discovered_languages) and DEFAULT_LANG_CODE == 'en':
-        logger.info(f"Default language '{DEFAULT_LANG_CODE}' not found in discovered languages. Adding English as a fallback.")
+    # If the default language is 'en' and it hasn't been added through a .mo file,
+    # add it here silently, as we assume source strings are English.
+    if DEFAULT_LANG_CODE == 'en' and not any(lang['code'] == 'en' for lang in discovered_languages):
         discovered_languages.append({'code': 'en', 'native_name': 'English'})
+        # Optionally, log at a debug level if confirmation of this path is needed.
+        # logger.debug(f"Default language '{DEFAULT_LANG_CODE}' added as a fallback (source strings).")
+    elif not any(lang['code'] == DEFAULT_LANG_CODE for lang in discovered_languages):
+        # This case handles if DEFAULT_LANG_CODE is something other than 'en' and is missing
+        logger.info(f"Default language '{DEFAULT_LANG_CODE}' not found in discovered languages. Adding it as a fallback.")
+        discovered_languages.append({'code': DEFAULT_LANG_CODE, 'native_name': DEFAULT_LANG_CODE.upper() + " (Fallback)"})
 
     logger.info(f"Discovered languages: {discovered_languages}")
     return discovered_languages
