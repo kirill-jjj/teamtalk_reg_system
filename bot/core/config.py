@@ -9,14 +9,8 @@ logger = logging.getLogger(__name__)
 GENERATED_FILE_TTL_SECONDS_ENV_VAR_NAME: str = "GENERATED_FILE_TTL_SECONDS"
 DEFAULT_TTL_SECONDS: int = 600
 
-# Load .env file
-dotenv_path = find_dotenv()
-if dotenv_path:
-    load_dotenv(dotenv_path)
-    logger.info(f"Loaded .env file from: {dotenv_path}")
-else:
-    logger.error("Could not find .env file. Please ensure it exists.")
-    # Consider exiting or using hardcoded defaults if .env is critical
+# NOTE: The .env file loading is now handled externally (e.g., in run.py)
+# before this module's variables are accessed.
 
 # Telegram Bot Configuration
 TG_BOT_TOKEN: Optional[str] = os.getenv("TG_BOT_TOKEN")

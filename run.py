@@ -1,27 +1,85 @@
+import sys # Must be one of the first
+import os # For os.path.exists, needed early
+from typing import Optional # For type hinting if used in moved function
+
+# Attempt to load python-dotenv. If not available, loading .env files will silently fail
+# or could raise an error if not handled. For this controlled environment, assume it's installed.
+try:
+    from dotenv import load_dotenv, find_dotenv
+except ImportError:
+    # This function will be a no-op if python-dotenv is not installed.
+    # Or, you could print a warning.
+    print("[bootstrap_warning] python-dotenv module not found. .env file loading will be skipped.")
+    def load_dotenv(*args, **kwargs): pass
+    def find_dotenv(*args, **kwargs): return None
+
+# --- Early .env file loading logic ---
+# This logic is moved here to run before any other module (especially bot.core.config)
+# reads environment variables.
+def _early_load_env_file(env_path: Optional[str] = None) -> None:
+    """
+    Loads environment variables from a .env file.
+    Uses print for feedback as logging might not be configured this early.
+    """
+    value_to_print = env_path if env_path else "<default>"
+    print(f"[_early_load_env_file] Attempting to load .env file. Provided path: '{value_to_print}'")
+    if env_path and os.path.exists(env_path):
+        load_dotenv(dotenv_path=env_path)
+        print(f"[_early_load_env_file] SUCCESS: Loaded .env file from specified path: {env_path}")
+    else:
+        if env_path:
+            print(f"[_early_load_env_file] INFO: Specified .env file path not found: {env_path}. Trying default locations.")
+
+        # Attempt to find .env only if no specific path was given or if it wasn't found
+        # This behavior matches the original intent of find_dotenv() being a fallback.
+        # If a path is given and not found, some might argue it shouldn't fall back.
+        # For now, maintaining original logic: fallback if specified path not found.
+        dotenv_path_found = find_dotenv(usecwd=True) # usecwd=True to search in current dir first
+
+        if dotenv_path_found and os.path.exists(dotenv_path_found):
+            load_dotenv(dotenv_path_found)
+            print(f"[_early_load_env_file] SUCCESS: Loaded .env file from default location: {dotenv_path_found}")
+        elif not env_path : # Only print "could not find" if no specific path was ever tried or default search failed
+            print(f"[_early_load_env_file] INFO: Could not find .env file in default locations.")
+        # If env_path was specified but not found, and default also not found, the earlier message about specified path is key.
+
+# Process command line arguments for .env file path BEFORE other imports that might rely on os.environ
+_env_file_to_load = None
+if len(sys.argv) > 1:
+    # Simplified logic: if --test-run is first, potential .env is second. Otherwise, .env is first.
+    if sys.argv[1] == "--test-run":
+        if len(sys.argv) > 2:
+            _env_file_to_load = sys.argv[2]
+    else: # First argument is not --test-run, so assume it's an env file path
+        _env_file_to_load = sys.argv[1]
+_early_load_env_file(_env_file_to_load)
+# --- End of early .env file loading ---
+
 import asyncio
-import sys # Added for --test-run
-import logging # Added standard logging
+import logging # Standard logging, configured after .env load
 
-import uvicorn # Added for FastAPI
+import uvicorn
 
-from bot.fastapi_app.main import app as fastapi_app # Added FastAPI app instance
-from bot.core import config as core_config
+# Now that .env is loaded (or attempted), these imports can proceed and config will see the right values
+from bot.fastapi_app.main import app as fastapi_app
+from bot.core import config as core_config # This should now see env vars from custom .env
 from bot.telegram_bot.main import run_telegram_bot, start_pytalk_bot_internals, start_telegram_polling
 from bot.core.database import close_db_engine
 from bot.core.teamtalk_client import shutdown_pytalk_bot
-from pathlib import Path # For SSL path checking
+from pathlib import Path
 
+# Configure logging AFTER .env load, as .env might contain logging settings in a real app
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.INFO, # Default level
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()]
+    handlers=[logging.StreamHandler(sys.stdout)] # Explicitly use stdout
 )
 # Set levels for other libraries
 logging.getLogger("aiosqlite").setLevel(logging.WARNING)
-logging.getLogger("pytalk").setLevel(logging.INFO)
+logging.getLogger("pytalk").setLevel(logging.INFO) # Assuming pytalk logs at INFO as before
 logging.getLogger("PIL.PngImagePlugin").setLevel(logging.WARNING)
-
-logger = logging.getLogger(__name__)
+# Logger for run.py itself
+logger = logging.getLogger(__name__) # Name will be '__main__' if run as script
 
 # Global task references
 telegram_polling_task_ref: asyncio.Task | None = None
@@ -191,11 +249,16 @@ async def main():
 
 
 if __name__ == "__main__":
+    # The .env loading logic has been moved to the top of the file,
+    # before other imports and logging configuration.
+    # The sys.argv parsing for --test-run for exiting early is still in main().
+    logger.info(f"Application starting with arguments: {sys.argv}")
+    logger.info(f"NICK_NAME from config: {core_config.NICK_NAME}") # Example: check if config loaded
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         # Using print here as logger might not be available or configured if asyncio.run(main()) fails very early
-        print("Application terminated by user (Ctrl+C in asyncio.run).") 
+        print("Application terminated by user (Ctrl+C in asyncio.run).")
     except Exception as e:
         # Using print for critical errors during asyncio.run if logger itself might be part of the problem
         print(f"CRITICAL: Critical error during asyncio.run: {e}", file=sys.stderr)
