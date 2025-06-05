@@ -227,10 +227,51 @@ async def connect_to_teamtalk_server():
         return False
 
 async def shutdown_pytalk_bot():
-    logger.info("Shutting down PyTalk bot connections.")
-    for tt_instance in pytalk_bot.teamtalks:
-        if tt_instance.logged_in:
-            tt_instance.logout()
-        if tt_instance.connected:
-            tt_instance.disconnect()
-    pytalk_bot.teamtalks.clear()
+    logger.info("Attempting to shut down PyTalk bot connections...")
+
+    # Iterate safely over a copy of the list if modification during iteration is a concern,
+    # though clear() at the end is typical. For direct calls, iterating original is fine.
+    for i, tt_instance in enumerate(pytalk_bot.teamtalks):
+        instance_id = f"Instance {i} (Host: {tt_instance.info.host if tt_instance.info else 'Unknown'})"
+        logger.debug(f"Processing {instance_id} for shutdown.")
+        try:
+            if tt_instance.logged_in:
+                logger.debug(f"Logging out from {instance_id}...")
+                tt_instance.logout() # Synchronous call
+                logger.info(f"Logged out from {instance_id}.")
+            else:
+                logger.debug(f"{instance_id} was not logged in.")
+        except Exception as e:
+            logger.error(f"Error logging out from {instance_id}: {e}", exc_info=True)
+
+        try:
+            if tt_instance.connected:
+                logger.debug(f"Disconnecting from {instance_id}...")
+                tt_instance.disconnect() # Synchronous call
+                logger.info(f"Disconnected from {instance_id}.")
+            else:
+                logger.debug(f"{instance_id} was not connected.")
+        except Exception as e:
+            logger.error(f"Error disconnecting from {instance_id}: {e}", exc_info=True)
+
+    # Close all underlying SDK instances
+    # This method is part of pytalk.TeamTalkBot and handles calling closeTeamTalk()
+    if hasattr(pytalk_bot, '_close_all_sdk'):
+        try:
+            logger.debug("Calling pytalk_bot._close_all_sdk() to close all TeamTalk SDK instances...")
+            pytalk_bot._close_all_sdk() # This contains synchronous calls
+            logger.info("Successfully called _close_all_sdk().")
+        except Exception as e:
+            logger.error("Error calling pytalk_bot._close_all_sdk(): {e}", exc_info=True)
+    else:
+        logger.warning("pytalk_bot does not have _close_all_sdk method. Skipping this step. SDK instances might not be cleanly closed.")
+
+    # Clear the list of server instances in the bot
+    if pytalk_bot.teamtalks:
+        logger.debug("Clearing pytalk_bot.teamtalks list...")
+        pytalk_bot.teamtalks.clear()
+        logger.info("pytalk_bot.teamtalks list cleared.")
+    else:
+        logger.debug("pytalk_bot.teamtalks list was already empty.")
+
+    logger.info("PyTalk bot shutdown process completed.")

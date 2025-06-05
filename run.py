@@ -23,18 +23,55 @@ logging.getLogger("PIL.PngImagePlugin").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
+# Global task references
+telegram_polling_task_ref: asyncio.Task | None = None
+pytalk_task_ref: asyncio.Task | None = None
+fastapi_server_task_ref: asyncio.Task | None = None
+
+
+async def on_aiogram_shutdown_handler():
+    """
+    Handles graceful shutdown of related asyncio tasks when Aiogram is shutting down.
+    This function is intended to be registered with Aiogram's dispatcher.
+    """
+    logger.info("Aiogram shutdown handler called. Cancelling related tasks...")
+
+    tasks_to_cancel = [
+        pytalk_task_ref,
+        # telegram_polling_task_ref, # Aiogram handles its own polling task cancellation
+        fastapi_server_task_ref
+    ]
+
+    for task in tasks_to_cancel:
+        if task and not task.done():
+            logger.info(f"Cancelling task: {task.get_name()}")
+            task.cancel()
+            try:
+                await task # Allow task to process cancellation
+            except asyncio.CancelledError:
+                logger.info(f"Task {task.get_name()} was cancelled successfully.")
+            except Exception as e:
+                logger.error(f"Error during cancellation of task {task.get_name()}: {e}", exc_info=True)
+        elif task and task.done():
+            logger.info(f"Task {task.get_name()} is already done.")
+        else:
+            logger.debug(f"Task reference was None, skipping cancellation.")
+    logger.info("Aiogram shutdown handler finished cancelling tasks.")
+
 
 async def main():
     logger.info("Starting application...")
 
-    tasks = []
+    global telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref
+
     actual_aiogram_bot_instance = None
     dp = None # Dispatcher
 
     try:
         # 1. Initialize Aiogram Bot and Dispatcher
-        actual_aiogram_bot_instance, dp = await run_telegram_bot()
-        
+        # The on_shutdown handler for the dispatcher will be set in telegram_bot.main
+        actual_aiogram_bot_instance, dp = await run_telegram_bot(shutdown_handler_callback=on_aiogram_shutdown_handler)
+
         # 2. Pass Bot instance to FastAPI app state
         if actual_aiogram_bot_instance:
             fastapi_app.state.aiogram_bot_instance = actual_aiogram_bot_instance
@@ -67,62 +104,90 @@ async def main():
         server = uvicorn.Server(config=uvicorn_config)
 
         # 4. Define tasks to run concurrently
-        # Telegram polling task
         if dp and actual_aiogram_bot_instance:
-             telegram_polling_task = asyncio.create_task(
-                start_telegram_polling(actual_aiogram_bot_instance, dp), 
+            telegram_polling_task_ref = asyncio.create_task(
+                start_telegram_polling(actual_aiogram_bot_instance, dp),
                 name="TelegramBotPolling"
             )
-             tasks.append(telegram_polling_task)
         else:
             logger.error("Dispatcher or Bot not initialized. Telegram polling will not start.")
 
-        pytalk_task = asyncio.create_task(start_pytalk_bot_internals(), name="PyTalkBotInternals")
-        tasks.append(pytalk_task)
+        pytalk_task_ref = asyncio.create_task(start_pytalk_bot_internals(), name="PyTalkBotInternals")
         
-        # FastAPI server task
-        fastapi_server_task = asyncio.create_task(server.serve(), name="FastAPIServer")
-        tasks.append(fastapi_server_task)
+        fastapi_server_task_ref = asyncio.create_task(server.serve(), name="FastAPIServer")
         
-        logger.info(f"FastAPI app starting on http{'s' if ssl_config else ''}://{core_config.WEB_APP_HOST}:{core_config.WEB_APP_PORT}") # Use new config names
+        logger.info(f"FastAPI app starting on http{'s' if ssl_config else ''}://{core_config.WEB_APP_HOST}:{core_config.WEB_APP_PORT}")
 
         # --- Test Run Logic ---
         if "--test-run" in sys.argv:
             logger.info("Test run: Initializations complete or error occurred before this point. Exiting.")
-            # The Uvicorn server task (fastapi_server_task) was created but not awaited directly here,
-            # it's part of asyncio.gather. For a test run, we don't want to run indefinitely.
-            # We can cancel the tasks created for a cleaner exit, though return will also work.
-            for task in tasks:
-                task.cancel()
-            # A brief moment to allow cancellations to register if needed, then exit.
-            await asyncio.sleep(0.1) 
+            tasks_to_cancel_test_run = [
+                telegram_polling_task_ref,
+                pytalk_task_ref,
+                fastapi_server_task_ref
+            ]
+            for task in tasks_to_cancel_test_run:
+                if task and not task.done():
+                    task.cancel()
+            await asyncio.sleep(0.1) # Allow cancellations to register
             return # Exit main function early
 
         # Run all tasks concurrently
-        await asyncio.gather(*tasks, return_exceptions=True)
+        # Only gather tasks that have been successfully created
+        active_tasks_to_gather = [task for task in [telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref] if task is not None]
+        if active_tasks_to_gather:
+            await asyncio.gather(*active_tasks_to_gather, return_exceptions=True)
+        else:
+            logger.warning("No main tasks were started. Application might not be functional.")
+
 
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received. Shutting down...")
     except asyncio.CancelledError:
-        logger.info("One or more tasks were cancelled, shutting down...")
+        logger.info("Main task or one of its children was cancelled, shutting down...")
     except Exception as e:
         logger.exception(f"Unhandled exception in main execution: {e}")
     finally:
-        logger.info("Performing cleanup...")
-        
-        # Отмена задач, если они еще не завершены
-        for task in tasks:
-            if not task.done():
-                task.cancel()
-        
-        # Ожидание завершения отмены задач
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+        logger.info("Performing cleanup in main finally block...")
 
-        await shutdown_pytalk_bot()
+        # Cancel tasks if they are still running
+        # This section primarily handles cancellations not initiated by Aiogram's own shutdown.
+        # If Aiogram's on_shutdown_handler was called, some tasks might already be cancelled.
+        tasks_to_cancel_finally = [
+            telegram_polling_task_ref, # Important if KeyboardInterrupt or other external signal stops main before Aiogram fully shuts down.
+            pytalk_task_ref,
+            fastapi_server_task_ref
+        ]
+        for task in tasks_to_cancel_finally:
+            if task and not task.done():
+                logger.info(f"Main finally: Cancelling task: {task.get_name()}")
+                task.cancel()
+
+        # Await the cancellation of all tasks
+        tasks_to_await_finally = [task for task in [telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref] if task is not None]
+        if tasks_to_await_finally:
+            logger.info(f"Main finally: Awaiting {len(tasks_to_await_finally)} tasks...")
+            # We use return_exceptions=True to ensure all tasks are awaited even if some were cancelled or failed.
+            results = await asyncio.gather(*tasks_to_await_finally, return_exceptions=True)
+            for i, result in enumerate(results):
+                task_name = tasks_to_await_finally[i].get_name()
+                if isinstance(result, asyncio.CancelledError):
+                    logger.info(f"Main finally: Task {task_name} was cancelled.")
+                elif isinstance(result, Exception):
+                    logger.error(f"Main finally: Task {task_name} raised an exception: {result}", exc_info=result if not isinstance(result, asyncio.CancelledError) else False)
+                else:
+                    logger.info(f"Main finally: Task {task_name} completed with result: {result}")
+        else:
+            logger.info("Main finally: No tasks to await.")
+
+        # Now, perform ordered shutdown of other resources
+        logger.info("Main finally: Shutting down PyTalk bot...")
+        await shutdown_pytalk_bot() # Should handle its own internal cleanup
+
+        logger.info("Main finally: Closing database engine...")
         await close_db_engine()
         
-        logger.info("Application shutdown complete.")
+        logger.info("Application shutdown sequence complete.")
 
 
 if __name__ == "__main__":

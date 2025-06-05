@@ -45,13 +45,16 @@ async def on_message(message: PyTalkMessage):
     # экземпляр aiogram_bot нужно будет передавать сюда (например, через замыкание или класс)
 
 # --- Aiogram Bot Setup and Run ---
-async def run_telegram_bot() -> AiogramBot: # Функция теперь возвращает экземпляр бота
+async def run_telegram_bot(shutdown_handler_callback: callable = None): #Signature changed -> AiogramBot:
     await database.init_db()
 
     bot_instance = AiogramBot(token=config.TG_BOT_TOKEN) # Создаем экземпляр здесь
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
+    if shutdown_handler_callback:
+        dp.shutdown.register(shutdown_handler_callback)
+        logger.info("Registered custom shutdown handler for Aiogram dispatcher.")
 
     # Register handlers
     dp.message.register(reg_handlers.start_command_handler, Command("start"))
