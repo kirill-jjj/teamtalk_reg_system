@@ -229,30 +229,46 @@ async def connect_to_teamtalk_server():
 async def shutdown_pytalk_bot():
     logger.info("Attempting to shut down PyTalk bot connections...")
 
+    if not pytalk_bot.teamtalks:
+        logger.info("pytalk_bot.teamtalks is empty, cleanup likely done by __aexit__ or already processed. Skipping further shutdown steps.")
+        return
+
     # Iterate safely over a copy of the list if modification during iteration is a concern,
     # though clear() at the end is typical. For direct calls, iterating original is fine.
-    for i, tt_instance in enumerate(pytalk_bot.teamtalks):
-        instance_id = f"Instance {i} (Host: {tt_instance.info.host if tt_instance.info else 'Unknown'})"
-        logger.debug(f"Processing {instance_id} for shutdown.")
-        try:
-            if tt_instance.logged_in:
-                logger.debug(f"Logging out from {instance_id}...")
-                tt_instance.logout() # Synchronous call
-                logger.info(f"Logged out from {instance_id}.")
+    for i, tt_instance in enumerate(list(pytalk_bot.teamtalks)): # Iterate over a copy
+        host_display_name = "Unknown Host"
+        if hasattr(tt_instance, 'info') and tt_instance.info:
+            if hasattr(tt_instance.info, 'host') and tt_instance.info.host:
+                host_display_name = tt_instance.info.host
             else:
-                logger.debug(f"{instance_id} was not logged in.")
-        except Exception as e:
-            logger.error(f"Error logging out from {instance_id}: {e}", exc_info=True)
+                host_display_name = "Host N/A" # info exists but host is not there
+        else:
+            host_display_name = "Info N/A" # tt_instance.info is None or tt_instance has no info attr
+
+        instance_id_str = f"Instance {i} (Host: {host_display_name})"
+        logger.debug(f"Processing {instance_id_str} for shutdown.")
 
         try:
-            if tt_instance.connected:
-                logger.debug(f"Disconnecting from {instance_id}...")
-                tt_instance.disconnect() # Synchronous call
-                logger.info(f"Disconnected from {instance_id}.")
+            # Robust check for logged_in attribute, though typically present
+            if hasattr(tt_instance, 'logged_in') and tt_instance.logged_in:
+                logger.debug(f"Logging out from {instance_id_str}...")
+                tt_instance.logout() # Synchronous call
+                logger.info(f"Logged out from {instance_id_str}.")
             else:
-                logger.debug(f"{instance_id} was not connected.")
+                logger.debug(f"{instance_id_str} was not logged in or 'logged_in' attribute missing.")
         except Exception as e:
-            logger.error(f"Error disconnecting from {instance_id}: {e}", exc_info=True)
+            logger.error(f"Error logging out from {instance_id_str}: {e}", exc_info=True)
+
+        try:
+            # Robust check for connected attribute
+            if hasattr(tt_instance, 'connected') and tt_instance.connected:
+                logger.debug(f"Disconnecting from {instance_id_str}...")
+                tt_instance.disconnect() # Synchronous call
+                logger.info(f"Disconnected from {instance_id_str}.")
+            else:
+                logger.debug(f"{instance_id_str} was not connected or 'connected' attribute missing.")
+        except Exception as e:
+            logger.error(f"Error disconnecting from {instance_id_str}: {e}", exc_info=True)
 
     # Close all underlying SDK instances
     # This method is part of pytalk.TeamTalkBot and handles calling closeTeamTalk()
