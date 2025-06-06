@@ -6,9 +6,10 @@ from pathlib import Path # Added for base_dir
 from bot.core.localization import get_translator, DEFAULT_LANG_CODE
 from bot.core.config import FORCE_USER_LANG # Import FORCE_USER_LANG
 
+import os # Added import for os module
 logger = logging.getLogger(__name__) # Reverted
 
-app = FastAPI()
+app = FastAPI(root_path=os.getenv("ROOT_PATH", "/")) # Added root_path using os.getenv
 
 # Initialize application state variables
 app.state.download_tokens = {}
