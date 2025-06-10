@@ -280,8 +280,7 @@ async def _process_actual_registration(
 
             try:
                 await bot.send_document(user_id_val, document=tt_buffered_file, caption=_("Your .tt file for quick connection"))
-                link_text_part = _("Or use this TT link:
-")
+                link_text_part = _("Or use this TT link:\n")
                 message_content = "{}`{}`".format(link_text_part, tt_link_val)
                 await bot.send_message(user_id_val, message_content, parse_mode="Markdown")
             except Exception as e_send:
@@ -331,19 +330,15 @@ async def _handle_registration_continuation(
 
         _ = get_translator(get_admin_lang_code())
 
-        admin_message_text = "{}
-{}: {}
-".format(
+        admin_message_text = "{}\n{}: {}\n".format(
             _('Registration request:'),
             _('Username:'),
             username_value
         )
         if nickname_value != username_value:
-            admin_message_text += "{}: {}
-".format(_('Nickname:'), nickname_value)
+            admin_message_text += "{}: {}\n".format(_('Nickname:'), nickname_value)
 
-        admin_message_text += "{}: {} (ID: {})
-{}".format(
+        admin_message_text += "{}: {} (ID: {})\n{}".format(
             _('Telegram User:'),
             user_full_name,
             user_tg_id,
