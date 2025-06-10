@@ -60,7 +60,7 @@ async def start_command_handler(message: types.Message, state: FSMContext, bot: 
         for lang_info in available_langs:
             button_text = lang_info["native_name"] if lang_info["native_name"] else lang_info["code"].upper()
             inline_keyboard_buttons.append(
-                [InlineKeyboardButton(text=button_text, callback_data=f"set_lang_tg:{lang_info['code']}")]
+                [InlineKeyboardButton(text=button_text, callback_data="set_lang_tg:{}".format(lang_info['code']))]
             )
 
     if not inline_keyboard_buttons:
@@ -259,7 +259,7 @@ async def _process_actual_registration(
                 f"CRITICAL: Failed to add Telegram ID {user_id_val} to database for TT user {username_val} after successful TT registration."
             )
             await bot.send_message(user_id_val, _("Registration error. Please try again later or contact an administrator."))
-            admin_notification = f"CRITICAL DB SYNC ERROR: User {username_val} (TG ID: {user_id_val}) registered on TeamTalk BUT FAILED to save to local database. Manual intervention may be required."
+            admin_notification = "CRITICAL DB SYNC ERROR: User {} (TG ID: {}) registered on TeamTalk BUT FAILED to save to local database. Manual intervention may be required.".format(username_val, user_id_val)
             for admin_tg_id in config.ADMIN_IDS:
                 try:
                     await bot.send_message(admin_tg_id, admin_notification)
@@ -275,14 +275,14 @@ async def _process_actual_registration(
             ).rstrip()
             if not safe_server_name_for_file:
                 safe_server_name_for_file = "TeamTalk_Server"
-            generated_filename = f"{safe_server_name_for_file}.tt"
+            generated_filename = "{}.tt".format(safe_server_name_for_file)
             tt_buffered_file = BufferedInputFile(tt_file_bytes, filename=generated_filename)
 
             try:
                 await bot.send_document(user_id_val, document=tt_buffered_file, caption=_("Your .tt file for quick connection"))
                 link_text_part = _("Or use this TT link:
 ")
-                message_content = f"{link_text_part}`{tt_link_val}`"
+                message_content = "{}`{}`".format(link_text_part, tt_link_val)
                 await bot.send_message(user_id_val, message_content, parse_mode="Markdown")
             except Exception as e_send:
                 logger.error(f"Error sending .tt file or link to user {user_id_val}: {e_send}", exc_info=True)
@@ -331,20 +331,30 @@ async def _handle_registration_continuation(
 
         _ = get_translator(get_admin_lang_code())
 
-        admin_message_text = f"{_('Registration request:')}
-" f"{_('Username:')} {username_value}
-"
+        admin_message_text = "{}
+{}: {}
+".format(
+            _('Registration request:'),
+            _('Username:'),
+            username_value
+        )
         if nickname_value != username_value:
-            admin_message_text += f"{_('Nickname:')} {nickname_value}
-"
-        admin_message_text += f"{_('Telegram User:')} {user_full_name} (ID: {user_tg_id})
-" f"{_('Approve registration?')}"
+            admin_message_text += "{}: {}
+".format(_('Nickname:'), nickname_value)
+
+        admin_message_text += "{}: {} (ID: {})
+{}".format(
+            _('Telegram User:'),
+            user_full_name,
+            user_tg_id,
+            _('Approve registration?')
+        )
 
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
                 [
-                    InlineKeyboardButton(text=_("Yes"), callback_data=f"verify_reg:yes:{request_id}"),
-                    InlineKeyboardButton(text=_("No"), callback_data=f"verify_reg:no:{request_id}"),
+                    InlineKeyboardButton(text=_("Yes"), callback_data="verify_reg:yes:{}".format(request_id)),
+                    InlineKeyboardButton(text=_("No"), callback_data="verify_reg:no:{}".format(request_id)),
                 ]
             ]
         )
