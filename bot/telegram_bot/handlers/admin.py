@@ -1,21 +1,16 @@
-# Placeholder for admin-specific command handlers for the Telegram bot
-# For example, commands to list users, manually trigger actions, etc.
-import logging # Reverted
+import logging
 
-logger = logging.getLogger(__name__) # Reverted
+from aiogram import Router
 
-# Example (not implemented in current scope, just for structure):
-# from aiogram import types
+logger = logging.getLogger(__name__)
+
+router = Router()
+
+# Future admin command handlers can be added here using @router.message(...)
+# For example:
 # from aiogram.filters import Command
-# from ...core import config
-#
+# @router.message(Command("admin_action"))
 # async def some_admin_command(message: types.Message):
-#     if message.from_user.id not in config.ADMIN_IDS:
-#         await message.reply("You are not authorized for this command.")
-#         return
-#     await message.reply("Admin command executed.")
+#     ...
 
-def register_admin_handlers(dp):
-    # dp.message.register(some_admin_command, Command("admin_action"))
-    logger.info("Admin handlers (placeholder) registered.")
-    pass
+logger.info("Admin router initialized.")
