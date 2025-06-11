@@ -4,7 +4,8 @@ from typing import Dict, Optional
 from aiogram import Bot as AiogramBot, F, Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import BufferedInputFile, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import BufferedInputFile
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from ...core import config, database
 from ...core import teamtalk_client as tt_client
@@ -55,20 +56,16 @@ async def start_command_handler(message: types.Message, state: FSMContext, bot: 
 
     _ = get_translator("en")
     available_langs = get_available_languages_for_display()
-    inline_keyboard_buttons = []
+    builder = InlineKeyboardBuilder()
     if available_langs:
         for lang_info in available_langs:
-            button_text = lang_info["native_name"] if lang_info["native_name"] else lang_info["code"].upper()
-            inline_keyboard_buttons.append(
-                [InlineKeyboardButton(text=button_text, callback_data="set_lang_tg:{}".format(lang_info['code']))]
-            )
-
-    if not inline_keyboard_buttons:
+            button_text = lang_info['native_name'] if lang_info['native_name'] else lang_info['code'].upper()
+            builder.button(text=button_text, callback_data=f"set_lang_tg:{lang_info['code']}")
+    else:
         logger.error("No languages discovered for Telegram language selection.")
-        inline_keyboard_buttons.append([InlineKeyboardButton(text="English", callback_data="set_lang_tg:en")])
+        builder.button(text="English", callback_data="set_lang_tg:en")
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=inline_keyboard_buttons)
-    await message.reply(_("Please choose your language:"), reply_markup=keyboard)
+    await message.reply(_("Please choose your language:"), reply_markup=builder.as_markup())
     await state.set_state(RegistrationStates.choosing_language)
 
 
@@ -139,18 +136,16 @@ async def password_handler(message: types.Message, state: FSMContext, bot: Aiogr
     yes_button_text = _("Yes")
     no_button_text = _("No (use username)")
 
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=yes_button_text, callback_data="set_nickname_choice:yes")],
-            [InlineKeyboardButton(text=no_button_text, callback_data="set_nickname_choice:no")],
-        ]
-    )
+    builder = InlineKeyboardBuilder()
+    builder.button(text=yes_button_text, callback_data="set_nickname_choice:yes")
+    builder.button(text=no_button_text, callback_data="set_nickname_choice:no")
+    builder.adjust(1) # Added this line
 
     prompt_message = _(
         "Your username will be '{username}'. Would you like to set a different nickname? If not, your nickname will be the same as your username."
     ).format(username=username_value)
 
-    await message.reply(prompt_message, reply_markup=keyboard)
+    await message.reply(prompt_message, reply_markup=builder.as_markup()) # Corrected this line
     await state.set_state(RegistrationStates.awaiting_nickname_choice)
 
 
@@ -345,18 +340,14 @@ async def _handle_registration_continuation(
             _('Approve registration?')
         )
 
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(text=_("Yes"), callback_data="verify_reg:yes:{}".format(request_id)),
-                    InlineKeyboardButton(text=_("No"), callback_data="verify_reg:no:{}".format(request_id)),
-                ]
-            ]
-        )
+        builder = InlineKeyboardBuilder()
+        builder.button(text=_("Yes"), callback_data=f"verify_reg:yes:{request_id}")
+        builder.button(text=_("No"), callback_data=f"verify_reg:no:{request_id}")
+        builder.adjust(2) # Added this line
 
         for admin_id_val in config.ADMIN_IDS:
             try:
-                await bot.send_message(admin_id_val, admin_message_text, reply_markup=keyboard)
+                await bot.send_message(admin_id_val, admin_message_text, reply_markup=builder.as_markup())
             except Exception as e:
                 logger.error(f"Error sending verification request to admin {admin_id_val}: {e}", exc_info=True)
 
