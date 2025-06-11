@@ -6,7 +6,8 @@ from aiogram import Bot as AiogramBot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from pytalk.message import Message as PyTalkMessage
 
-from ..core import config, database
+from ..core import config
+from ..core.db import init_db
 from ..core import teamtalk_client as tt_client
 from .handlers.admin import router as admin_router
 from .handlers.registration import router as registration_router
@@ -40,7 +41,7 @@ async def on_message(message: PyTalkMessage):
 
 
 async def run_telegram_bot(shutdown_handler_callback: callable = None):
-    await database.init_db()
+    await init_db()
 
     bot_instance = AiogramBot(token=config.TG_BOT_TOKEN)
     storage = MemoryStorage()

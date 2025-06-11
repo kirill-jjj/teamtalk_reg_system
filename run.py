@@ -64,7 +64,7 @@ import uvicorn
 from bot.fastapi_app.main import app as fastapi_app
 from bot.core import config as core_config # This should now see env vars from custom .env
 from bot.telegram_bot.main import run_telegram_bot, start_pytalk_bot_internals, start_telegram_polling
-from bot.core.database import close_db_engine
+from bot.core.db import close_db_engine
 from bot.core.teamtalk_client import shutdown_pytalk_bot
 from pathlib import Path
 

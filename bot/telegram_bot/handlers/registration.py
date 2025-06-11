@@ -7,7 +7,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from ...core import config, database
+from ...core import config
+from ...core.db import is_telegram_id_registered, add_telegram_registration
 from ...core import teamtalk_client as tt_client
 from ...core.config import FORCE_USER_LANG
 from ...core.localization import (
@@ -30,7 +31,7 @@ request_id_counter = 0
 async def start_command_handler(message: types.Message, state: FSMContext, bot: AiogramBot):
     telegram_id = message.from_user.id
     _ = get_translator(get_admin_lang_code())
-    if await database.is_telegram_id_registered(telegram_id):
+    if await is_telegram_id_registered(telegram_id):
         await message.reply(
             _("You have already registered one TeamTalk account from this Telegram account. Only one registration is allowed.")
         )
@@ -120,7 +121,7 @@ async def password_handler(message: types.Message, state: FSMContext, bot: Aiogr
     user_lang_code = data.get("user_tg_lang", "en")
     _ = get_translator(user_lang_code)
 
-    if await database.is_telegram_id_registered(user_tg_id):
+    if await is_telegram_id_registered(user_tg_id):
         await message.reply(
             _("You have already registered one TeamTalk account from this Telegram account. Only one registration is allowed.")
         )
@@ -173,7 +174,7 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, state:
     user_telegram_full_name = pending_reg_data.get("telegram_full_name", "N/A")
     nickname_val = pending_reg_data.get("nickname", username_val)
 
-    if await database.is_telegram_id_registered(user_tg_id_val):
+    if await is_telegram_id_registered(user_tg_id_val):
         await callback_query.answer(_("This Telegram account has already registered a TeamTalk account."), show_alert=True)
 
         _ = get_translator(user_tg_lang_val)
@@ -248,7 +249,7 @@ async def _process_actual_registration(
     )
 
     if success:
-        db_add_success = await database.add_telegram_registration(user_id_val, username_val)
+        db_add_success = await add_telegram_registration(user_id_val, username_val)
         if not db_add_success:
             logger.error(
                 f"CRITICAL: Failed to add Telegram ID {user_id_val} to database for TT user {username_val} after successful TT registration."
