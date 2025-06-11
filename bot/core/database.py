@@ -3,11 +3,11 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Integer, String
 from sqlalchemy.exc import IntegrityError as SQLAlchemyIntegrityError
+from .config import DB_NAME_CONFIG
 
 logger = logging.getLogger(__name__)
 
-DB_NAME = "users.db"
-DB_ASYNC_URL = f"sqlite+aiosqlite:///{DB_NAME}"
+DB_ASYNC_URL = f"sqlite+aiosqlite:///{DB_NAME_CONFIG}"
 
 async_engine = create_async_engine(DB_ASYNC_URL)
 AsyncSessionLocal = async_sessionmaker(bind=async_engine, expire_on_commit=False, class_=AsyncSession)

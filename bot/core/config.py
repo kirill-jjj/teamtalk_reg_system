@@ -8,6 +8,8 @@ logger = logging.getLogger(__name__)
 # --- Constants for Environment Variable Names and Defaults ---
 GENERATED_FILE_TTL_SECONDS_ENV_VAR_NAME: str = "GENERATED_FILE_TTL_SECONDS"
 DEFAULT_TTL_SECONDS: int = 600
+DATABASE_FILE_NAME_ENV_VAR: str = "DB_NAME"
+DEFAULT_DB_NAME: str = "users.db"
 
 # NOTE: The .env file loading is now handled externally (e.g., in run.py)
 # before this module's variables are accessed.
@@ -27,6 +29,7 @@ NICK_NAME: str = os.getenv("NICK_NAME", "RegisterBot")
 CLIENT_NAME: str = os.getenv("CLIENT_NAME", "PyTalkRegisterBot")
 ENCRYPTED_STR: str = os.getenv("ENCRYPTED", "0")
 SERVER_NAME: str = os.getenv("SERVER_NAME", "TeamTalk Server")
+DB_NAME_CONFIG: str = os.getenv(DATABASE_FILE_NAME_ENV_VAR, DEFAULT_DB_NAME)
 
 # Registration Settings
 VERIFY_REGISTRATION_STR: str = os.getenv("VERIFY_REGISTRATION", "0")
