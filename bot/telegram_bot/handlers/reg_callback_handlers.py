@@ -12,11 +12,11 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder # Not used directly in 
 from ..states import RegistrationStates
 # Imports from core
 from ...core import config
-from ...core.db import is_telegram_id_registered
+from ...core.db import is_telegram_id_registered, get_and_remove_pending_telegram_registration # Import new CRUD function
 from ...core.localization import get_admin_lang_code, get_translator
 
 # Imports from within the registration handlers module
-from .reg_logic_helpers import registration_requests
+# from .reg_logic_helpers import registration_requests # Removed
 from .reg_logic_helpers import _ask_nickname_preference, _process_actual_registration, _handle_registration_continuation
 # Import the CallbackData definitions from the new central file
 from .reg_callback_data import LanguageCallback, NicknameChoiceCallback, AdminVerificationCallback, TTAccountTypeCallback
@@ -81,34 +81,37 @@ async def tt_account_type_choice_handler(callback_query: types.CallbackQuery, ca
 # The callback data definition has 'action: str'. Let's assume specific actions like "verify" and "reject".
 @callback_router.callback_query(AdminVerificationCallback.filter(F.action.in_({"verify", "reject"})))
 async def admin_verification_handler(callback_query: types.CallbackQuery, callback_data: AdminVerificationCallback, bot: AiogramBot, db_session: AsyncSession):
-    request_key = callback_data.request_id
+    request_key_str = callback_data.request_key # Field name updated in AdminVerificationCallback
     decision_action = callback_data.action # This is "verify" or "reject"
 
     admin_id_str = str(callback_query.from_user.id)
     admin_lang_code = await get_admin_lang_code(admin_id_str)
     _ = get_translator(admin_lang_code)
 
-    pending_reg_data = registration_requests.pop(request_key, None)
+    # Retrieve and remove the pending registration from the database
+    pending_reg_data_model = await get_and_remove_pending_telegram_registration(db_session, request_key_str)
 
-    if not pending_reg_data:
-        await callback_query.answer(_("Registration request not found or outdated."), show_alert=True)
+    if not pending_reg_data_model:
+        await callback_query.answer(_("Registration request not found, outdated, or already processed."), show_alert=True)
         try: await callback_query.message.delete()
         except Exception as e: logger.debug(f"Error deleting admin verification message: {e}")
         return
 
-    registrant_user_tg_id = pending_reg_data["registrant_user_id"]
-    username_val = pending_reg_data["username_value"]
-    password_val_cb = pending_reg_data["password_value"]
-    nickname_val = pending_reg_data["nickname_value"]
-    source_info_from_request = pending_reg_data["source_info"]
+    # Adapt to use attributes from the SQLAlchemy model instance
+    registrant_user_tg_id = pending_reg_data_model.registrant_telegram_id
+    username_val = pending_reg_data_model.username
+    password_val_cb = pending_reg_data_model.password_cleartext
+    nickname_val = pending_reg_data_model.nickname
+    source_info_from_request = pending_reg_data_model.source_info # This is already a dict
 
     user_specific_lang_code = source_info_from_request.get("selected_language", config.CFG_ADMIN_LANG)
     _user_specific_translator = get_translator(user_specific_lang_code)
 
-    if await is_telegram_id_registered(db_session, registrant_user_tg_id) and decision_action == "verify":
+    # Check if already registered *before* processing, especially for "verify"
+    if decision_action == "verify" and await is_telegram_id_registered(db_session, registrant_user_tg_id):
         await callback_query.answer(_("This Telegram account has already a TeamTalk account linked."), show_alert=True)
         try:
-            await bot.send_message(registrant_user_tg_id, _user_specific_translator("You have already registered one TeamTalk account from this Telegram account. Only one registration is allowed."))
+            await bot.send_message(registrant_user_tg_id, _user_specific_translator("Your registration request was processed, but this Telegram account already has a TeamTalk account linked. Only one registration is allowed."))
         except Exception as e: logger.warning(f"Could not notify user {registrant_user_tg_id} about being already registered: {e}")
         try: await callback_query.message.delete()
         except: pass

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import functools # Added for partial
 
 from aiogram import Bot as AiogramBot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -15,12 +16,15 @@ logger = logging.getLogger(__name__)
 
 
 # Startup and Shutdown Handlers
-async def on_startup(dispatcher: Dispatcher):
+async def on_startup(dispatcher: Dispatcher, db_ready_event: asyncio.Event = None): # Added db_ready_event
     # The dispatcher argument might not be strictly needed for init_db
     # but it's a common signature for startup handlers.
     logger.info("Executing startup actions...")
     await init_db()
     logger.info("Database initialization complete.")
+    if db_ready_event:
+        db_ready_event.set() # Signal that DB is ready
+        logger.info("DB ready event signalled.")
 
 async def on_shutdown(dispatcher: Dispatcher):
     # Similar to on_startup, dispatcher argument might not be needed for close_db_engine
@@ -28,7 +32,7 @@ async def on_shutdown(dispatcher: Dispatcher):
     await close_db_engine()
     logger.info("Database engine closed.")
 
-async def run_telegram_bot(shutdown_handler_callback: callable = None):
+async def run_telegram_bot(shutdown_handler_callback: callable = None, db_ready_event: asyncio.Event = None): # Added db_ready_event
     # await init_db() # Removed direct call, handled by on_startup
 
     bot_instance = AiogramBot(token=config.TG_BOT_TOKEN)
@@ -39,7 +43,14 @@ async def run_telegram_bot(shutdown_handler_callback: callable = None):
     dp.update.outer_middleware(DbSessionMiddleware())
 
     # Register startup and shutdown handlers
-    dp.startup.register(on_startup)
+    if db_ready_event:
+        # Pass the event to the on_startup handler using functools.partial
+        dp.startup.register(functools.partial(on_startup, db_ready_event=db_ready_event))
+    else:
+        # Register without the event if it's not provided (fallback, though run.py should always provide it)
+        dp.startup.register(on_startup)
+        logger.warning("Running on_startup without db_ready_event. Cleanup task might start prematurely if not coordinated.")
+
     # Note: The custom shutdown_handler_callback from parameters is also registered to dp.shutdown.
     # Aiogram allows multiple handlers for the same event. They will be called in order of registration.
     # If the custom one needs to run before close_db_engine, it should be registered before on_shutdown.

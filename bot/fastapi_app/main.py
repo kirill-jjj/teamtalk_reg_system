@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__) # Reverted
 app = FastAPI(root_path=os.getenv("ROOT_PATH", "/")) # Added root_path using os.getenv
 
 # Initialize application state variables
-app.state.download_tokens = {}
-app.state.registered_ips = set()
+# app.state.download_tokens = {} # Removed, will be handled by DB
+# app.state.registered_ips = set() # Removed, will be handled by DB
 
 # --- Jinja2 Context Processor for i18n ---
 def i18n_context_processor(request: Request):
@@ -99,10 +99,12 @@ async def initial_fastapi_app_setup(): # Removed app_instance parameter
         logger.info("TEAMTALK_CLIENT_TEMPLATE_DIR not configured. Skipping base client ZIP creation.") # Removed await
         app.state.base_client_zip_path_on_disk = Path("dummy_base_client.zip") # Use app
 
-    # 4. Clear runtime state
-    app.state.download_tokens.clear() # Use app
-    app.state.registered_ips.clear()  # Use app
-    logger.info("Cleared download tokens and registered IPs.") # Removed await
+    # 4. Clear runtime state (No longer needed for download_tokens and registered_ips)
+    # app.state.download_tokens.clear() # Use app
+    # app.state.registered_ips.clear()  # Use app
+    # logger.info("Cleared download tokens and registered IPs.") # Removed await
+    logger.info("Download tokens and registered IPs are now DB-managed.")
+
 
     # 5. Refresh translations
     try:

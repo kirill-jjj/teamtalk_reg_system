@@ -10,7 +10,7 @@ class NicknameChoiceCallback(CallbackData, prefix="reg_nick_choice"): # Changed 
 
 class AdminVerificationCallback(CallbackData, prefix="reg_admin_verify"): # Changed prefix
     action: str  # e.g., "verify", "reject"
-    request_id: int # Corresponds to a key in registration_requests dictionary
+    request_key: str # Corresponds to the string key in pending_telegram_registrations table
 
 class TTAccountTypeCallback(CallbackData, prefix="reg_tt_type"): # Changed prefix
     action: str # e.g., "select"

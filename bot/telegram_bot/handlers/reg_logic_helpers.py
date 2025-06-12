@@ -15,13 +15,17 @@ from ...utils.file_generator import generate_tt_file_content, generate_tt_link
 from ..states import RegistrationStates
 from pytalk.enums import UserType as PyTalkUserType
 
+import uuid # For generating unique request keys
+from ...core.db import add_telegram_registration, add_pending_telegram_registration # Import new CRUD function
+
 # Updated import to point to reg_callback_data.py
 from .reg_callback_data import AdminVerificationCallback, NicknameChoiceCallback
 
 logger = logging.getLogger(__name__)
 
-registration_requests: Dict[int, Dict] = {}
-request_id_counter = 0
+# Removed global registration_requests dictionary and request_id_counter
+# registration_requests: Dict[int, Dict] = {}
+# request_id_counter = 0
 
 async def _ask_nickname_preference(
     message_target: types.Message | types.CallbackQuery,
@@ -215,19 +219,26 @@ async def _handle_registration_continuation(
     }
 
     if config.VERIFY_REGISTRATION and not is_initiator_of_start_admin:
-        global request_id_counter
-        request_id_counter += 1
-        current_request_id = request_id_counter
+        # Generate a unique request key instead of using a counter
+        current_request_key = uuid.uuid4().hex
 
-        global registration_requests
-        registration_requests[current_request_id] = {
-            "registrant_user_id": registrant_user_id,
-            "username_value": username_value,
-            "password_value": password_value,
-            "nickname_value": nickname_value,
-            "source_info": source_info,
-        }
-        logger.info(f"Reg request {current_request_id} for TG user {registrant_user_id} ({username_value}) stored for admin verification.")
+        # Store the registration request in the database
+        try:
+            await add_pending_telegram_registration(
+                db=db_session,
+                request_key=current_request_key,
+                registrant_telegram_id=registrant_user_id,
+                username=username_value,
+                password_cleartext=password_value,
+                nickname=nickname_value,
+                source_info=source_info
+            )
+            logger.info(f"Reg request {current_request_key} for TG user {registrant_user_id} ({username_value}) stored in DB for admin verification.")
+        except Exception as e_db_add_pending:
+            logger.error(f"Failed to add pending registration to DB for user {registrant_user_id}, username {username_value}: {e_db_add_pending}", exc_info=True)
+            await bot.send_message(registrant_user_id, _user_translator("An error occurred while submitting your registration for approval. Please try again later or contact an administrator."))
+            if state: await state.clear() # Clear state to prevent resubmission issues
+            return # Stop further processing if DB write fails
 
         admin_notify_lang = get_translator(get_admin_lang_code())
         admin_msg_text = admin_notify_lang('Registration request:') + "\n" + \
@@ -237,8 +248,9 @@ async def _handle_registration_continuation(
                           admin_notify_lang('Approve registration?')
 
         builder = InlineKeyboardBuilder()
-        builder.button(text=admin_notify_lang("Yes"), callback_data=AdminVerificationCallback(action="verify", user_id=current_request_id))
-        builder.button(text=admin_notify_lang("No"), callback_data=AdminVerificationCallback(action="reject", user_id=current_request_id))
+        # Use the new string request_key in AdminVerificationCallback
+        builder.button(text=admin_notify_lang("Yes"), callback_data=AdminVerificationCallback(action="verify", request_key=current_request_key))
+        builder.button(text=admin_notify_lang("No"), callback_data=AdminVerificationCallback(action="reject", request_key=current_request_key))
         builder.adjust(2)
 
         for admin_id in config.ADMIN_IDS:

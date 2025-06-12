@@ -87,6 +87,7 @@ logger = logging.getLogger(__name__) # Name will be '__main__' if run as script
 telegram_polling_task_ref: asyncio.Task | None = None
 pytalk_task_ref: asyncio.Task | None = None
 fastapi_server_task_ref: asyncio.Task | None = None
+db_cleanup_task_ref: asyncio.Task | None = None # Added for the new task
 
 
 async def on_aiogram_shutdown_handler():
@@ -99,7 +100,8 @@ async def on_aiogram_shutdown_handler():
     tasks_to_cancel = [
         pytalk_task_ref,
         # telegram_polling_task_ref, # Aiogram handles its own polling task cancellation
-        fastapi_server_task_ref
+        fastapi_server_task_ref,
+        db_cleanup_task_ref # Add cleanup task
     ]
 
     for task in tasks_to_cancel:
@@ -122,15 +124,21 @@ async def on_aiogram_shutdown_handler():
 async def main():
     logger.info("Starting application...")
 
-    global telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref
+    global telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref, db_cleanup_task_ref # Added db_cleanup_task_ref
+    # Import the new task function
+    from bot.core.tasks import periodic_database_cleanup
 
     actual_aiogram_bot_instance = None
     dp = None # Dispatcher
+    db_initialized_event = asyncio.Event() # Create the event
 
     try:
         # 1. Initialize Aiogram Bot and Dispatcher
         # The on_shutdown handler for the dispatcher will be set in telegram_bot.main
-        actual_aiogram_bot_instance, dp = await run_telegram_bot(shutdown_handler_callback=on_aiogram_shutdown_handler)
+        actual_aiogram_bot_instance, dp = await run_telegram_bot(
+            shutdown_handler_callback=on_aiogram_shutdown_handler,
+            db_ready_event=db_initialized_event # Pass the event
+        )
 
         # 2. Pass Bot instance to FastAPI app state
 
@@ -194,13 +202,22 @@ async def main():
         
         # fastapi_server_task_ref is now set conditionally above
         
+
+        # 5. Create and start the periodic database cleanup task
+        db_cleanup_task_ref = asyncio.create_task(
+            periodic_database_cleanup(db_ready_event=db_initialized_event), # Pass the event
+            name="DatabaseCleanupTask"
+        )
+        logger.info("Periodic database cleanup task created.")
+
         # --- Test Run Logic ---
         if "--test-run" in sys.argv:
             logger.info("Test run: Initializations complete or error occurred before this point. Exiting.")
             tasks_to_cancel_test_run = [
                 telegram_polling_task_ref,
                 pytalk_task_ref,
-                fastapi_server_task_ref
+                fastapi_server_task_ref,
+                db_cleanup_task_ref # Add cleanup task
             ]
             for task in tasks_to_cancel_test_run:
                 if task and not task.done():
@@ -210,7 +227,7 @@ async def main():
 
         # Run all tasks concurrently
         # Only gather tasks that have been successfully created
-        active_tasks_to_gather = [task for task in [telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref] if task is not None]
+        active_tasks_to_gather = [task for task in [telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref, db_cleanup_task_ref] if task is not None]
         if active_tasks_to_gather:
             await asyncio.gather(*active_tasks_to_gather, return_exceptions=True)
         else:
@@ -232,7 +249,8 @@ async def main():
         tasks_to_cancel_finally = [
             telegram_polling_task_ref, # Important if KeyboardInterrupt or other external signal stops main before Aiogram fully shuts down.
             pytalk_task_ref,
-            fastapi_server_task_ref
+            fastapi_server_task_ref,
+            db_cleanup_task_ref # Add cleanup task
         ]
         for task in tasks_to_cancel_finally:
             if task and not task.done():
@@ -240,7 +258,7 @@ async def main():
                 task.cancel()
 
         # Await the cancellation of all tasks
-        tasks_to_await_finally = [task for task in [telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref] if task is not None]
+        tasks_to_await_finally = [task for task in [telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref, db_cleanup_task_ref] if task is not None]
         if tasks_to_await_finally:
             logger.info(f"Main finally: Awaiting {len(tasks_to_await_finally)} tasks...")
             # We use return_exceptions=True to ensure all tasks are awaited even if some were cancelled or failed.

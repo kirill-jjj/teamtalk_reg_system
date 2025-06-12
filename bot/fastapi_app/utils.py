@@ -1,65 +1,73 @@
 import asyncio
 import os
 from pathlib import Path
-from fastapi import FastAPI, BackgroundTasks
-import logging # Reverted
-import aiofiles # Keep aiofiles
-import aiofiles.os # Keep aiofiles.os
+from fastapi import FastAPI, BackgroundTasks # FastAPI import might not be needed by cleanup_temp_file_and_token_task directly
+import logging
+import aiofiles
+import aiofiles.os
 
-logger = logging.getLogger(__name__) # Reverted
+# DB imports for background task
+from bot.core.db.session import AsyncSessionLocal
+from bot.core.db import remove_fastapi_download_token # Import specific function
 
-async def cleanup_temp_file_and_token_task(app_instance: FastAPI, actual_filename_on_server: str, base_dir_name: str, token: str):
+logger = logging.getLogger(__name__)
+
+async def cleanup_temp_file_and_token_task(file_path_to_delete: Path, token_to_remove: str):
     """
-    Waits for a delay (implicitly, as it's called after a delay by schedule_temp_file_deletion's caller)
-    then deletes the temporary file and its associated token.
+    Deletes the temporary file and its associated token from the database.
+    This function is intended to be run by a background task.
     """
     try:
-        if base_dir_name == "files":
-            base_path = get_generated_files_path(app_instance)
-        elif base_dir_name == "zips":
-            base_path = get_generated_zips_path(app_instance)
+        if file_path_to_delete.exists():
+            await aiofiles.os.remove(file_path_to_delete)
+            logger.info(f"Successfully deleted temporary file: {file_path_to_delete}")
         else:
-            logger.error(f"Unknown base_dir_name '{base_dir_name}' for cleanup for token {token}.") # Removed await
-            # Remove token to prevent repeated attempts for unknown dir
-            if token in app_instance.state.download_tokens:
-                del app_instance.state.download_tokens[token]
-            return
-        file_path = base_path / actual_filename_on_server
-        
-        if file_path.exists():
-            await aiofiles.os.remove(file_path) # Keep await for aiofiles
-            logger.info(f"Successfully deleted temporary file: {file_path}") # Removed await
-        else:
-            logger.warning(f"Temporary file not found for deletion: {file_path}") # Removed await
+            logger.warning(f"Temporary file not found for deletion: {file_path_to_delete}")
 
-        # Remove the token from the download_tokens dictionary
-        if token in app_instance.state.download_tokens:
-            del app_instance.state.download_tokens[token]
-            logger.info(f"Successfully deleted token: {token}") # Removed await
-        else:
-            logger.warning(f"Token not found in download_tokens: {token}") # Removed await
+        # Remove the token from the database
+        async with AsyncSessionLocal() as db:
+            success = await remove_fastapi_download_token(db, token_to_remove) # Use direct import
+            if success:
+                logger.info(f"Successfully deleted token from DB: {token_to_remove}")
+                await db.commit() # Commit if remove_fastapi_download_token doesn't
+            else:
+                logger.warning(f"Token not found in DB or failed to delete: {token_to_remove}")
+                # No explicit rollback needed for select/delete if nothing was changed or if auto-commit is off for session.
+                # If remove_fastapi_download_token implies a flush that failed, rollback might be needed.
+                # Assuming remove_fastapi_download_token handles its own session state or is simple delete.
 
     except Exception as e:
-        logger.error(f"Error during cleanup for token {token}, file {actual_filename_on_server}: {e}", exc_info=True) # Removed await
+        logger.error(f"Error during cleanup for token {token_to_remove}, file {file_path_to_delete}: {e}", exc_info=True)
+        # No explicit rollback here as the session is local to this task instance.
 
 
 def schedule_temp_file_deletion(
-    background_tasks: BackgroundTasks, 
-    app_instance: FastAPI, 
-    actual_filename_on_server: str, 
-    base_dir_name: str,  # e.g., "generated_files" or "generated_zips"
-    token: str,
+    background_tasks: BackgroundTasks,
+    app_instance: FastAPI, # Still needed for path generation
+    actual_filename_on_server: str,
+    base_dir_name: str,  # e.g., "files" or "zips"
+    token_to_remove: str, # Renamed for clarity
     delay_seconds: int
 ):
     """
     Schedules a background task to delete a temporary file and its token after a delay.
     """
+    # Determine full file path before scheduling the task
+    if base_dir_name == "files":
+        full_file_path = get_generated_files_path(app_instance) / actual_filename_on_server
+    elif base_dir_name == "zips":
+        full_file_path = get_generated_zips_path(app_instance) / actual_filename_on_server
+    else:
+        logger.error(f"Cannot schedule deletion: Unknown base_dir_name '{base_dir_name}' for token {token_to_remove}.")
+        return
+
     async def delayed_cleanup():
         await asyncio.sleep(delay_seconds)
-        await cleanup_temp_file_and_token_task(app_instance, actual_filename_on_server, base_dir_name, token)
+        # Pass the full file path and token to the cleanup task
+        await cleanup_temp_file_and_token_task(full_file_path, token_to_remove)
 
     background_tasks.add_task(delayed_cleanup)
-    logger.info(f"Scheduled cleanup for token {token}, file {actual_filename_on_server} in {delay_seconds}s")
+    logger.info(f"Scheduled cleanup for token {token_to_remove}, file {full_file_path} in {delay_seconds}s")
 
 
 import shutil
