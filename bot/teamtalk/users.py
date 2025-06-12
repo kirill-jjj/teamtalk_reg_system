@@ -5,6 +5,7 @@ import pytalk
 from pytalk.enums import UserType as PyTalkUserType
 from pytalk.permission import Permission as PyTalkPermission
 from pytalk.instance import TeamTalkInstance
+from pytalk.implementation.TeamTalkPy import TeamTalk5 as sdk
 
 # from bot.core import config # Config import removed
 from .connection import pytalk_bot
@@ -25,13 +26,55 @@ def _calculate_pytalk_user_rights(teamtalk_default_user_rights_list: List[str]) 
             logger.error(f"Error processing permission string '{right_string}': {e_perm}")
     return pytalk_user_rights
 
+async def _send_broadcast_message_directly(active_server_instance: TeamTalkInstance, content: str):
+    '''
+    Workaround function to send a broadcast message by calling the SDK directly.
+    This fixes the issue on Linux where the string is not correctly encoded.
+    '''
+    try:
+        # Create the message structure from the SDK
+        msg = sdk.TextMessage()
+
+        # Set message type to BROADCAST
+        msg.nMsgType = sdk.TextMsgType.MSGTYPE_BROADCAST
+
+        # Set sender information
+        msg.nFromUserID = active_server_instance.getMyUserID()
+        # Ensure the username string is also correctly encoded
+        # Assuming getMyUserAccount() and szUsername are valid attributes/methods
+        my_account = active_server_instance.getMyUserAccount()
+        if my_account and hasattr(my_account, 'szUsername'):
+             msg.szFromUsername = sdk.ttstr(my_account.szUsername)
+        else:
+             # Fallback or log warning if username cannot be fetched for the message
+             logger.warning("Could not retrieve own username for broadcast message sender info.")
+             msg.szFromUsername = sdk.ttstr("Bot") # Default or anonymous
+
+        # For broadcast, ToUserID and ChannelID are 0
+        msg.nToUserID = 0
+        msg.nChannelID = 0
+
+        # CRITICAL FIX: Wrap the message content with sdk.ttstr()
+        msg.szMessage = sdk.ttstr(content)
+
+        # This is not a multi-part message
+        msg.bMore = False
+
+        # Call the low-level doTextMessage function directly on the instance
+        active_server_instance.doTextMessage(msg)
+        logger.info(f"Broadcast message for user sent directly via SDK: '{content}'")
+
+    except Exception as e:
+        logger.error(f"Failed to send broadcast message directly via SDK: {e}", exc_info=True)
+
+
 async def _handle_registration_broadcast(
     active_server_instance: TeamTalkInstance,
     username: str,
     broadcast_message_text: Optional[str],
     registration_broadcast_enabled: bool
 ):
-    """Handles sending a registration broadcast message if enabled and message provided."""
+    '''Handles sending a registration broadcast message if enabled and message provided.'''
     if not registration_broadcast_enabled:
         logger.info(f"Registration broadcast is disabled by parameter. Skipping for user '{username}'.")
         return
@@ -40,14 +83,8 @@ async def _handle_registration_broadcast(
         logger.info(f"No broadcast message text provided for user '{username}'. Skipping broadcast.")
         return
 
-    try:
-        if active_server_instance.server:
-            active_server_instance.server.send_message(broadcast_message_text)
-            logger.info(f"Broadcast message for user '{username}' sent to server via PyTalk: '{broadcast_message_text}'")
-        else:
-            logger.warning(f"Cannot send broadcast for '{username}': active_server_instance.server is None.")
-    except Exception as e_broadcast:
-        logger.error(f"Failed to send broadcast message for user '{username}' via PyTalk: {e_broadcast}")
+    # Instead of calling the broken library function, we call our direct SDK workaround
+    await _send_broadcast_message_directly(active_server_instance, broadcast_message_text)
 
 # --- Main Functions ---
 async def check_username_exists(username: str) -> Optional[bool]:
