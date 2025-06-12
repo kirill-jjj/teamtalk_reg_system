@@ -7,7 +7,6 @@ from pytalk.permission import Permission as PyTalkPermission
 from pytalk.instance import TeamTalkInstance
 from pytalk.implementation.TeamTalkPy import TeamTalk5 as sdk
 
-# from bot.core import config # Config import removed
 from .connection import pytalk_bot
 
 logger = logging.getLogger(__name__)

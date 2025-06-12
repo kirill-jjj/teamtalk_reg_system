@@ -6,8 +6,7 @@ from aiogram import Bot as AiogramBot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from ..core import config
-# from ..core.db import init_db # Old import
-from ..core.db.session import init_db, close_db_engine # Changed import
+from ..core.db.session import init_db, close_db_engine
 from .middlewares.db_middleware import DbSessionMiddleware
 from .handlers.admin import router as admin_router
 from .handlers.registration import router as registration_router
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 # Startup and Shutdown Handlers
-async def on_startup(dispatcher: Dispatcher, db_ready_event: asyncio.Event = None): # Added db_ready_event
+async def on_startup(dispatcher: Dispatcher, db_ready_event: asyncio.Event = None):
     # The dispatcher argument might not be strictly needed for init_db
     # but it's a common signature for startup handlers.
     logger.info("Executing startup actions...")
@@ -32,9 +31,7 @@ async def on_shutdown(dispatcher: Dispatcher):
     await close_db_engine()
     logger.info("Database engine closed.")
 
-async def run_telegram_bot(shutdown_handler_callback: callable = None, db_ready_event: asyncio.Event = None): # Added db_ready_event
-    # await init_db() # Removed direct call, handled by on_startup
-
+async def run_telegram_bot(shutdown_handler_callback: callable = None, db_ready_event: asyncio.Event = None):
     bot_instance = AiogramBot(token=config.TG_BOT_TOKEN)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)

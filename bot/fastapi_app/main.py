@@ -1,19 +1,15 @@
-import logging # Reverted to standard logging
+import logging
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pathlib import Path # Added for base_dir
+from pathlib import Path
 from bot.core.localization import get_translator, DEFAULT_LANG_CODE
-from bot.core.config import FORCE_USER_LANG # Import FORCE_USER_LANG
+from bot.core.config import FORCE_USER_LANG
 
-import os # Added import for os module
-logger = logging.getLogger(__name__) # Reverted
+import os
+logger = logging.getLogger(__name__)
 
-app = FastAPI(root_path=os.getenv("ROOT_PATH", "/")) # Added root_path using os.getenv
-
-# Initialize application state variables
-# app.state.download_tokens = {} # Removed, will be handled by DB
-# app.state.registered_ips = set() # Removed, will be handled by DB
+app = FastAPI(root_path=os.getenv("ROOT_PATH", "/"))
 
 # --- Jinja2 Context Processor for i18n ---
 def i18n_context_processor(request: Request):
@@ -23,14 +19,14 @@ def i18n_context_processor(request: Request):
 
     if FORCE_USER_LANG and FORCE_USER_LANG.strip():
         forced_lang_code = FORCE_USER_LANG.strip()
-        _ = get_translator(forced_lang_code) # Changed _forced_lang_translator to _
+        _ = get_translator(forced_lang_code)
         # Validate if the language is genuinely available
         original_string = "Username:" # A common string that should be translated
-        translated_string = _(original_string) # Updated to _
+        translated_string = _(original_string)
 
         if translated_string != original_string:
             logger.debug(f"Forcing web language to '{forced_lang_code}' based on config.")
-            translator = _ # Updated from _forced_lang_translator
+            translator = _
             language_forced = True
             final_lang_code = forced_lang_code
         else:
@@ -49,91 +45,87 @@ app.state.templates = Jinja2Templates(
     directory="bot/fastapi_app/templates",
     context_processors=[i18n_context_processor]
 )
-app.state.cached_server_name = "DefaultServerName (Not yet loaded)" # Placeholder
-app.state.base_client_zip_path_on_disk = Path("dummy_base_client.zip") # Placeholder
-# app.state.aiogram_bot_instance will be set by run.py before server starts
+app.state.cached_server_name = "DefaultServerName (Not yet loaded)"
+app.state.base_client_zip_path_on_disk = Path("dummy_base_client.zip")
 
 app.mount("/static", StaticFiles(directory="bot/fastapi_app/static"), name="static")
 
 # --- Startup and Shutdown Event Handlers ---
-from bot.core import config as core_config # Changed import
+from bot.core import config as core_config
 from bot.core.localization import refresh_translations
 from bot.fastapi_app.utils import (
     get_generated_files_path, 
     get_generated_zips_path, 
     create_and_save_base_client_zip
 )
-import shutil # For rmtree
+import shutil
 
 @app.on_event("startup")
-async def initial_fastapi_app_setup(): # Removed app_instance parameter
-    logger.info("Running FastAPI startup tasks...") # Removed await
+async def initial_fastapi_app_setup():
+    logger.info("Running FastAPI startup tasks...")
     # 1. Set cached server name
-    app.state.cached_server_name = core_config.SERVER_NAME # Use app from module scope, changed to SERVER_NAME
+    app.state.cached_server_name = core_config.SERVER_NAME
 
     # 2. Create/clean generated files/zips directories
-    generated_files_dir = get_generated_files_path(app) # Use app from module scope
-    generated_zips_dir = get_generated_zips_path(app)   # Use app from module scope
+    generated_files_dir = get_generated_files_path(app)
+    generated_zips_dir = get_generated_zips_path(app)
 
     # Clean directories first
     if generated_files_dir.exists():
         shutil.rmtree(generated_files_dir)
     generated_files_dir.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Cleaned and created directory: {generated_files_dir}") # Removed await
+    logger.info(f"Cleaned and created directory: {generated_files_dir}")
 
     if generated_zips_dir.exists():
         shutil.rmtree(generated_zips_dir)
     generated_zips_dir.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Cleaned and created directory: {generated_zips_dir}") # Removed await
+    logger.info(f"Cleaned and created directory: {generated_zips_dir}")
 
     # 3. Create and save base client ZIP
     if core_config.TEAMTALK_CLIENT_TEMPLATE_DIR:
-        base_zip_path = create_and_save_base_client_zip(app, core_config.TEAMTALK_CLIENT_TEMPLATE_DIR) # Use app
+        base_zip_path = create_and_save_base_client_zip(app, core_config.TEAMTALK_CLIENT_TEMPLATE_DIR)
         if base_zip_path:
-            app.state.base_client_zip_path_on_disk = base_zip_path # Use app
-            logger.info(f"Base client ZIP created at: {base_zip_path}") # Removed await
+            app.state.base_client_zip_path_on_disk = base_zip_path
+            logger.info(f"Base client ZIP created at: {base_zip_path}")
         else:
-            logger.error("Failed to create base client ZIP. Functionality requiring it may be affected.") # Removed await
-            app.state.base_client_zip_path_on_disk = Path("dummy_base_client.zip") # Use app
+            logger.error("Failed to create base client ZIP. Functionality requiring it may be affected.")
+            app.state.base_client_zip_path_on_disk = Path("dummy_base_client.zip")
     else:
-        logger.info("TEAMTALK_CLIENT_TEMPLATE_DIR not configured. Skipping base client ZIP creation.") # Removed await
-        app.state.base_client_zip_path_on_disk = Path("dummy_base_client.zip") # Use app
+        logger.info("TEAMTALK_CLIENT_TEMPLATE_DIR not configured. Skipping base client ZIP creation.")
+        app.state.base_client_zip_path_on_disk = Path("dummy_base_client.zip")
 
-    # 4. Clear runtime state (No longer needed for download_tokens and registered_ips)
-    # app.state.download_tokens.clear() # Use app
-    # app.state.registered_ips.clear()  # Use app
-    # logger.info("Cleared download tokens and registered IPs.") # Removed await
+    # 4. Clear runtime state
     logger.info("Download tokens and registered IPs are now DB-managed.")
 
 
     # 5. Refresh translations
     try:
         refresh_translations()
-        logger.info("Translations refreshed.") # Removed await
+        logger.info("Translations refreshed.")
     except Exception as e:
-        logger.error(f"Error refreshing translations: {e}", exc_info=True) # Removed await
+        logger.error(f"Error refreshing translations: {e}", exc_info=True)
 
-    logger.info("FastAPI startup tasks completed.") # Removed await
+    logger.info("FastAPI startup tasks completed.")
 
 @app.on_event("shutdown")
-async def cleanup_fastapi_resources(): # Removed app_instance parameter
-    logger.info("Running FastAPI shutdown tasks...") # Removed await
+async def cleanup_fastapi_resources():
+    logger.info("Running FastAPI shutdown tasks...")
     # BackgroundTasks are fire-and-forget, so no specific cleanup needed for them here.
     # If other resources were acquired (e.g., database connections), they would be released here.
     # For now, this can be minimal.
     # Optional: Clean up generated files on shutdown if desired (for development)
-    generated_files_dir = get_generated_files_path(app) # Example if app was needed
+    generated_files_dir = get_generated_files_path(app)
     if generated_files_dir.exists():
         shutil.rmtree(generated_files_dir)
     generated_zips_dir = get_generated_zips_path(app)
     if generated_zips_dir.exists():
         shutil.rmtree(generated_zips_dir)
-    logger.info("Cleaned up generated files and zips directories on shutdown.") # Removed await
-    logger.info("FastAPI shutdown tasks completed.") # Removed await
+    logger.info("Cleaned up generated files and zips directories on shutdown.")
+    logger.info("FastAPI shutdown tasks completed.")
 
 
 # Import and include registration router
-from bot.fastapi_app.routers import registration # Moved import after event handlers for clarity
+from bot.fastapi_app.routers import registration
 app.include_router(registration.router)
 
 @app.get("/")
