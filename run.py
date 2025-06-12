@@ -83,11 +83,56 @@ logging.getLogger("PIL.PngImagePlugin").setLevel(logging.WARNING)
 # Logger for run.py itself
 logger = logging.getLogger(__name__) # Name will be '__main__' if run as script
 
+# --- Imports for Admin ID Check ---
+from bot.core.db.crud import is_telegram_id_registered, delete_telegram_registration_by_id
+from bot.core.db.session import AsyncSessionLocal
+# --- End Imports for Admin ID Check ---
+
 # Global task references
 telegram_polling_task_ref: asyncio.Task | None = None
 pytalk_task_ref: asyncio.Task | None = None
 fastapi_server_task_ref: asyncio.Task | None = None
-db_cleanup_task_ref: asyncio.Task | None = None # Added for the new task
+db_cleanup_task_ref: asyncio.Task | None = None
+admin_check_task_ref: asyncio.Task | None = None # Task for checking admin IDs in DB
+
+
+async def remove_admin_ids_from_registrations(db_ready_event: asyncio.Event):
+    '''
+    Checks for any admin IDs in the TelegramRegistration table on startup
+    and removes them.
+    '''
+    await db_ready_event.wait() # Ensure DB is ready
+    logger.info("Performing startup check: Verifying admin IDs are not in TelegramRegistration table...")
+
+    if not core_config.ADMIN_IDS:
+        logger.info("No ADMIN_IDS configured. Skipping startup check for admin registrations.")
+        return
+
+    removed_count = 0
+    # Use the session factory as a context manager
+    async with AsyncSessionLocal() as session:
+        try:
+            for admin_id_str in core_config.ADMIN_IDS: # ADMIN_IDS are strings from config
+                admin_id = int(admin_id_str) # Convert to int for DB operations
+                if await is_telegram_id_registered(session, admin_id):
+                    logger.info(f"Admin ID {admin_id} found in TelegramRegistration table. Attempting removal.")
+                    deleted = await delete_telegram_registration_by_id(session, admin_id)
+                    if deleted:
+                        logger.info(f"Admin ID {admin_id} successfully removed from TelegramRegistration table.")
+                        removed_count += 1
+                    else:
+                        logger.warning(f"Admin ID {admin_id} was reported as registered, but removal failed or found no rows to delete.")
+                # else:
+                    # logger.debug(f"Admin ID {admin_id} not found in TelegramRegistration table. No action needed.")
+
+            if removed_count > 0:
+                logger.info(f"Startup check completed. Removed {removed_count} admin ID(s) from TelegramRegistration table.")
+                await session.commit() # Commit changes if any deletions were made
+            else:
+                logger.info("Startup check completed. No admin IDs found/removed from TelegramRegistration table.")
+        except Exception as e:
+            logger.error(f"Error during startup check for admin registrations: {e}", exc_info=True)
+            await session.rollback() # Rollback on any error during the process
 
 
 async def on_aiogram_shutdown_handler():
@@ -101,7 +146,8 @@ async def on_aiogram_shutdown_handler():
         pytalk_task_ref,
         # telegram_polling_task_ref, # Aiogram handles its own polling task cancellation
         fastapi_server_task_ref,
-        db_cleanup_task_ref # Add cleanup task
+        db_cleanup_task_ref,
+        admin_check_task_ref # Add admin check task
     ]
 
     for task in tasks_to_cancel:
@@ -124,7 +170,7 @@ async def on_aiogram_shutdown_handler():
 async def main():
     logger.info("Starting application...")
 
-    global telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref, db_cleanup_task_ref # Added db_cleanup_task_ref
+    global telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref, db_cleanup_task_ref, admin_check_task_ref
     # Import the new task function
     from bot.core.tasks import periodic_database_cleanup
 
@@ -210,6 +256,13 @@ async def main():
         )
         logger.info("Periodic database cleanup task created.")
 
+        # 6. Create and start the admin ID registration check task
+        admin_check_task_ref = asyncio.create_task(
+            remove_admin_ids_from_registrations(db_ready_event=db_initialized_event),
+            name="AdminRegistrationCheckTask"
+        )
+        logger.info("Admin ID registration check task created.")
+
         # --- Test Run Logic ---
         if "--test-run" in sys.argv:
             logger.info("Test run: Initializations complete or error occurred before this point. Exiting.")
@@ -217,7 +270,8 @@ async def main():
                 telegram_polling_task_ref,
                 pytalk_task_ref,
                 fastapi_server_task_ref,
-                db_cleanup_task_ref # Add cleanup task
+                db_cleanup_task_ref,
+                admin_check_task_ref # Add admin check task
             ]
             for task in tasks_to_cancel_test_run:
                 if task and not task.done():
@@ -227,7 +281,7 @@ async def main():
 
         # Run all tasks concurrently
         # Only gather tasks that have been successfully created
-        active_tasks_to_gather = [task for task in [telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref, db_cleanup_task_ref] if task is not None]
+        active_tasks_to_gather = [task for task in [telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref, db_cleanup_task_ref, admin_check_task_ref] if task is not None]
         if active_tasks_to_gather:
             await asyncio.gather(*active_tasks_to_gather, return_exceptions=True)
         else:
@@ -250,7 +304,8 @@ async def main():
             telegram_polling_task_ref, # Important if KeyboardInterrupt or other external signal stops main before Aiogram fully shuts down.
             pytalk_task_ref,
             fastapi_server_task_ref,
-            db_cleanup_task_ref # Add cleanup task
+            db_cleanup_task_ref,
+            admin_check_task_ref # Add admin check task
         ]
         for task in tasks_to_cancel_finally:
             if task and not task.done():
@@ -258,7 +313,7 @@ async def main():
                 task.cancel()
 
         # Await the cancellation of all tasks
-        tasks_to_await_finally = [task for task in [telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref, db_cleanup_task_ref] if task is not None]
+        tasks_to_await_finally = [task for task in [telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref, db_cleanup_task_ref, admin_check_task_ref] if task is not None]
         if tasks_to_await_finally:
             logger.info(f"Main finally: Awaiting {len(tasks_to_await_finally)} tasks...")
             # We use return_exceptions=True to ensure all tasks are awaited even if some were cancelled or failed.

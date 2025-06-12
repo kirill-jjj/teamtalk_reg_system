@@ -154,12 +154,23 @@ async def _process_actual_registration(
         initiator_telegram_id = source_info.get("registrar_telegram_id")
         if not is_initiator_admin or (is_initiator_admin and initiator_telegram_id == registrant_user_id):
             try:
-                await add_telegram_registration(db_session, registrant_user_id, username_val)
+                registration_record = await add_telegram_registration(db_session, registrant_user_id, username_val)
+                if registration_record is None:
+                    # This means the ID was an admin ID and was intentionally not added.
+                    logger.info(f"Telegram registration for admin ID {registrant_user_id} (username: {username_val}) was intentionally skipped as per new policy. The TeamTalk account was still created.")
+                    # No specific user message here as the main "User registered" was already sent.
+                    # The core requirement is to prevent DB entry, which is handled by add_telegram_registration.
+                # else:
+                    # logger.info(f"Telegram registration for {username_val} (TG ID: {registrant_user_id}) added to local DB.") # Optional: log success
             except Exception as e_db_add:
-                logger.error(f"CRITICAL DB Exception for TT user {username_val} (TG ID: {registrant_user_id}): {e_db_add}", exc_info=True)
-                await bot.send_message(registrant_user_id, _("Registration completed, but a sync error occurred. Please contact admin."))
-                for admin_tg_id_notify in config.ADMIN_IDS:
-                    await bot.send_message(admin_tg_id_notify, f"DB SYNC ERROR (Exception): User {username_val} (TG ID: {registrant_user_id}) registered on TT but FAILED local DB save. Exc: {e_db_add}")
+                # This will catch actual database errors, not the admin ID blocking.
+                logger.error(f"CRITICAL DB Exception during Telegram registration for TT user {username_val} (TG ID: {registrant_user_id}): {e_db_add}", exc_info=True)
+                # The user already received "User registered successfully". This message clarifies a backend sync issue.
+                await bot.send_message(registrant_user_id, _("Your TeamTalk account is ready, but there was an issue syncing your registration locally. Please contact an administrator if you experience issues."))
+                # Notify admins about the sync failure.
+                for admin_tg_id_notify in config.ADMIN_IDS: # Ensure config is available or pass ADMIN_IDS
+                    if admin_tg_id_notify != registrant_user_id: # Don't notify the admin if they are the one causing the error log
+                       await bot.send_message(admin_tg_id_notify, f"DB SYNC ERROR (Exception): User {username_val} (TG ID: {registrant_user_id}) created in TeamTalk but FAILED local TelegramRegistration DB save. Exception: {e_db_add}")
 
         if config.ADMIN_IDS:
             admin_notify_lang = get_translator(get_admin_lang_code())

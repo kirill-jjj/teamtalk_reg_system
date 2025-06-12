@@ -6,6 +6,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.exc import IntegrityError as SQLAlchemyIntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot.core.config import ADMIN_IDS
 from .models import TelegramRegistration, PendingTelegramRegistration, FastapiRegisteredIp, FastapiDownloadToken
 
 logger = logging.getLogger(__name__)
@@ -16,7 +17,11 @@ async def is_telegram_id_registered(session: AsyncSession, telegram_id: int) -> 
     user = await session.get(TelegramRegistration, telegram_id)
     return user is not None
 
-async def add_telegram_registration(session: AsyncSession, telegram_id: int, teamtalk_username: str) -> TelegramRegistration:
+async def add_telegram_registration(session: AsyncSession, telegram_id: int, teamtalk_username: str) -> Optional[TelegramRegistration]:
+    if telegram_id in ADMIN_IDS:
+        logger.warning(f"Attempt to register an admin ID ({telegram_id}) was blocked. User: {teamtalk_username}")
+        return None
+
     try:
         new_registration = TelegramRegistration(telegram_id=telegram_id, teamtalk_username=teamtalk_username)
         session.add(new_registration)
@@ -38,6 +43,18 @@ async def add_telegram_registration(session: AsyncSession, telegram_id: int, tea
 async def get_teamtalk_username_by_telegram_id(session: AsyncSession, telegram_id: int) -> str | None:
     user = await session.get(TelegramRegistration, telegram_id)
     return user.teamtalk_username if user else None
+
+async def delete_telegram_registration_by_id(session: AsyncSession, telegram_id: int) -> bool:
+    '''Deletes a TelegramRegistration record by telegram_id.'''
+    logger.info(f"Attempting to delete registration for Telegram ID: {telegram_id}")
+    stmt = delete(TelegramRegistration).where(TelegramRegistration.telegram_id == telegram_id)
+    result = await session.execute(stmt)
+    # await session.flush() # Not strictly necessary for delete if not immediately checking, but good practice
+    if result.rowcount > 0:
+        logger.info(f"Successfully deleted registration for Telegram ID: {telegram_id}. Rows affected: {result.rowcount}")
+        return True
+    logger.info(f"No registration found for Telegram ID: {telegram_id} to delete.")
+    return False
 
 # --- PendingTelegramRegistration CRUD ---
 
