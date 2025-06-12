@@ -8,10 +8,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from ...core import config
 from ...core.db import is_telegram_id_registered
-from ...core.config import FORCE_USER_LANG # Specific config import
+from ...core.config import FORCE_USER_LANG
 from ...core.localization import get_admin_lang_code, get_available_languages_for_display, get_translator
 from ..states import RegistrationStates
-# Import the LanguageCallback for inline keyboard from reg_callback_data.py (Updated)
 from .reg_callback_data import LanguageCallback
 
 logger = logging.getLogger(__name__)
@@ -42,14 +41,14 @@ async def start_command_handler(message: types.Message, state: FSMContext, bot: 
     # Language selection / forced language logic starts here
     if FORCE_USER_LANG and FORCE_USER_LANG.strip():
         forced_lang_code = FORCE_USER_LANG.strip()
-        _f = get_translator(forced_lang_code) # Translator for forced language
+        _f = get_translator(forced_lang_code)
         original_key = "Hello! Please enter a username for registration." # Key for translation
         translated_string = _f(original_key)
 
         # Check if translation exists and is different from the key, or if the forced lang is 'en'
         if translated_string != original_key or forced_lang_code == "en":
             logger.info(f"Forcing language to '{forced_lang_code}' for user {telegram_id} based on config.")
-            await state.update_data(selected_language=forced_lang_code) # Store selected language in FSM
+            await state.update_data(selected_language=forced_lang_code)
             await message.reply(_f(original_key))
             await state.set_state(RegistrationStates.awaiting_username)
             return

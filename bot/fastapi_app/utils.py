@@ -6,9 +6,8 @@ import logging
 import aiofiles
 import aiofiles.os
 
-# DB imports for background task
 from bot.core.db.session import AsyncSessionLocal
-from bot.core.db import remove_fastapi_download_token # Import specific function
+from bot.core.db import remove_fastapi_download_token
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +25,7 @@ async def cleanup_temp_file_and_token_task(file_path_to_delete: Path, token_to_r
 
         # Remove the token from the database
         async with AsyncSessionLocal() as db:
-            success = await remove_fastapi_download_token(db, token_to_remove) # Use direct import
+            success = await remove_fastapi_download_token(db, token_to_remove)
             if success:
                 logger.info(f"Successfully deleted token from DB: {token_to_remove}")
                 await db.commit() # Commit if remove_fastapi_download_token doesn't
@@ -43,10 +42,10 @@ async def cleanup_temp_file_and_token_task(file_path_to_delete: Path, token_to_r
 
 def schedule_temp_file_deletion(
     background_tasks: BackgroundTasks,
-    app_instance: FastAPI, # Still needed for path generation
+    app_instance: FastAPI,
     actual_filename_on_server: str,
-    base_dir_name: str,  # e.g., "files" or "zips"
-    token_to_remove: str, # Renamed for clarity
+    base_dir_name: str,
+    token_to_remove: str,
     delay_seconds: int
 ):
     """
@@ -72,18 +71,17 @@ def schedule_temp_file_deletion(
 
 import shutil
 import secrets
-# import os # For path operations in create_and_save_base_client_zip # This was the targeted one
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 import configparser # For modify_teamtalk_ini_from_template
 import io # For modify_teamtalk_ini_from_template
 
-from fastapi import FastAPI, Request, BackgroundTasks # Request is for get_user_ip_fastapi
+from fastapi import FastAPI, Request, BackgroundTasks
 
-from bot.core import config as core_config # Changed import
+from bot.core import config as core_config
 
 # Constants for client ZIP generation
-BASE_CLIENT_ZIP_FILENAME = '_base_client_template_fastapi.zip' # Unique name for FastAPI
+BASE_CLIENT_ZIP_FILENAME = '_base_client_template_fastapi.zip'
 TEAMTALK_INI_FILENAME_IN_ZIP = "Client/TeamTalk5.ini"
 TEAMTALK_INI_FILENAME_LOWER_IN_ZIP = "Client/teamtalk5.ini"
 
@@ -124,7 +122,7 @@ def get_ini_path_from_template_dir_fastapi(template_dir_base: Path) -> Path | No
     return None
 
 def modify_teamtalk_ini_from_template(
-    template_dir_base: Path, # Expecting Path object
+    template_dir_base: Path,
     username: str, password: str,
     server_name_display: str, host: str, tcpport: int, udpport: int, 
     user_client_lang: str # 'en' or 'ru'
@@ -135,7 +133,7 @@ def modify_teamtalk_ini_from_template(
         return None
 
     config = configparser.ConfigParser(interpolation=None, comment_prefixes=(';', '#'), allow_no_value=True)
-    config.optionxform = str # Preserve case
+    config.optionxform = str
 
     try:
         with open(ini_template_path, 'r', encoding='utf-8-sig') as f:
@@ -158,8 +156,8 @@ def modify_teamtalk_ini_from_template(
     config.set('serverentries', '0_name', server_name_display)
     config.set('serverentries', '0_hostaddr', host)
     config.set('serverentries', '0_tcpport', str(tcpport))
-    config.set('serverentries', '0_udpport', str(udpport)) # Assuming core_config.UDP_PORT or similar
-    config.set('serverentries', '0_encrypted', 'true' if core_config.ENCRYPTED else 'false') # Corrected
+    config.set('serverentries', '0_udpport', str(udpport))
+    config.set('serverentries', '0_encrypted', 'true' if core_config.ENCRYPTED else 'false')
     config.set('serverentries', '0_username', username)
     config.set('serverentries', '0_password', password)
     config.set('serverentries', '0_nickname', username)
@@ -223,7 +221,7 @@ def create_and_save_base_client_zip(app: FastAPI, template_dir_str: str) -> Path
 def create_client_zip_for_user(
     app: FastAPI, 
     username: str, 
-    password: str, # Added password
+    password: str,
     tt_file_name_on_server: str, 
     lang_code: str = "en"
 ) -> tuple[Path | None, str]:
@@ -257,13 +255,13 @@ def create_client_zip_for_user(
         return None, ""
 
     modified_ini_content = modify_teamtalk_ini_from_template(
-        template_dir_base=client_template_dir, # Source for INI structure
+        template_dir_base=client_template_dir,
         username=username,
         password=password,
-        server_name_display=core_config.SERVER_NAME, # Corrected
-        host=core_config.HOST_NAME,                 # Corrected
-        tcpport=core_config.TCP_PORT,               # Corrected
-        udpport=core_config.UDP_PORT,               # Corrected (was already correct but good to confirm)
+        server_name_display=core_config.SERVER_NAME,
+        host=core_config.HOST_NAME,
+        tcpport=core_config.TCP_PORT,
+        udpport=core_config.UDP_PORT,
         user_client_lang=lang_code
     )
 

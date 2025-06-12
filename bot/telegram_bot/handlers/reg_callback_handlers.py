@@ -5,20 +5,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from aiogram import Bot as AiogramBot, F, Router, types
 # CallbackData itself is no longer defined here, but imported for type hinting if needed,
 # or used by the imported CallbackData classes.
-# from aiogram.filters.callback_data import CallbackData # Not strictly needed if classes handle it.
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder # Not used directly in this file after refactor
 
 from ..states import RegistrationStates
-# Imports from core
 from ...core import config
-from ...core.db import is_telegram_id_registered, get_and_remove_pending_telegram_registration # Import new CRUD function
+from ...core.db import is_telegram_id_registered, get_and_remove_pending_telegram_registration
 from ...core.localization import get_admin_lang_code, get_translator
 
-# Imports from within the registration handlers module
-# from .reg_logic_helpers import registration_requests # Removed
 from .reg_logic_helpers import _ask_nickname_preference, _process_actual_registration, _handle_registration_continuation
-# Import the CallbackData definitions from the new central file
 from .reg_callback_data import LanguageCallback, NicknameChoiceCallback, AdminVerificationCallback, TTAccountTypeCallback
 
 

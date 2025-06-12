@@ -11,9 +11,7 @@ from ...teamtalk import users as tt_users_service
 from ...core.localization import get_translator
 from ..states import RegistrationStates
 
-# Imports from within the registration handlers module
 from .reg_logic_helpers import _ask_nickname_preference, _handle_registration_continuation
-# TTAccountTypeCallback is needed by password_handler, imported from reg_callback_data (Updated)
 from .reg_callback_data import TTAccountTypeCallback
 
 logger = logging.getLogger(__name__)

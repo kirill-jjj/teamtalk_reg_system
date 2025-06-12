@@ -8,8 +8,6 @@ from pytalk import Channel as TeamTalkChannel
 
 logger = logging.getLogger(__name__)
 
-# Removed kick_event_timestamps and KICK_CONNECTION_LOST_THRESHOLD_SECONDS
-
 @pytalk_bot.event
 async def on_ready():
     logger.info("PyTalk Bot is ready (on_ready event).")
