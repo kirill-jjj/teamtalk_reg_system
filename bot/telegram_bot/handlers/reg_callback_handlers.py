@@ -85,7 +85,7 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
     decision_action = callback_data.action # This is "verify" or "reject"
 
     admin_id_str = str(callback_query.from_user.id)
-    admin_lang_code = await get_admin_lang_code(admin_id_str)
+    admin_lang_code = get_admin_lang_code()
     _ = get_translator(admin_lang_code)
 
     # Retrieve and remove the pending registration from the database
