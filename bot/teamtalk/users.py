@@ -27,40 +27,28 @@ def _calculate_pytalk_user_rights(teamtalk_default_user_rights_list: List[str]) 
     return pytalk_user_rights
 
 async def _send_broadcast_message_directly(active_server_instance: TeamTalkInstance, content: str):
-    '''
+    """
     Workaround function to send a broadcast message by calling the SDK directly.
     This fixes the issue on Linux where the string is not correctly encoded.
-    '''
+    """
     try:
-        # Create the message structure from the SDK
         msg = sdk.TextMessage()
-
-        # Set message type to BROADCAST
         msg.nMsgType = sdk.TextMsgType.MSGTYPE_BROADCAST
-
-        # Set sender information
         msg.nFromUserID = active_server_instance.getMyUserID()
-        # Ensure the username string is also correctly encoded
-        # Assuming getMyUserAccount() and szUsername are valid attributes/methods
-        my_account = active_server_instance.getMyUserAccount()
-        if my_account and hasattr(my_account, 'szUsername'):
-             msg.szFromUsername = sdk.ttstr(my_account.szUsername)
-        else:
-             # Fallback or log warning if username cannot be fetched for the message
-             logger.warning("Could not retrieve own username for broadcast message sender info.")
-             msg.szFromUsername = sdk.ttstr("Bot") # Default or anonymous
 
-        # For broadcast, ToUserID and ChannelID are 0
+        my_account = active_server_instance.getMyUserAccount()
+
+        if my_account:
+            msg.szFromUsername = my_account.szUsername
+        else:
+            logger.warning("Could not retrieve own user account for broadcast message sender username. Using default 'Bot'.")
+            msg.szFromUsername = sdk.ttstr("Bot")
+
         msg.nToUserID = 0
         msg.nChannelID = 0
-
-        # CRITICAL FIX: Wrap the message content with sdk.ttstr()
         msg.szMessage = sdk.ttstr(content)
-
-        # This is not a multi-part message
         msg.bMore = False
 
-        # Call the low-level doTextMessage function directly on the instance
         active_server_instance.doTextMessage(msg)
         logger.info(f"Broadcast message for user sent directly via SDK: '{content}'")
 
