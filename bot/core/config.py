@@ -159,7 +159,6 @@ WEB_APP_SSL_CERT_PATH: Optional[str] = _get_env_var("WEB_APP_SSL_CERT_PATH")
 WEB_APP_SSL_KEY_PATH: Optional[str] = _get_env_var("WEB_APP_SSL_KEY_PATH")
 
 # Web Application Proxy Configuration
-# WEB_APP_FORWARDED_ALLOW_IPS_ENV_VAR_NAME and WEB_APP_PROXY_HEADERS_ENV_VAR_NAME moved up
 WEB_APP_FORWARDED_ALLOW_IPS_STR: str = _get_env_var(WEB_APP_FORWARDED_ALLOW_IPS_ENV_VAR_NAME, "*")
 WEB_APP_FORWARDED_ALLOW_IPS: str | List[str]
 if WEB_APP_FORWARDED_ALLOW_IPS_STR == "*":
@@ -198,8 +197,6 @@ DB_CLEANUP_INTERVAL_SECONDS: int = _get_env_var_int(
 )
 
 # Default TeamTalk User Rights and Registration Broadcast
-# ENV_VAR_NAME constants moved up
-# DEFAULT_..._VALUE constants moved up
 
 TEAMTALK_DEFAULT_USER_RIGHTS: List[str] = _get_env_var_list(
     TEAMTALK_DEFAULT_USER_RIGHTS_ENV_VAR_NAME,
