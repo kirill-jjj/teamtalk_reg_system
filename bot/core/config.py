@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import List, Optional, Callable, Any # Added Callable, Any
+from typing import List, Optional, Callable, Any
 from dotenv import load_dotenv, find_dotenv
 
 logger = logging.getLogger(__name__)
@@ -79,7 +79,6 @@ DATABASE_FILE_NAME_ENV_VAR: str = "DB_NAME"
 PENDING_REG_TTL_SECONDS_ENV_VAR_NAME: str = "PENDING_REG_TTL_SECONDS"
 REGISTERED_IP_TTL_SECONDS_ENV_VAR_NAME: str = "REGISTERED_IP_TTL_SECONDS"
 DB_CLEANUP_INTERVAL_SECONDS_ENV_VAR_NAME: str = "DB_CLEANUP_INTERVAL_SECONDS"
-# Moved other _ENV_VAR_NAME constants here
 WEB_APP_FORWARDED_ALLOW_IPS_ENV_VAR_NAME: str = "WEB_APP_FORWARDED_ALLOW_IPS"
 WEB_APP_PROXY_HEADERS_ENV_VAR_NAME: str = "WEB_APP_PROXY_HEADERS"
 TEAMTALK_DEFAULT_USER_RIGHTS_ENV_VAR_NAME: str = "TEAMTALK_DEFAULT_USER_RIGHTS"
@@ -212,9 +211,6 @@ REGISTRATION_BROADCAST_ENABLED: bool = _get_env_var_bool(
 FORCE_USER_LANG_RAW: Optional[str] = _get_env_var(FORCE_USER_LANG_ENV_VAR_NAME, "")
 FORCE_USER_LANG: str = FORCE_USER_LANG_RAW.strip() if FORCE_USER_LANG_RAW else ""
 
-
-# The old "# --- Parsed and validated values ---" section and the "try-except ValueError" block are now removed
-# as parsing is handled by helper functions directly during variable assignment.
 
 # --- Check for required variables ---
 # Variables that MUST have a value from the .env file (or environment)

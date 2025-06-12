@@ -122,14 +122,6 @@ async def add_fastapi_registered_ip(
         logger.info(f"Added registered IP: {ip_address} for user: {username if username else 'N/A'}")
     except SQLAlchemyIntegrityError:
         await db.rollback() # Rollback the specific failed add
-        # If we want to update the timestamp of an existing entry:
-        # stmt_update = update(FastapiRegisteredIp).where(FastapiRegisteredIp.ip_address == ip_address).values(registration_timestamp=datetime.utcnow(), username=username)
-        # await db.execute(stmt_update)
-        # await db.flush()
-        # stmt_select = select(FastapiRegisteredIp).where(FastapiRegisteredIp.ip_address == ip_address)
-        # result = await db.execute(stmt_select)
-        # registered_ip = result.scalars().one()
-        # logger.info(f"Updated registration timestamp for existing IP: {ip_address}")
         # Re-raise for now, as the current requirement is just to add.
         logger.warning(f"IP address {ip_address} already registered.")
         raise # Or handle as an update if that's the desired behavior for duplicates.

@@ -10,7 +10,6 @@ from .reg_fsm_message_handlers import fsm_router
 logger = logging.getLogger(__name__)
 
 # The main router for the registration functionality
-# Giving it a unique name for clarity in logs if Aiogram supports it
 router = Router(name=__name__) # Using module name for the router name
 
 # Include the routers from the individual handler files
