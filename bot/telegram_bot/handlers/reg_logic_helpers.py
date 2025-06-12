@@ -15,17 +15,12 @@ from ...utils.file_generator import generate_tt_file_content, generate_tt_link
 from ..states import RegistrationStates
 from pytalk.enums import UserType as PyTalkUserType
 
-import uuid # For generating unique request keys
-from ...core.db import add_telegram_registration, add_pending_telegram_registration # Import new CRUD function
+import uuid
+from ...core.db import add_telegram_registration, add_pending_telegram_registration
 
-# Updated import to point to reg_callback_data.py
 from .reg_callback_data import AdminVerificationCallback, NicknameChoiceCallback
 
 logger = logging.getLogger(__name__)
-
-# Removed global registration_requests dictionary and request_id_counter
-# registration_requests: Dict[int, Dict] = {}
-# request_id_counter = 0
 
 async def _ask_nickname_preference(
     message_target: types.Message | types.CallbackQuery,
@@ -160,15 +155,13 @@ async def _process_actual_registration(
                     logger.info(f"Telegram registration for admin ID {registrant_user_id} (username: {username_val}) was intentionally skipped as per new policy. The TeamTalk account was still created.")
                     # No specific user message here as the main "User registered" was already sent.
                     # The core requirement is to prevent DB entry, which is handled by add_telegram_registration.
-                # else:
-                    # logger.info(f"Telegram registration for {username_val} (TG ID: {registrant_user_id}) added to local DB.") # Optional: log success
             except Exception as e_db_add:
                 # This will catch actual database errors, not the admin ID blocking.
                 logger.error(f"CRITICAL DB Exception during Telegram registration for TT user {username_val} (TG ID: {registrant_user_id}): {e_db_add}", exc_info=True)
                 # The user already received "User registered successfully". This message clarifies a backend sync issue.
                 await bot.send_message(registrant_user_id, _("Your TeamTalk account is ready, but there was an issue syncing your registration locally. Please contact an administrator if you experience issues."))
                 # Notify admins about the sync failure.
-                for admin_tg_id_notify in config.ADMIN_IDS: # Ensure config is available or pass ADMIN_IDS
+                for admin_tg_id_notify in config.ADMIN_IDS:
                     if admin_tg_id_notify != registrant_user_id: # Don't notify the admin if they are the one causing the error log
                        await bot.send_message(admin_tg_id_notify, f"DB SYNC ERROR (Exception): User {username_val} (TG ID: {registrant_user_id}) created in TeamTalk but FAILED local TelegramRegistration DB save. Exception: {e_db_add}")
 

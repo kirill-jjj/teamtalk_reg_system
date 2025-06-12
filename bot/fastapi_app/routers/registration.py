@@ -2,12 +2,11 @@ from fastapi import APIRouter, Request, HTTPException, Depends, Form, Background
 from fastapi.responses import FileResponse, RedirectResponse, HTMLResponse
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple
-from datetime import datetime, timedelta # Added for token expiration
-from sqlalchemy.ext.asyncio import AsyncSession # Added for DB session
+from datetime import datetime, timedelta
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import DB dependency and CRUD functions
-from ..dependencies import get_db_session # Assuming this path is correct
-# Updated to import functions directly from bot.core.db
+from ..dependencies import get_db_session
 from bot.core.db import (
     is_fastapi_ip_registered,
     add_fastapi_registered_ip,
@@ -23,18 +22,16 @@ from bot.fastapi_app.utils import (
     generate_random_token,
     get_generated_files_path,
     get_generated_zips_path,
-    # generate_tt_file_content, # Removed from here
-    create_client_zip_for_user, # Added
-    get_user_ip_fastapi, # Added
-    # generate_tt_link # Removed from here
+    create_client_zip_for_user,
+    get_user_ip_fastapi,
 )
-from bot.utils.file_generator import generate_tt_file_content, generate_tt_link # Added new import
+from bot.utils.file_generator import generate_tt_file_content, generate_tt_link
 from bot.core.localization import get_translator, get_admin_lang_code, DEFAULT_LANG_CODE, get_available_languages_for_display
 from bot.core.config import FORCE_USER_LANG
 from bot.core import config as core_config
 from bot.teamtalk import users as teamtalk_users_service
 import logging
-from pytalk.enums import UserType as PyTalkUserType # Added import
+from pytalk.enums import UserType as PyTalkUserType
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +44,7 @@ async def _validate_web_registration_request(
     password: str,
     user_ip: str,
     translator,
-    db: AsyncSession # Added db session
+    db: AsyncSession
 ) -> Optional[HTTPException]:
     # Check for empty username/password
     if not username or not password:
@@ -55,7 +52,7 @@ async def _validate_web_registration_request(
         return HTTPException(status_code=400, detail=translator("username_password_required_error"))
 
     # Check if IP is already registered (rate limiting) using database
-    if await is_fastapi_ip_registered(db, user_ip): # Use direct import
+    if await is_fastapi_ip_registered(db, user_ip):
         logger.warning(f"Validation failed for IP {user_ip} (Username: {username}): IP already registered.")
         return HTTPException(status_code=400, detail=translator("ip_already_registered_error"))
 
@@ -116,15 +113,15 @@ async def _prepare_downloadables_for_web(
     request: Request,
     background_tasks: BackgroundTasks,
     artefact_data: Dict[str, Any],
-    db: AsyncSession # Added db session
+    db: AsyncSession
 ) -> Dict[str, Any]:
     username = artefact_data["username"]
     password = artefact_data["password"]
     file_generation_nickname = artefact_data["final_nickname"]
-    user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE) # For translator in this helper
+    user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     translator = get_translator(user_lang_code)
 
-    tt_content = generate_tt_file_content( # Use data from artefact_data
+    tt_content = generate_tt_file_content(
         server_name_val=artefact_data["server_name"],
         host_val=artefact_data["effective_hostname"],
         tcpport_val=artefact_data["tcp_port"],
@@ -150,7 +147,7 @@ async def _prepare_downloadables_for_web(
 
     tt_token = generate_random_token()
     expires_at_dt = datetime.utcnow() + timedelta(seconds=core_config.GENERATED_FILE_TTL_SECONDS)
-    await add_fastapi_download_token( # Use direct import
+    await add_fastapi_download_token(
         db=db,
         token=tt_token,
         filepath_on_server=tt_file_path.name, # Store only filename
@@ -180,7 +177,7 @@ async def _prepare_downloadables_for_web(
         if zip_file_path_on_server and client_zip_user_download_name:
             zip_token = generate_random_token()
             actual_client_zip_filename_for_user = client_zip_user_download_name
-            await add_fastapi_download_token( # Use direct import
+            await add_fastapi_download_token(
                 db=db,
                 token=zip_token,
                 filepath_on_server=zip_file_path_on_server.name, # Store only filename
@@ -240,7 +237,7 @@ async def register_page_get(request: Request):
     # The template will decide whether to show language selection or the form.
     context = {
         "request": request,
-        "title": translator("registration_title"), # Page title
+        "title": translator("registration_title"),
         "message": "", 
         "show_form": True, # Main form is now always shown initially, template handles visibility post-registration
         "current_lang": effective_lang_code, # Reflects forced or cookie lang
@@ -266,7 +263,7 @@ async def register_page_post(
     username: str = Form(...),
     password: str = Form(...),
     nickname: Optional[str] = Form(None),
-    db: AsyncSession = Depends(get_db_session) # Added DB Session dependency
+    db: AsyncSession = Depends(get_db_session)
 ):
     user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     translator = get_translator(user_lang_code)
@@ -319,7 +316,7 @@ async def register_page_post(
 
     # --- Registration successful, proceed to file generation ---
     try:
-        await add_fastapi_registered_ip(db, ip_address=user_ip, username=username) # Use direct import
+        await add_fastapi_registered_ip(db, ip_address=user_ip, username=username)
     except Exception as e_ip_add: # Catch potential IntegrityError if IP somehow gets re-added before this by parallel requests
         logger.error(f"Failed to add/update registered IP {user_ip} for user {username} to DB: {e_ip_add}", exc_info=True)
         # Not necessarily a fatal error for the user flow, so log and continue.
@@ -329,7 +326,7 @@ async def register_page_post(
         request,
         background_tasks,
         artefact_data=tt_artefact_data_from_reg, # Pass the whole dict
-        db=db # Pass DB session
+        db=db
     )
 
     if downloadables_context.get("file_generation_error"):
@@ -371,12 +368,12 @@ async def register_page_post(
 @router.get("/download_tt/{token}")
 async def download_tt_file(
     request: Request, token: str,
-    db: AsyncSession = Depends(get_db_session) # Added DB Session
+    db: AsyncSession = Depends(get_db_session)
 ):
     user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     translator = get_translator(user_lang_code)
 
-    token_info_model = await get_fastapi_download_token(db, token) # Use direct import
+    token_info_model = await get_fastapi_download_token(db, token)
 
     if token_info_model and token_info_model.token_type == "tt_config":
         # get_fastapi_download_token already checks expiry and is_used
@@ -385,7 +382,7 @@ async def download_tt_file(
         file_path = get_generated_files_path(request.app) / server_filename
 
         if file_path.exists():
-            await mark_fastapi_download_token_used(db, token) # Use direct import
+            await mark_fastapi_download_token_used(db, token)
             return FileResponse(
                 path=file_path,
                 media_type='application/octet-stream',
@@ -396,12 +393,12 @@ async def download_tt_file(
 @router.get("/download_client_zip/{token}")
 async def download_client_zip_file(
     request: Request, token: str,
-    db: AsyncSession = Depends(get_db_session) # Added DB Session
+    db: AsyncSession = Depends(get_db_session)
 ):
     user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     translator = get_translator(user_lang_code)
 
-    token_info_model = await get_fastapi_download_token(db, token) # Use direct import
+    token_info_model = await get_fastapi_download_token(db, token)
 
     if token_info_model and token_info_model.token_type == "client_zip":
         # get_fastapi_download_token already checks expiry and is_used
@@ -410,7 +407,7 @@ async def download_client_zip_file(
         file_path = get_generated_zips_path(request.app) / server_filename
 
         if file_path.exists():
-            await mark_fastapi_download_token_used(db, token) # Use direct import
+            await mark_fastapi_download_token_used(db, token)
             return FileResponse(
                 path=file_path,
                 media_type='application/zip',

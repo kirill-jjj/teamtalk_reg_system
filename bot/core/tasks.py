@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from bot.core.db.session import AsyncSessionLocal
-from bot.core.db import ( # Updated imports
+from bot.core.db import (
     cleanup_expired_pending_registrations,
     cleanup_expired_registered_ips,
     cleanup_expired_download_tokens
@@ -10,7 +10,7 @@ from bot.core import config as core_config
 
 logger = logging.getLogger(__name__)
 
-async def periodic_database_cleanup(db_ready_event: asyncio.Event): # Added db_ready_event parameter
+async def periodic_database_cleanup(db_ready_event: asyncio.Event):
     """
     Periodically cleans up stale data from the database.
     Waits for the db_ready_event before starting its cycles.
@@ -28,19 +28,19 @@ async def periodic_database_cleanup(db_ready_event: asyncio.Event): # Added db_r
         try:
             logger.info("Database cleanup cycle starting...")
             async with AsyncSessionLocal() as db:
-                deleted_pending_regs = await cleanup_expired_pending_registrations( # Use direct import
+                deleted_pending_regs = await cleanup_expired_pending_registrations(
                     db, older_than_seconds=core_config.DEFAULT_PENDING_REGISTRATION_TTL_SECONDS
                 )
                 if deleted_pending_regs > 0:
                     logger.info(f"Cleaned up {deleted_pending_regs} expired pending registrations.")
 
-                deleted_ips = await cleanup_expired_registered_ips( # Use direct import
+                deleted_ips = await cleanup_expired_registered_ips(
                     db, older_than_seconds=core_config.DEFAULT_REGISTERED_IP_TTL_SECONDS
                 )
                 if deleted_ips > 0:
                     logger.info(f"Cleaned up {deleted_ips} expired registered IPs.")
 
-                deleted_tokens = await cleanup_expired_download_tokens(db) # Use direct import
+                deleted_tokens = await cleanup_expired_download_tokens(db)
                 if deleted_tokens > 0:
                     logger.info(f"Cleaned up {deleted_tokens} expired or used download tokens.")
 

@@ -8,7 +8,6 @@ try:
     from dotenv import load_dotenv, find_dotenv
 except ImportError:
     # This function will be a no-op if python-dotenv is not installed.
-    # Or, you could print a warning.
     print("[bootstrap_warning] python-dotenv module not found. .env file loading will be skipped.")
     def load_dotenv(*args, **kwargs): pass
     def find_dotenv(*args, **kwargs): return None
@@ -56,7 +55,7 @@ _early_load_env_file(_env_file_to_load)
 # --- End of early .env file loading ---
 
 import asyncio
-import logging # Standard logging, configured after .env load
+import logging
 
 import uvicorn
 
@@ -72,16 +71,16 @@ from pathlib import Path
 
 # Configure logging AFTER .env load, as .env might contain logging settings in a real app
 logging.basicConfig(
-    level=logging.INFO, # Default level
+    level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)] # Explicitly use stdout
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
 # Set levels for other libraries
 logging.getLogger("aiosqlite").setLevel(logging.WARNING)
-logging.getLogger("pytalk").setLevel(logging.INFO) # Assuming pytalk logs at INFO as before
+logging.getLogger("pytalk").setLevel(logging.INFO)
 logging.getLogger("PIL.PngImagePlugin").setLevel(logging.WARNING)
 # Logger for run.py itself
-logger = logging.getLogger(__name__) # Name will be '__main__' if run as script
+logger = logging.getLogger(__name__)
 
 # --- Imports for Admin ID Check ---
 from bot.core.db.crud import is_telegram_id_registered, delete_telegram_registration_by_id
@@ -93,7 +92,7 @@ telegram_polling_task_ref: asyncio.Task | None = None
 pytalk_task_ref: asyncio.Task | None = None
 fastapi_server_task_ref: asyncio.Task | None = None
 db_cleanup_task_ref: asyncio.Task | None = None
-admin_check_task_ref: asyncio.Task | None = None # Task for checking admin IDs in DB
+admin_check_task_ref: asyncio.Task | None = None
 
 
 async def remove_admin_ids_from_registrations(db_ready_event: asyncio.Event):
@@ -122,8 +121,6 @@ async def remove_admin_ids_from_registrations(db_ready_event: asyncio.Event):
                         removed_count += 1
                     else:
                         logger.warning(f"Admin ID {admin_id} was reported as registered, but removal failed or found no rows to delete.")
-                # else:
-                    # logger.debug(f"Admin ID {admin_id} not found in TelegramRegistration table. No action needed.")
 
             if removed_count > 0:
                 logger.info(f"Startup check completed. Removed {removed_count} admin ID(s) from TelegramRegistration table.")
@@ -147,7 +144,7 @@ async def on_aiogram_shutdown_handler():
         # telegram_polling_task_ref, # Aiogram handles its own polling task cancellation
         fastapi_server_task_ref,
         db_cleanup_task_ref,
-        admin_check_task_ref # Add admin check task
+        admin_check_task_ref
     ]
 
     for task in tasks_to_cancel:
@@ -171,19 +168,18 @@ async def main():
     logger.info("Starting application...")
 
     global telegram_polling_task_ref, pytalk_task_ref, fastapi_server_task_ref, db_cleanup_task_ref, admin_check_task_ref
-    # Import the new task function
     from bot.core.tasks import periodic_database_cleanup
 
     actual_aiogram_bot_instance = None
     dp = None # Dispatcher
-    db_initialized_event = asyncio.Event() # Create the event
+    db_initialized_event = asyncio.Event()
 
     try:
         # 1. Initialize Aiogram Bot and Dispatcher
         # The on_shutdown handler for the dispatcher will be set in telegram_bot.main
         actual_aiogram_bot_instance, dp = await run_telegram_bot(
             shutdown_handler_callback=on_aiogram_shutdown_handler,
-            db_ready_event=db_initialized_event # Pass the event
+            db_ready_event=db_initialized_event
         )
 
         # 2. Pass Bot instance to FastAPI app state
@@ -251,7 +247,7 @@ async def main():
 
         # 5. Create and start the periodic database cleanup task
         db_cleanup_task_ref = asyncio.create_task(
-            periodic_database_cleanup(db_ready_event=db_initialized_event), # Pass the event
+            periodic_database_cleanup(db_ready_event=db_initialized_event),
             name="DatabaseCleanupTask"
         )
         logger.info("Periodic database cleanup task created.")
@@ -271,7 +267,7 @@ async def main():
                 pytalk_task_ref,
                 fastapi_server_task_ref,
                 db_cleanup_task_ref,
-                admin_check_task_ref # Add admin check task
+                admin_check_task_ref
             ]
             for task in tasks_to_cancel_test_run:
                 if task and not task.done():
@@ -305,7 +301,7 @@ async def main():
             pytalk_task_ref,
             fastapi_server_task_ref,
             db_cleanup_task_ref,
-            admin_check_task_ref # Add admin check task
+            admin_check_task_ref
         ]
         for task in tasks_to_cancel_finally:
             if task and not task.done():
@@ -344,7 +340,7 @@ if __name__ == "__main__":
     # before other imports and logging configuration.
     # The sys.argv parsing for --test-run for exiting early is still in main().
     logger.info(f"Application starting with arguments: {sys.argv}")
-    logger.info(f"NICK_NAME from config: {core_config.NICK_NAME}") # Example: check if config loaded
+    logger.info(f"NICK_NAME from config: {core_config.NICK_NAME}")
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
@@ -353,7 +349,3 @@ if __name__ == "__main__":
     except Exception as e:
         # Using print for critical errors during asyncio.run if logger itself might be part of the problem
         print(f"CRITICAL: Critical error during asyncio.run: {e}", file=sys.stderr)
-        # Optionally, try to log with a fallback basic logger if the main one failed or wasn't set up
-        # logging.basicConfig(level=logging.CRITICAL, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        # logging.getLogger("run_critical").critical(f"Critical error during asyncio.run: {e}", exc_info=True)
-        # For this task, direct print to stderr is simplest for bootstrap errors.

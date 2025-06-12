@@ -6,16 +6,16 @@ import io
 from zipfile import ZipFile, ZIP_DEFLATED
 from urllib.parse import quote_plus
 from typing import Optional, Tuple
-import logging # Reverted
+import logging
 
-logger = logging.getLogger(__name__) # Reverted
+logger = logging.getLogger(__name__)
 
 
 # --- .tt file and TT link generation (retained for now, assuming used by other bot parts) ---
 def generate_tt_file_content(
     server_name_val: str, host_val: str, tcpport_val: int, udpport_val: int,
     encrypted_val: bool, username_val: str, password_val: str,
-    nickname_val: Optional[str] = None # Added
+    nickname_val: Optional[str] = None
 ) -> str:
     encrypted_str_val = "true" if encrypted_val else "false"
     # Basic XML escaping for username/password in .tt file
@@ -51,7 +51,7 @@ def generate_tt_file_content(
 def generate_tt_link(
     host_val: str, tcpport_val: int, udpport_val: int,
     encrypted_val: bool, username_val: str, password_val: str,
-    nickname_val: Optional[str] = None # Added
+    nickname_val: Optional[str] = None
 ) -> str:
     encrypted_link_val = "1" if encrypted_val else "0"
     encoded_username = quote_plus(username_val)
