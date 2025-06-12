@@ -62,10 +62,12 @@ import uvicorn
 
 # Now that .env is loaded (or attempted), these imports can proceed and config will see the right values
 from bot.fastapi_app.main import app as fastapi_app
+from bot.teamtalk.connection import launch_teamtalk_service
+from bot.teamtalk import events as _ # To register core TT event handlers
 from bot.core import config as core_config # This should now see env vars from custom .env
-from bot.telegram_bot.main import run_telegram_bot, start_pytalk_bot_internals, start_telegram_polling
+from bot.telegram_bot.main import run_telegram_bot, start_telegram_polling
 from bot.core.db import close_db_engine
-from bot.core.teamtalk_client import shutdown_pytalk_bot
+from bot.teamtalk.connection import close_teamtalk_connection
 from pathlib import Path
 
 # Configure logging AFTER .env load, as .env might contain logging settings in a real app
@@ -131,35 +133,38 @@ async def main():
         actual_aiogram_bot_instance, dp = await run_telegram_bot(shutdown_handler_callback=on_aiogram_shutdown_handler)
 
         # 2. Pass Bot instance to FastAPI app state
-        if actual_aiogram_bot_instance:
-            fastapi_app.state.aiogram_bot_instance = actual_aiogram_bot_instance
-            logger.info("Aiogram Bot instance passed to FastAPI app state.")
-        else:
-            logger.error("Failed to initialize Aiogram Bot. FastAPI might not function correctly regarding bot interactions.")
 
-        # 3. Configure Uvicorn server
-        ssl_config = {}
-        if core_config.WEB_APP_SSL_ENABLED: # Use new config name
-            key_path = Path(core_config.WEB_APP_SSL_KEY_PATH) # Use new config name
-            cert_path = Path(core_config.WEB_APP_SSL_CERT_PATH) # Use new config name
-            if key_path.exists() and cert_path.exists():
-                ssl_config["ssl_keyfile"] = str(key_path)
-                ssl_config["ssl_certfile"] = str(cert_path)
-                logger.info(f"SSL enabled for FastAPI. Key: {key_path}, Cert: {cert_path}")
-            else:
-                logger.warning(f"SSL enabled in config, but key/cert files not found. Key: {key_path}, Cert: {cert_path}. FastAPI will run without SSL.")
-        
-        uvicorn_config = uvicorn.Config(
-            app=fastapi_app,
-            host=core_config.WEB_APP_HOST, # Use new config name
-            port=core_config.WEB_APP_PORT, # Use new config name
-            loop="asyncio",
-            log_level="info", # You can adjust uvicorn's log level
-            forwarded_allow_ips=core_config.WEB_APP_FORWARDED_ALLOW_IPS,
-            proxy_headers=core_config.WEB_APP_PROXY_HEADERS,
-            **ssl_config
-        )
-        server = uvicorn.Server(config=uvicorn_config)
+        # 3. Configure Uvicorn server (conditionally)
+        if core_config.WEB_REGISTRATION_ENABLED:
+            ssl_config = {}
+            if core_config.WEB_APP_SSL_ENABLED:
+                key_path = Path(core_config.WEB_APP_SSL_KEY_PATH)
+                cert_path = Path(core_config.WEB_APP_SSL_CERT_PATH)
+                if key_path.exists() and cert_path.exists():
+                    ssl_config["ssl_keyfile"] = str(key_path)
+                    ssl_config["ssl_certfile"] = str(cert_path)
+                    logger.info(f"SSL enabled for FastAPI. Key: {key_path}, Cert: {cert_path}")
+                else:
+                    logger.warning(f"SSL enabled in config, but key/cert files not found. Key: {key_path}, Cert: {cert_path}. FastAPI will run without SSL.")
+
+            uvicorn_config = uvicorn.Config(
+                app=fastapi_app,
+                host=core_config.WEB_APP_HOST,
+                port=core_config.WEB_APP_PORT,
+                loop="asyncio",
+                log_level="info",
+                forwarded_allow_ips=core_config.WEB_APP_FORWARDED_ALLOW_IPS,
+                proxy_headers=core_config.WEB_APP_PROXY_HEADERS,
+                **ssl_config
+            )
+            server = uvicorn.Server(config=uvicorn_config)
+
+            fastapi_server_task_ref = asyncio.create_task(server.serve(), name="FastAPIServer")
+
+            logger.info(f"FastAPI app starting on http{'s' if ssl_config else ''}://{core_config.WEB_APP_HOST}:{core_config.WEB_APP_PORT}")
+        else:
+            logger.info("WEB_REGISTRATION_ENABLED is false in config. FastAPI server (web registration) will not be started.")
+            # fastapi_server_task_ref remains None (its initial value at the top of main())
 
         # 4. Define tasks to run concurrently
         if dp and actual_aiogram_bot_instance:
@@ -170,12 +175,25 @@ async def main():
         else:
             logger.error("Dispatcher or Bot not initialized. Telegram polling will not start.")
 
-        pytalk_task_ref = asyncio.create_task(start_pytalk_bot_internals(), name="PyTalkBotInternals")
+        pytalk_task_ref = asyncio.create_task(
+            launch_teamtalk_service(
+                host_name=core_config.HOST_NAME,
+                tcp_port=core_config.TCP_PORT,
+                udp_port=core_config.UDP_PORT,
+                user_name=core_config.USER_NAME,
+                password=core_config.PASSWORD,
+                nickname=core_config.NICK_NAME,
+                encrypted=core_config.ENCRYPTED,
+                join_channel_path=core_config.TEAMTALK_JOIN_CHANNEL,
+                join_channel_pass=core_config.TEAMTALK_JOIN_CHANNEL_PASSWORD,
+                bot_gender=core_config.TEAMTALK_GENDER,
+                bot_status_text=core_config.TEAMTALK_STATUS_TEXT
+            ),
+            name="PyTalkBotInternals"
+        )
         
-        fastapi_server_task_ref = asyncio.create_task(server.serve(), name="FastAPIServer")
+        # fastapi_server_task_ref is now set conditionally above
         
-        logger.info(f"FastAPI app starting on http{'s' if ssl_config else ''}://{core_config.WEB_APP_HOST}:{core_config.WEB_APP_PORT}")
-
         # --- Test Run Logic ---
         if "--test-run" in sys.argv:
             logger.info("Test run: Initializations complete or error occurred before this point. Exiting.")
@@ -240,7 +258,7 @@ async def main():
 
         # Now, perform ordered shutdown of other resources
         logger.info("Main finally: Shutting down PyTalk bot...")
-        await shutdown_pytalk_bot() # Should handle its own internal cleanup
+        await close_teamtalk_connection() # Should handle its own internal cleanup
 
         logger.info("Main finally: Closing database engine...")
         await close_db_engine()

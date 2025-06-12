@@ -35,13 +35,13 @@ def discover_available_languages() -> list[dict[str, str]]:
                 try:
                     # Load just this specific language to get its native name
                     lang_translations = babel.support.Translations.load(str(LOCALES_DIR), [lang_code])
-                    # Attempt to get the translation for "self_language_name_native"
+                    # Attempt to get the translation for "native_language_name"
                     # This msgid should be defined in each messages.po file
-                    translated_native_name = lang_translations.gettext('self_language_name_native')
-                    if translated_native_name and translated_native_name != 'self_language_name_native':
+                    translated_native_name = lang_translations.gettext('native_language_name')
+                    if translated_native_name and translated_native_name != 'native_language_name':
                         native_name = translated_native_name
                 except Exception as e:
-                    logger.warning(f"Could not load native name for language {lang_code} from 'self_language_name_native': {e}")
+                    logger.warning(f"Could not load native name for language {lang_code} from 'native_language_name': {e}")
 
                 discovered_languages.append({'code': lang_code, 'native_name': native_name})
             else:

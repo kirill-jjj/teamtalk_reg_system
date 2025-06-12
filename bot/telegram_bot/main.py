@@ -1,53 +1,54 @@
 import asyncio
 import logging
 
-import pytalk
 from aiogram import Bot as AiogramBot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-from pytalk.message import Message as PyTalkMessage
 
 from ..core import config
-from ..core.db import init_db
-from ..core import teamtalk_client as tt_client
+# from ..core.db import init_db # Old import
+from ..core.db.session import init_db, close_db_engine # Changed import
+from .middlewares.db_middleware import DbSessionMiddleware
 from .handlers.admin import router as admin_router
 from .handlers.registration import router as registration_router
 
 logger = logging.getLogger(__name__)
 
 
-@tt_client.pytalk_bot.event
-async def on_ready():
-    logger.info("PyTalk Bot is ready (event received in telegram_bot.main).")
+# Startup and Shutdown Handlers
+async def on_startup(dispatcher: Dispatcher):
+    # The dispatcher argument might not be strictly needed for init_db
+    # but it's a common signature for startup handlers.
+    logger.info("Executing startup actions...")
+    await init_db()
+    logger.info("Database initialization complete.")
 
-
-@tt_client.pytalk_bot.event
-async def on_my_login(server: pytalk.server.Server):
-    logger.info(f"Successfully logged into TeamTalk server via PyTalk: {server.info.host} (event in telegram_bot.main)")
-
-
-@tt_client.pytalk_bot.event
-async def on_message(message: PyTalkMessage):
-    channel_name_info = "DM/Broadcast"
-    if hasattr(message, "channel") and message.channel:
-        channel_name_info = message.channel.name
-    elif isinstance(message, PyTalkMessage) and not hasattr(message, "channel"):
-        pass
-
-    logger.info(
-        f"Received TeamTalk message via PyTalk: '{message.content}' "
-        f"from user '{message.user.username if message.user else 'Unknown User'}' "
-        f"in {channel_name_info}"
-    )
-
+async def on_shutdown(dispatcher: Dispatcher):
+    # Similar to on_startup, dispatcher argument might not be needed for close_db_engine
+    logger.info("Executing shutdown actions...")
+    await close_db_engine()
+    logger.info("Database engine closed.")
 
 async def run_telegram_bot(shutdown_handler_callback: callable = None):
-    await init_db()
+    # await init_db() # Removed direct call, handled by on_startup
 
     bot_instance = AiogramBot(token=config.TG_BOT_TOKEN)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
+    # Register DbSessionMiddleware
+    dp.update.outer_middleware(DbSessionMiddleware())
+
+    # Register startup and shutdown handlers
+    dp.startup.register(on_startup)
+    # Note: The custom shutdown_handler_callback from parameters is also registered to dp.shutdown.
+    # Aiogram allows multiple handlers for the same event. They will be called in order of registration.
+    # If the custom one needs to run before close_db_engine, it should be registered before on_shutdown.
+    # If it needs to run after, it should be registered after.
+    # For now, let's register on_shutdown, and the existing custom one will also run.
+    dp.shutdown.register(on_shutdown)
+
     if shutdown_handler_callback:
+        # This will be registered in addition to on_shutdown if provided
         dp.shutdown.register(shutdown_handler_callback)
         logger.info("Registered custom shutdown handler for Aiogram dispatcher.")
 
@@ -72,15 +73,3 @@ async def start_telegram_polling(bot_instance: AiogramBot, dp: Dispatcher):
         logger.info("Telegram Bot polling stopped and session closed.")
 
 
-async def start_pytalk_bot_internals():
-    logger.info("Starting PyTalk bot internal event processing...")
-    try:
-        async with tt_client.pytalk_bot:
-            if not await tt_client.connect_to_teamtalk_server():
-                logger.error("Failed to connect to TeamTalk server. PyTalk event processing might not work correctly.")
-            await tt_client.pytalk_bot._start()
-
-    except Exception as e:
-        logger.exception("Exception in PyTalk bot internal processing loop:", exc_info=True)
-    finally:
-        logger.info("PyTalk bot internal event processing stopped.")

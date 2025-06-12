@@ -103,6 +103,12 @@ These instructions assume you have Python 3.11+ installed.
         *   TeamTalk server connection details (`HOST_NAME`, `PORT`, `USER_NAME`, `PASSWORD`).
         *   Web registration settings (if enabled, using variables like `WEB_APP_HOST`, `WEB_APP_PORT` which are now used by Uvicorn).
         *   The `FLASK_SECRET_KEY` (now removed/commented in `.env.example`) is not directly used by FastAPI for session management in the same way. Secure practices for any session/cookie management in FastAPI should be ensured if custom session logic is added.
+        *   **New Configuration Variables (Optional):**
+            *   `TT_PUBLIC_HOSTNAME`: Public hostname to be used in generated .tt files and links. If not specified, `HOST_NAME` is used. (Optional)
+            *   `TT_JOIN_CHANNEL`: Channel ID (integer) or channel path (string, e.g., "/" for root, or "/My Channel/Sub Channel") for the bot to join on startup. If not specified, the bot will not automatically join a channel. (Optional)
+            *   `TT_JOIN_CHANNEL_PASSWORD`: Password for the channel specified in `TT_JOIN_CHANNEL`. (Optional, if the channel is not password-protected)
+            *   `TT_STATUS_TEXT`: Status message for the bot in TeamTalk. (Optional, defaults to empty)
+            *   `TT_GENDER`: Gender for the bot in TeamTalk. Possible values: `male`, `female`, `neutral`. Defaults to `neutral`. (Optional)
 
 6.  **Run the application using `uv`:**
     This command will run the `run.py` script within the `uv`-managed virtual environment. `run.py` now starts both the Telegram bot and the FastAPI web application (using Uvicorn).
@@ -116,6 +122,21 @@ These instructions assume you have Python 3.11+ installed.
 *   **Telegram Bot:** Start a chat with your bot and send the `/start` command.
 *   **Web Registration:** If enabled (`WEB_REGISTRATION_ENABLED=true` in `.env`), navigate to `http://<your_host>:<your_port>/register` (e.g., `http://127.0.0.1:5000/register`) in your web browser. The host and port are determined by `WEB_APP_HOST` and `WEB_APP_PORT` in your `.env` file.
 
+## Localization Management
+
+This project uses Babel for localization. The `manage-locales.py` script (located in the project root) helps manage localization files.
+
+The script provides the following commands:
+
+*   `uv run manage-locales.py extract`: Extracts translatable strings from the source code and updates the `.pot` template file (`locales/messages.pot`).
+
+*   `uv run manage-locales.py update`: Updates language-specific `.po` files (e.g., `locales/ru/LC_MESSAGES/messages.po`) based on the changes in the `.pot` template.
+
+*   `uv run manage-locales.py compile`: Compiles the `.po` files into binary `.mo` files, which are used by the application to display translated messages. This step is necessary after updating `.po` files. The "Compile Localization Files" step during initial installation already performs this.
+
+*   `uv run manage-locales` (or `uv run manage-locales.py all`): Runs all three steps sequentially: extract, update, and then compile.
+
+*   `uv run manage-locales.py help`: Displays help information about the script and its available commands.
 
 ## Note
 

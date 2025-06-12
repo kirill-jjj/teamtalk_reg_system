@@ -1,154 +1,201 @@
 import os
 import logging
-from typing import List, Optional
+from typing import List, Optional, Callable, Any # Added Callable, Any
 from dotenv import load_dotenv, find_dotenv
 
 logger = logging.getLogger(__name__)
 
-# --- Constants for Environment Variable Names and Defaults ---
+# Helper functions for parsing environment variables
+def _get_env_var(var_name: str, default: Optional[str] = None) -> Optional[str]:
+    return os.getenv(var_name, default)
+
+def _get_env_var_bool(var_name: str, default_bool: bool = False) -> bool:
+    val_str = os.getenv(var_name)
+    if val_str is None:
+        return default_bool
+    val_lower = val_str.strip().lower()
+    if val_lower in ("1", "true", "yes", "on"):
+        return True
+    if val_lower in ("0", "false", "no", "off"):
+        return False
+    logger.warning(
+        f"Invalid boolean value for environment variable {var_name}: '{val_str}'. "
+        f"Using default: {default_bool}."
+    )
+    return default_bool
+
+def _get_env_var_int(var_name: str, default_int: int) -> int:
+    val_str = os.getenv(var_name)
+    if val_str is None or not val_str.strip():
+        # Also consider empty string as "not set" for integers if default should apply
+        return default_int
+    try:
+        return int(val_str.strip())
+    except ValueError:
+        logger.warning(
+            f"Invalid integer value for environment variable {var_name}: '{val_str}'. "
+            f"Using default: {default_int}."
+        )
+        return default_int
+
+def _get_env_var_list(
+    var_name: str,
+    default_list_str: Optional[str] = None,
+    item_type_converter: Callable[[str], Any] = str
+) -> List[Any]:
+    val_str = os.getenv(var_name)
+
+    effective_str_to_parse = None
+    if val_str is not None: # Env var is set
+        effective_str_to_parse = val_str
+    elif default_list_str is not None: # Env var not set, but a default string for the list is provided
+        effective_str_to_parse = default_list_str
+    else: # Env var not set, and no default string provided
+        return []
+
+    if not effective_str_to_parse.strip(): # Handles empty string for both val_str and default_list_str
+        return []
+
+    items = []
+    raw_items = effective_str_to_parse.split(',')
+    for item_str in raw_items:
+        stripped_item = item_str.strip()
+        if not stripped_item: # Skip empty strings resulting from multiple commas like "a,,b"
+            continue
+        try:
+            items.append(item_type_converter(stripped_item))
+        except ValueError:
+            logger.warning(
+                f"Could not convert item '{stripped_item}' to {item_type_converter.__name__} "
+                f"for environment variable {var_name}. Skipping this item."
+            )
+    return items
+
+# --- Constants for Environment Variable Names ---
 GENERATED_FILE_TTL_SECONDS_ENV_VAR_NAME: str = "GENERATED_FILE_TTL_SECONDS"
-DEFAULT_TTL_SECONDS: int = 600
 DATABASE_FILE_NAME_ENV_VAR: str = "DB_NAME"
+# Moved other _ENV_VAR_NAME constants here
+WEB_APP_FORWARDED_ALLOW_IPS_ENV_VAR_NAME: str = "WEB_APP_FORWARDED_ALLOW_IPS"
+WEB_APP_PROXY_HEADERS_ENV_VAR_NAME: str = "WEB_APP_PROXY_HEADERS"
+TEAMTALK_DEFAULT_USER_RIGHTS_ENV_VAR_NAME: str = "TEAMTALK_DEFAULT_USER_RIGHTS"
+REGISTRATION_BROADCAST_ENABLED_ENV_VAR_NAME: str = "TEAMTALK_REGISTRATION_BROADCAST_ENABLED"
+FORCE_USER_LANG_ENV_VAR_NAME: str = "FORCE_USER_LANG"
+# TeamTalk specific env var names
+TT_PUBLIC_HOSTNAME_ENV_VAR_NAME: str = "TT_PUBLIC_HOSTNAME"
+TT_JOIN_CHANNEL_ENV_VAR_NAME: str = "TT_JOIN_CHANNEL"
+TT_JOIN_CHANNEL_PASSWORD_ENV_VAR_NAME: str = "TT_JOIN_CHANNEL_PASSWORD"
+TT_STATUS_TEXT_ENV_VAR_NAME: str = "TT_STATUS_TEXT"
+TT_GENDER_ENV_VAR_NAME: str = "TT_GENDER"
+
+# --- Default Fallback Values for Configuration ---
+DEFAULT_TTL_SECONDS: int = 600
 DEFAULT_DB_NAME: str = "users.db"
+DEFAULT_TEAMTALK_USER_RIGHTS_VALUE: str = "MULTI_LOGIN,VIEW_ALL_USERS,CREATE_TEMPORARY_CHANNEL,UPLOAD_FILES,DOWNLOAD_FILES,TRANSMIT_VOICE,TRANSMIT_VIDEOCAPTURE,TRANSMIT_DESKTOP,TRANSMIT_DESKTOPINPUT,TRANSMIT_MEDIAFILE,TEXTMESSAGE_USER,TEXTMESSAGE_CHANNEL"
+DEFAULT_REGISTRATION_BROADCAST_ENABLED_VALUE: str = "1" # String "1" as it represents a common env var value for True
 
 # NOTE: The .env file loading is now handled externally (e.g., in run.py)
 # before this module's variables are accessed.
 
+# --- Configuration Variable Initialization using Helpers ---
 # Telegram Bot Configuration
-TG_BOT_TOKEN: Optional[str] = os.getenv("TG_BOT_TOKEN")
-ADMIN_IDS_STR: str = os.getenv("ADMIN_IDS", "") # Default to empty string if not set
-ADMIN_IDS: List[int] = [int(id_str.strip()) for id_str in ADMIN_IDS_STR.split(',') if id_str.strip()]
+TG_BOT_TOKEN: Optional[str] = _get_env_var("TG_BOT_TOKEN")
+ADMIN_IDS: List[int] = _get_env_var_list("ADMIN_IDS", default_list_str="", item_type_converter=int)
 
 # TeamTalk Server Configuration
-HOST_NAME: Optional[str] = os.getenv("HOST_NAME")
-TCP_PORT_STR: Optional[str] = os.getenv("PORT")
-UDP_PORT_STR: Optional[str] = os.getenv("UDP_PORT") # No default here initially, will default to TCP_PORT later if needed
-USER_NAME: Optional[str] = os.getenv("USER_NAME")
-PASSWORD: Optional[str] = os.getenv("PASSWORD")
-NICK_NAME: str = os.getenv("NICK_NAME", "RegisterBot")
-CLIENT_NAME: str = os.getenv("CLIENT_NAME", "PyTalkRegisterBot")
-ENCRYPTED_STR: str = os.getenv("ENCRYPTED", "0")
-SERVER_NAME: str = os.getenv("SERVER_NAME", "TeamTalk Server")
-DB_NAME_CONFIG: str = os.getenv(DATABASE_FILE_NAME_ENV_VAR, DEFAULT_DB_NAME)
+HOST_NAME: Optional[str] = _get_env_var("HOST_NAME")
+TCP_PORT_STR: Optional[str] = _get_env_var("PORT") # Kept for required_values_from_env check
+TCP_PORT: int = _get_env_var_int("PORT", 0)
+UDP_PORT: int = _get_env_var_int("UDP_PORT", 0)
+if UDP_PORT == 0 and TCP_PORT != 0:
+    UDP_PORT = TCP_PORT
+
+USER_NAME: Optional[str] = _get_env_var("USER_NAME")
+PASSWORD: Optional[str] = _get_env_var("PASSWORD")
+NICK_NAME: str = _get_env_var("NICK_NAME", "RegisterBot")
+CLIENT_NAME: str = _get_env_var("CLIENT_NAME", "PyTalkRegisterBot")
+ENCRYPTED: bool = _get_env_var_bool("ENCRYPTED", False)
+SERVER_NAME: str = _get_env_var("SERVER_NAME", "TeamTalk Server")
+DB_NAME_CONFIG: str = _get_env_var(DATABASE_FILE_NAME_ENV_VAR, DEFAULT_DB_NAME)
+
+# TeamTalk Bot Account Specific Configuration
+TEAMTALK_PUBLIC_HOSTNAME: Optional[str] = _get_env_var(TT_PUBLIC_HOSTNAME_ENV_VAR_NAME, None)
+TEAMTALK_JOIN_CHANNEL: Optional[str] = _get_env_var(TT_JOIN_CHANNEL_ENV_VAR_NAME, None)
+TEAMTALK_JOIN_CHANNEL_PASSWORD: str = _get_env_var(TT_JOIN_CHANNEL_PASSWORD_ENV_VAR_NAME, "")
+TEAMTALK_STATUS_TEXT: str = _get_env_var(TT_STATUS_TEXT_ENV_VAR_NAME, "")
+
+_raw_gender = _get_env_var(TT_GENDER_ENV_VAR_NAME, "neutral")
+_valid_genders = ["male", "female", "neutral"]
+if _raw_gender and _raw_gender.lower() in _valid_genders:
+    TEAMTALK_GENDER: str = _raw_gender.lower()
+else:
+    logger.warning(
+        f"Invalid value for environment variable {TT_GENDER_ENV_VAR_NAME}: '{_raw_gender}'. "
+        f"Using default: 'neutral'."
+    )
+    TEAMTALK_GENDER: str = "neutral"
+
 
 # Registration Settings
-VERIFY_REGISTRATION_STR: str = os.getenv("VERIFY_REGISTRATION", "0")
-CFG_ADMIN_LANG: str = os.getenv("BOT_ADMIN_LANG", "en")
+VERIFY_REGISTRATION: bool = _get_env_var_bool("VERIFY_REGISTRATION", False)
+CFG_ADMIN_LANG: str = _get_env_var("BOT_ADMIN_LANG", "en")
 
 # Web Application (FastAPI) Configuration
-WEB_REGISTRATION_ENABLED_STR: str = os.getenv("WEB_REGISTRATION_ENABLED", "0") # Renamed from FLASK_REGISTRATION_ENABLED
-WEB_APP_HOST: str = os.getenv("WEB_APP_HOST", "0.0.0.0") # Renamed from FLASK_HOST
-WEB_APP_PORT_STR: Optional[str] = os.getenv("WEB_APP_PORT") # Renamed from FLASK_PORT
-# FLASK_SECRET_KEY is not used directly by FastAPI core.
+WEB_REGISTRATION_ENABLED: bool = _get_env_var_bool("WEB_REGISTRATION_ENABLED", False)
+WEB_APP_HOST: str = _get_env_var("WEB_APP_HOST", "0.0.0.0")
+WEB_APP_PORT_STR: Optional[str] = _get_env_var("WEB_APP_PORT") # Kept for required_values_from_env check
+WEB_APP_PORT: int = _get_env_var_int("WEB_APP_PORT", 0)
 
 # Web Application SSL (Optional)
-WEB_APP_SSL_ENABLED_STR: str = os.getenv("WEB_APP_SSL_ENABLED", "0") # Renamed from FLASK_SSL_ENABLED
-WEB_APP_SSL_CERT_PATH: Optional[str] = os.getenv("WEB_APP_SSL_CERT_PATH") # Renamed
-WEB_APP_SSL_KEY_PATH: Optional[str] = os.getenv("WEB_APP_SSL_KEY_PATH") # Renamed
+WEB_APP_SSL_ENABLED: bool = _get_env_var_bool("WEB_APP_SSL_ENABLED", False)
+WEB_APP_SSL_CERT_PATH: Optional[str] = _get_env_var("WEB_APP_SSL_CERT_PATH")
+WEB_APP_SSL_KEY_PATH: Optional[str] = _get_env_var("WEB_APP_SSL_KEY_PATH")
 
 # Web Application Proxy Configuration
-WEB_APP_FORWARDED_ALLOW_IPS_ENV_VAR_NAME: str = "WEB_APP_FORWARDED_ALLOW_IPS"
-WEB_APP_PROXY_HEADERS_ENV_VAR_NAME: str = "WEB_APP_PROXY_HEADERS"
+# WEB_APP_FORWARDED_ALLOW_IPS_ENV_VAR_NAME and WEB_APP_PROXY_HEADERS_ENV_VAR_NAME moved up
+WEB_APP_FORWARDED_ALLOW_IPS_STR: str = _get_env_var(WEB_APP_FORWARDED_ALLOW_IPS_ENV_VAR_NAME, "*")
+WEB_APP_FORWARDED_ALLOW_IPS: str | List[str]
+if WEB_APP_FORWARDED_ALLOW_IPS_STR == "*":
+    WEB_APP_FORWARDED_ALLOW_IPS = "*"
+else:
+    temp_list = [ip.strip() for ip in WEB_APP_FORWARDED_ALLOW_IPS_STR.split(',') if ip.strip()]
+    if not temp_list:
+        WEB_APP_FORWARDED_ALLOW_IPS = "*"
+        logger.warning(
+            f"{WEB_APP_FORWARDED_ALLOW_IPS_ENV_VAR_NAME} was set to an empty or invalid list. "
+            f"Defaulting to '*'. Original value: '{WEB_APP_FORWARDED_ALLOW_IPS_STR}'"
+        )
+    else:
+        WEB_APP_FORWARDED_ALLOW_IPS = temp_list
+
+WEB_APP_PROXY_HEADERS: bool = _get_env_var_bool(WEB_APP_PROXY_HEADERS_ENV_VAR_NAME, True)
+
 
 # TeamTalk Client Template for Web Downloads (Optional)
-TEAMTALK_CLIENT_TEMPLATE_DIR: Optional[str] = os.getenv("TEAMTALK_CLIENT_TEMPLATE_DIR")
+TEAMTALK_CLIENT_TEMPLATE_DIR: Optional[str] = _get_env_var("TEAMTALK_CLIENT_TEMPLATE_DIR")
 
 # Generated File TTL
-GENERATED_FILE_TTL_SECONDS_STR: Optional[str] = os.getenv(
-    GENERATED_FILE_TTL_SECONDS_ENV_VAR_NAME, str(DEFAULT_TTL_SECONDS)
+GENERATED_FILE_TTL_SECONDS: int = _get_env_var_int(
+    GENERATED_FILE_TTL_SECONDS_ENV_VAR_NAME, DEFAULT_TTL_SECONDS
 )
 
 # Default TeamTalk User Rights and Registration Broadcast
-TEAMTALK_DEFAULT_USER_RIGHTS_ENV_VAR_NAME: str = "TEAMTALK_DEFAULT_USER_RIGHTS"
-REGISTRATION_BROADCAST_ENABLED_ENV_VAR_NAME: str = "TEAMTALK_REGISTRATION_BROADCAST_ENABLED"
-FORCE_USER_LANG_ENV_VAR_NAME: str = "FORCE_USER_LANG" # New constant
+# ENV_VAR_NAME constants moved up
+# DEFAULT_..._VALUE constants moved up
 
-DEFAULT_TEAMTALK_USER_RIGHTS_VALUE: str = "MULTI_LOGIN,VIEW_ALL_USERS,CREATE_TEMPORARY_CHANNEL,UPLOAD_FILES,DOWNLOAD_FILES,TRANSMIT_VOICE,TRANSMIT_VIDEOCAPTURE,TRANSMIT_DESKTOP,TRANSMIT_DESKTOPINPUT,TRANSMIT_MEDIAFILE,TEXTMESSAGE_USER,TEXTMESSAGE_CHANNEL"
-DEFAULT_REGISTRATION_BROADCAST_ENABLED_VALUE: str = "1"
+TEAMTALK_DEFAULT_USER_RIGHTS: List[str] = _get_env_var_list(
+    TEAMTALK_DEFAULT_USER_RIGHTS_ENV_VAR_NAME,
+    default_list_str=DEFAULT_TEAMTALK_USER_RIGHTS_VALUE
+)
+REGISTRATION_BROADCAST_ENABLED: bool = _get_env_var_bool(
+    REGISTRATION_BROADCAST_ENABLED_ENV_VAR_NAME,
+    True # Default was "1" (which helper _get_env_var_bool("...", True) handles if env var is "0" or "1" or missing)
+)
+FORCE_USER_LANG_RAW: Optional[str] = _get_env_var(FORCE_USER_LANG_ENV_VAR_NAME, "")
+FORCE_USER_LANG: str = FORCE_USER_LANG_RAW.strip() if FORCE_USER_LANG_RAW else ""
 
-TEAMTALK_DEFAULT_USER_RIGHTS_STR: str = os.getenv(TEAMTALK_DEFAULT_USER_RIGHTS_ENV_VAR_NAME, DEFAULT_TEAMTALK_USER_RIGHTS_VALUE)
-REGISTRATION_BROADCAST_ENABLED_STR: str = os.getenv(REGISTRATION_BROADCAST_ENABLED_ENV_VAR_NAME, DEFAULT_REGISTRATION_BROADCAST_ENABLED_VALUE)
-FORCE_USER_LANG_STR: Optional[str] = os.getenv(FORCE_USER_LANG_ENV_VAR_NAME, "") # New variable read from env
 
-WEB_APP_FORWARDED_ALLOW_IPS_STR: str = os.getenv(WEB_APP_FORWARDED_ALLOW_IPS_ENV_VAR_NAME, "*")
-WEB_APP_PROXY_HEADERS_STR: str = os.getenv(WEB_APP_PROXY_HEADERS_ENV_VAR_NAME, "1")
-
-
-# --- Parsed and validated values ---
-TCP_PORT: int = 0
-UDP_PORT: int = 0
-ENCRYPTED: bool = False
-VERIFY_REGISTRATION: bool = False
-WEB_REGISTRATION_ENABLED: bool = bool(int(WEB_REGISTRATION_ENABLED_STR)) # Renamed
-WEB_APP_PORT: int = 0 # Renamed
-WEB_APP_SSL_ENABLED: bool = bool(int(WEB_APP_SSL_ENABLED_STR)) # Renamed
-GENERATED_FILE_TTL_SECONDS: int = DEFAULT_TTL_SECONDS # Initialize with default
-TEAMTALK_DEFAULT_USER_RIGHTS: List[str] = []
-REGISTRATION_BROADCAST_ENABLED: bool = False
-FORCE_USER_LANG: str = FORCE_USER_LANG_STR.strip() # New parsed variable
-WEB_APP_FORWARDED_ALLOW_IPS: str | List[str] = "*" # Default initialization
-WEB_APP_PROXY_HEADERS: bool = True # Default initialization
-
-# Validate and parse integer/boolean variables
-try:
-    if TCP_PORT_STR and TCP_PORT_STR.strip():
-        TCP_PORT = int(TCP_PORT_STR)
-    # UDP_PORT defaults to TCP_PORT if UDP_PORT_STR is not set or empty
-    if UDP_PORT_STR and UDP_PORT_STR.strip():
-        UDP_PORT = int(UDP_PORT_STR)
-    elif TCP_PORT: # Only default if TCP_PORT was successfully parsed
-        UDP_PORT = TCP_PORT
-    else: # If TCP_PORT is also 0 (not set or invalid), UDP_PORT remains 0
-        UDP_PORT = 0 # This will likely be caught by missing var check if PORT was required
-
-    ENCRYPTED = bool(int(ENCRYPTED_STR))
-    VERIFY_REGISTRATION = bool(int(VERIFY_REGISTRATION_STR))
-    REGISTRATION_BROADCAST_ENABLED = bool(int(REGISTRATION_BROADCAST_ENABLED_STR))
-
-    TEAMTALK_DEFAULT_USER_RIGHTS = [
-        right.strip() for right in TEAMTALK_DEFAULT_USER_RIGHTS_STR.split(',') if right.strip()
-    ]
-    
-    if WEB_REGISTRATION_ENABLED: # Renamed
-        if WEB_APP_PORT_STR and WEB_APP_PORT_STR.strip(): # Renamed
-            WEB_APP_PORT = int(WEB_APP_PORT_STR) # Renamed
-        # If WEB_APP_PORT_STR is not set while WEB_REGISTRATION_ENABLED, it will be caught by missing_vars
-
-    if GENERATED_FILE_TTL_SECONDS_STR and GENERATED_FILE_TTL_SECONDS_STR.strip():
-        try:
-            GENERATED_FILE_TTL_SECONDS = int(GENERATED_FILE_TTL_SECONDS_STR)
-        except ValueError:
-            logger.warning(
-                f"Invalid value for {GENERATED_FILE_TTL_SECONDS_ENV_VAR_NAME}: "
-                f"'{GENERATED_FILE_TTL_SECONDS_STR}'. Using default TTL: {DEFAULT_TTL_SECONDS} seconds."
-            )
-            GENERATED_FILE_TTL_SECONDS = DEFAULT_TTL_SECONDS # Fallback to default
-
-    # Parse WEB_APP_FORWARDED_ALLOW_IPS
-    if WEB_APP_FORWARDED_ALLOW_IPS_STR == "*":
-        WEB_APP_FORWARDED_ALLOW_IPS = "*"
-    else:
-        WEB_APP_FORWARDED_ALLOW_IPS = [ip.strip() for ip in WEB_APP_FORWARDED_ALLOW_IPS_STR.split(',') if ip.strip()]
-        if not WEB_APP_FORWARDED_ALLOW_IPS: # If the list is empty after parsing (e.g., empty string or just commas)
-            WEB_APP_FORWARDED_ALLOW_IPS = "*" # Fallback to "*"
-            logger.warning(
-                f"{WEB_APP_FORWARDED_ALLOW_IPS_ENV_VAR_NAME} was set to an empty or invalid list. "
-                f"Defaulting to '*'. Original value: '{WEB_APP_FORWARDED_ALLOW_IPS_STR}'"
-            )
-
-    # Parse WEB_APP_PROXY_HEADERS
-    try:
-        WEB_APP_PROXY_HEADERS = bool(int(WEB_APP_PROXY_HEADERS_STR))
-    except ValueError:
-        logger.warning(
-            f"Invalid value for {WEB_APP_PROXY_HEADERS_ENV_VAR_NAME}: '{WEB_APP_PROXY_HEADERS_STR}'. "
-            f"Expected '0' or '1'. Using default: True."
-        )
-        WEB_APP_PROXY_HEADERS = True # Default to True on parsing error
-
-except ValueError as e:
-    logger.error(f"Invalid value in environment variables: {e}. Please check your .env file.")
-    exit(1)
+# The old "# --- Parsed and validated values ---" section and the "try-except ValueError" block are now removed
+# as parsing is handled by helper functions directly during variable assignment.
 
 # --- Check for required variables ---
 # Variables that MUST have a value from the .env file (or environment)

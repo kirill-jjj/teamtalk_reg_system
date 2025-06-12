@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException, Depends, Form, BackgroundTasks
 from fastapi.responses import FileResponse, RedirectResponse, HTMLResponse
 from pathlib import Path
-from typing import Optional # Add this line
+from typing import Optional, Dict, Any, Tuple # Modified line
 
 # Assuming utils.py contains schedule_temp_file_deletion, generate_random_token,
 # get_generated_files_path, get_generated_zips_path, generate_tt_file_content, create_client_zip_for_user
@@ -16,15 +16,165 @@ from bot.fastapi_app.utils import (
     # generate_tt_link # Removed from here
 )
 from bot.utils.file_generator import generate_tt_file_content, generate_tt_link # Added new import
-from bot.core.localization import get_translator, DEFAULT_LANG_CODE, get_available_languages_for_display
-from bot.core.config import FORCE_USER_LANG # Import FORCE_USER_LANG
-from bot.core import config as core_config # Changed import
-from bot.core import teamtalk_client # Added
-import logging # Reverted
+from bot.core.localization import get_translator, get_admin_lang_code, DEFAULT_LANG_CODE, get_available_languages_for_display
+from bot.core.config import FORCE_USER_LANG
+from bot.core import config as core_config
+from bot.teamtalk import users as teamtalk_users_service
+import logging
+from pytalk.enums import UserType as PyTalkUserType # Added import
 
-logger = logging.getLogger(__name__) # Reverted
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Helper function for validation
+async def _validate_web_registration_request(
+    request: Request,
+    username: str,
+    password: str,
+    user_ip: str,
+    translator
+) -> Optional[HTTPException]:
+    # Check for empty username/password
+    if not username or not password:
+        logger.warning(f"Validation failed for IP {user_ip}: Empty username or password.")
+        return HTTPException(status_code=400, detail=translator("username_password_required_error"))
+
+    # Check if IP is already registered (rate limiting)
+    if user_ip in request.app.state.registered_ips:
+        logger.warning(f"Validation failed for IP {user_ip} (Username: {username}): IP already registered.")
+        return HTTPException(status_code=400, detail=translator("ip_already_registered_error"))
+
+    # Check if username already exists
+    try:
+        username_exists = await teamtalk_users_service.check_username_exists(username=username)
+        if username_exists is True:
+            logger.warning(f"Validation failed for IP {user_ip} (Username: {username}): Username already taken.")
+            return HTTPException(status_code=400, detail=translator("username_taken_error"))
+        elif username_exists is None: # Indicates an error during the check
+            logger.error(f"Validation failed for IP {user_ip} (Username: {username}): check_username_exists returned None (error).")
+            return HTTPException(status_code=500, detail=translator("registration_failed_error"))
+    except Exception as e:
+        logger.error(f"Exception during username existence check for {username} (IP: {user_ip}): {e}", exc_info=True)
+        return HTTPException(status_code=500, detail=translator("registration_failed_error"))
+
+    return None # All validations passed
+
+async def _execute_tt_registration_for_web(
+    username: str,
+    password: str,
+    nickname: Optional[str],
+    source_info_data: dict,
+) -> Tuple[bool, Optional[Dict[str, Any]]]: # Return success status and artefact_data
+    try:
+        broadcast_text_for_tt = None
+        if core_config.REGISTRATION_BROADCAST_ENABLED:
+            # Use admin language for the broadcast message from web context as well
+            admin_lang_translator = get_translator(get_admin_lang_code())
+            broadcast_text_for_tt = admin_lang_translator("User {} was registered.").format(username)
+
+        reg_success_bool, _msg_key, tt_artefact_data = await teamtalk_users_service.perform_teamtalk_registration(
+            username_str=username,
+            password_str=password,
+            usertype_to_create=PyTalkUserType.DEFAULT, # Explicitly default for web
+            nickname_str=nickname,
+            source_info=source_info_data,
+            broadcast_message_text=broadcast_text_for_tt,
+            teamtalk_default_user_rights=core_config.TEAMTALK_DEFAULT_USER_RIGHTS,
+            registration_broadcast_enabled=core_config.REGISTRATION_BROADCAST_ENABLED,
+            host_name=core_config.HOST_NAME,
+            tcp_port=core_config.TCP_PORT,
+            udp_port=core_config.UDP_PORT,
+            encrypted=core_config.ENCRYPTED,
+            server_name=core_config.SERVER_NAME,
+            teamtalk_public_hostname=core_config.TEAMTALK_PUBLIC_HOSTNAME
+        )
+        if not reg_success_bool:
+            logger.error(f"TeamTalk registration failed for user {username} via web, perform_teamtalk_registration returned False.")
+            return False, None
+        logger.info(f"TeamTalk registration successful for user {username} via web.")
+        return True, tt_artefact_data
+    except Exception as e:
+        logger.error(f"Exception during TeamTalk registration for web user {username}: {e}", exc_info=True)
+        return False, None
+
+async def _prepare_downloadables_for_web(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    artefact_data: Dict[str, Any]
+) -> Dict[str, Any]:
+    username = artefact_data["username"]
+    password = artefact_data["password"]
+    file_generation_nickname = artefact_data["final_nickname"]
+    user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE) # For translator in this helper
+    translator = get_translator(user_lang_code)
+
+    tt_content = generate_tt_file_content( # Use data from artefact_data
+        server_name_val=artefact_data["server_name"],
+        host_val=artefact_data["effective_hostname"],
+        tcpport_val=artefact_data["tcp_port"],
+        udpport_val=artefact_data["udp_port"],
+        encrypted_val=artefact_data["encrypted"],
+        username_val=username,
+        password_val=password,
+        nickname_val=file_generation_nickname
+    )
+    tt_file_name_for_user = f"{artefact_data['server_name']}.tt"
+    tt_file_path = get_generated_files_path(request.app) / tt_file_name_for_user
+
+    try:
+        with open(tt_file_path, "w", encoding="utf-8") as f:
+            f.write(tt_content)
+    except IOError as e:
+        logger.error(f"Failed to write .tt file {tt_file_path}: {e}", exc_info=True)
+        return {
+            "tt_download_link_token": None, "tt_file_name_for_user": None,
+            "client_zip_token": None, "client_zip_filename_for_user": None,
+            "tt_quick_link": None, "file_generation_error": True
+        }
+
+    tt_token = generate_random_token()
+    request.app.state.download_tokens[tt_token] = {
+        "filename": tt_file_name_for_user, "type": "tt_config",
+        "original_filename": tt_file_name_for_user
+    }
+    schedule_temp_file_deletion(
+        background_tasks, request.app, tt_file_name_for_user, "files", tt_token,
+        delay_seconds=core_config.GENERATED_FILE_TTL_SECONDS
+    )
+
+    tt_quick_link = generate_tt_link(
+        host_val=artefact_data["effective_hostname"], tcpport_val=artefact_data["tcp_port"],
+        udpport_val=artefact_data["udp_port"], encrypted_val=artefact_data["encrypted"],
+        username_val=username, password_val=password, nickname_val=file_generation_nickname
+    )
+
+    zip_token: Optional[str] = None
+    actual_client_zip_filename_for_user: Optional[str] = None
+    if core_config.TEAMTALK_CLIENT_TEMPLATE_DIR:
+        zip_file_path_on_server, client_zip_user_download_name = create_client_zip_for_user(
+            app=request.app, username=username, password=password,
+            tt_file_name_on_server=tt_file_name_for_user, lang_code=user_lang_code
+        )
+        if zip_file_path_on_server and client_zip_user_download_name:
+            zip_token = generate_random_token()
+            actual_client_zip_filename_for_user = client_zip_user_download_name
+            request.app.state.download_tokens[zip_token] = {
+                "filename": zip_file_path_on_server.name, "type": "client_zip",
+                "original_filename": actual_client_zip_filename_for_user
+            }
+            schedule_temp_file_deletion(
+                background_tasks, request.app, zip_file_path_on_server.name, "zips", zip_token,
+                delay_seconds=core_config.GENERATED_FILE_TTL_SECONDS
+            )
+        else:
+            logger.warning(f"Failed to create client ZIP for web user {username}")
+
+    return {
+        "tt_download_link_token": tt_token, "tt_file_name_for_user": tt_file_name_for_user,
+        "client_zip_token": zip_token, "client_zip_filename_for_user": actual_client_zip_filename_for_user,
+        "tt_quick_link": tt_quick_link, "file_generation_error": False
+    }
 
 @router.post("/set_lang_and_reload")
 async def set_language_and_reload(request: Request, lang_code: str = Form(...)):
@@ -89,88 +239,45 @@ async def register_page_post(
     background_tasks: BackgroundTasks, # Added BackgroundTasks
     username: str = Form(...), 
     password: str = Form(...),
-    nickname: Optional[str] = Form(None) # Added
+    nickname: Optional[str] = Form(None)
 ):
-    if not username or not password:
-        # Use translator for error message
-        user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE) # Use new name
-        translator = get_translator(user_lang_code)
-        raise HTTPException(status_code=400, detail=translator("username_password_required_error"))
-
-    user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE) # Use new name
+    user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     translator = get_translator(user_lang_code)
-
-    # Get user IP
     user_ip = get_user_ip_fastapi(request)
 
-    # Check if IP is already registered (rate limiting)
-    if user_ip in request.app.state.registered_ips:
-        message = translator("ip_already_registered_error")
-        # Render the form again with the error message
-        # (Need to pass all template variables again)
+    validation_error = await _validate_web_registration_request(
+        request, username, password, user_ip, translator
+    )
+
+    if validation_error:
         available_languages = get_available_languages_for_display()
         return request.app.state.templates.TemplateResponse("register.html", {
             "request": request,
             "title": translator("registration_title"),
-            "message": message,
+            "message": validation_error.detail,
             "show_form": True,
             "current_lang": user_lang_code,
             "server_name_from_env": request.app.state.cached_server_name,
             "available_languages": available_languages
-        }, status_code=400)
+        }, status_code=validation_error.status_code)
 
-    # Check if username already exists (using TeamTalk client)
-    try:
-        if await teamtalk_client.check_username_exists(username=username):
-            message = translator("username_taken_error")
-            available_languages = get_available_languages_for_display()
-            return request.app.state.templates.TemplateResponse("register.html", {
-                "request": request,
-                "title": translator("registration_title"),
-                "message": message,
-                "show_form": True,
-                "current_lang": user_lang_code,
-                "server_name_from_env": request.app.state.cached_server_name,
-                "available_languages": available_languages
-            }, status_code=400)
-    except Exception as e:
-        logger.error(f"Error checking username existence: {e}", exc_info=True) # Removed await
-        message = translator("registration_failed_error") # Generic error
-        available_languages = get_available_languages_for_display()
-        return request.app.state.templates.TemplateResponse("register.html", {
-            "request": request,
-            "title": translator("registration_title"),
-            "message": message,
-            "show_form": True,
-            "current_lang": user_lang_code,
-            "server_name_from_env": request.app.state.cached_server_name,
-            "available_languages": available_languages
-        }, status_code=500)
+    # Prepare source_info for TeamTalk registration
+    final_nickname = nickname if nickname and nickname.strip() else username
+    source_info_data = {
+        "type": "web",
+        "ip_address": user_ip,
+        "user_lang": user_lang_code,
+        "nickname": final_nickname
+    }
 
-    # Perform actual TeamTalk registration
-    reg_success_bool = False # Default to false
-    source_info_data = {"type": "web", "ip_address": user_ip, "user_lang": user_lang_code}
-    if nickname and nickname.strip():
-        source_info_data["nickname"] = nickname.strip()
-    else:
-        source_info_data["nickname"] = username # Default to username if not provided or blank
+    registration_successful, tt_artefact_data_from_reg = await _execute_tt_registration_for_web(
+        username=username,
+        password=password,
+        nickname=final_nickname,
+        source_info_data=source_info_data
+    )
 
-    try:
-        reg_success_bool, _, _, _ = await teamtalk_client.perform_teamtalk_registration(
-            username_str=username,
-            password_str=password,
-            nickname_str=nickname, # Added nickname here
-            source_info=source_info_data,
-            aiogram_bot_instance=request.app.state.aiogram_bot_instance
-            # other params like user_rights_mask, initial_channel_id will use defaults from perform_teamtalk_registration
-        )
-    except Exception as e:
-        logger.error(f"Error during TeamTalk registration for user {username}: {e}", exc_info=True) # Removed await
-        reg_success_bool = False # Ensure it's false on exception
-
-    registration_successful = reg_success_bool # Assign to the variable used in subsequent logic
-
-    if not registration_successful:
+    if not registration_successful or not tt_artefact_data_from_reg:
         message = translator("registration_failed_error")
         available_languages = get_available_languages_for_display()
         return request.app.state.templates.TemplateResponse("register.html", {
@@ -184,27 +291,16 @@ async def register_page_post(
         }, status_code=500)
 
     # --- Registration successful, proceed to file generation ---
-    request.app.state.registered_ips.add(user_ip) # Add user IP to registered set
+    request.app.state.registered_ips.add(user_ip)
 
-    # 1. Generate .tt file content
-    tt_content = generate_tt_file_content(
-        server_name_val=request.app.state.cached_server_name,
-        host_val=core_config.HOST_NAME,
-        tcpport_val=core_config.TCP_PORT,
-        udpport_val=core_config.UDP_PORT,
-        encrypted_val=core_config.ENCRYPTED,
-        username_val=username,
-        password_val=password
+    downloadables_context = await _prepare_downloadables_for_web(
+        request,
+        background_tasks,
+        artefact_data=tt_artefact_data_from_reg # Pass the whole dict
     )
-    tt_file_name = f"{request.app.state.cached_server_name}.tt" # _config suffix removed
-    tt_file_path = get_generated_files_path(request.app) / tt_file_name
-    try:
-        with open(tt_file_path, "w", encoding="utf-8") as f:
-            f.write(tt_content)
-    except IOError as e:
-        logger.error(f"Failed to write .tt file {tt_file_path}: {e}", exc_info=True) # Removed await
+
+    if downloadables_context.get("file_generation_error"):
         message = translator("registration_failed_file_error")
-        # Potentially un-register user or handle this failure more gracefully
         available_languages = get_available_languages_for_display()
         return request.app.state.templates.TemplateResponse("register.html", {
             "request": request,
@@ -215,65 +311,12 @@ async def register_page_post(
             "server_name_from_env": request.app.state.cached_server_name,
             "available_languages": available_languages
         }, status_code=500)
-
-    # 2. Store token for .tt file download
-    tt_token = generate_random_token()
-    request.app.state.download_tokens[tt_token] = {
-        "filename": tt_file_name, 
-        "type": "tt_config",
-        "original_filename": tt_file_name # For user download
-    }
-    schedule_temp_file_deletion(
-        background_tasks, request.app, tt_file_name, "files", tt_token, 
-        delay_seconds=core_config.GENERATED_FILE_TTL_SECONDS
-    )
     
-    tt_download_link = request.url_for('download_tt_file', token=tt_token)
-    # Individual token/filename variables will be used.
-
-    # Initialize variables for client ZIP info, to be populated if ZIP is created
-    zip_token: Optional[str] = None
-    actual_client_zip_filename_for_user: Optional[str] = None # Renamed from zip_user_filename for clarity
-
-    # 3. Create client ZIP if enabled
-    if core_config.TEAMTALK_CLIENT_TEMPLATE_DIR: # Check for template dir presence
-        zip_file_path, client_zip_user_download_name = create_client_zip_for_user( # Renamed output var
-            app=request.app,
-            username=username,
-            password=password, # Pass the password
-            tt_file_name_on_server=tt_file_name, # Pass the .tt file name that's inside the zip
-            lang_code=user_lang_code
-        )
-        if zip_file_path and client_zip_user_download_name:
-            zip_token = generate_random_token() # This is the correct zip_token
-            actual_client_zip_filename_for_user = client_zip_user_download_name # Assign here
-            request.app.state.download_tokens[zip_token] = {
-                "filename": zip_file_path.name, # Actual name on server
-                "type": "client_zip",
-                "original_filename": actual_client_zip_filename_for_user # Name for user download
-            }
-            schedule_temp_file_deletion(
-                background_tasks, request.app, zip_file_path.name, "zips", zip_token,
-                delay_seconds=core_config.GENERATED_FILE_TTL_SECONDS
-            )
-        else:
-            logger.warning(f"Failed to create client ZIP for user {username}") # Removed await
-            # Non-critical error, proceed with just .tt file if ZIP fails
-    
-    # Prepare context for unified registration page in success state
     success_title = translator("registration_successful_title")
     success_message = translator("registration_successful_message")
-    tt_quick_link = generate_tt_link(
-        host_val=core_config.HOST_NAME,
-        tcpport_val=core_config.TCP_PORT,
-        udpport_val=core_config.UDP_PORT,
-        encrypted_val=core_config.ENCRYPTED,
-        username_val=username,
-        password_val=password
-    )
-    available_languages = get_available_languages_for_display() # Also needed for success page if language selector is part of the layout
+    available_languages = get_available_languages_for_display()
 
-    return request.app.state.templates.TemplateResponse("register.html", {
+    final_context = {
         "request": request,
         "title": success_title,
         "message": success_message,
@@ -283,12 +326,13 @@ async def register_page_post(
         "current_lang": user_lang_code,
         "server_name_from_env": request.app.state.cached_server_name,
         "available_languages": available_languages,
-        "tt_link": tt_quick_link,
-        "download_tt_token": tt_token, # This is the token for the .tt file
-        "actual_tt_filename_for_user": tt_file_name, # This is the filename for the .tt file
-        "download_client_zip_token": zip_token, # Token for client zip, will be None if not created
-        "actual_client_zip_filename_for_user": actual_client_zip_filename_for_user # Filename for zip, None if not created
-    })
+        "tt_link": downloadables_context["tt_quick_link"],
+        "download_tt_token": downloadables_context["tt_download_link_token"],
+        "actual_tt_filename_for_user": downloadables_context["tt_file_name_for_user"],
+        "download_client_zip_token": downloadables_context["client_zip_token"],
+        "actual_client_zip_filename_for_user": downloadables_context["client_zip_filename_for_user"]
+    }
+    return request.app.state.templates.TemplateResponse("register.html", final_context)
 
 
 @router.get("/download_tt/{token}")
