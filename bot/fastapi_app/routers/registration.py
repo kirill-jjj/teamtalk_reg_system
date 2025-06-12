@@ -218,9 +218,9 @@ async def register_page_get(request: Request):
     language_is_forced = False
 
     if FORCE_USER_LANG and FORCE_USER_LANG.strip():
-        _ = get_translator(FORCE_USER_LANG.strip()) # Changed _forced_translator to _
+        _ = get_translator(FORCE_USER_LANG.strip())
         original_string = "Username:" # Test string for validation
-        translated_string = _(original_string) # Updated to _
+        translated_string = _(original_string)
         if translated_string != original_string:
             effective_lang_code = FORCE_USER_LANG.strip()
             language_is_forced = True # Used to decide if we should even check cookies
@@ -277,7 +277,7 @@ async def register_page_post(
     user_ip = get_user_ip_fastapi(request)
 
     validation_error = await _validate_web_registration_request(
-        request, username, password, user_ip, translator, db # Pass DB session
+        request, username, password, user_ip, translator, db
     )
 
     if validation_error:

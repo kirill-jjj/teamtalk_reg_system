@@ -7,5 +7,5 @@ class RegistrationStates(StatesGroup):
     awaiting_password = State()
     awaiting_nickname_choice = State()
     awaiting_nickname = State()
-    awaiting_tt_account_type = State() # New state
+    awaiting_tt_account_type = State()
     waiting_admin_approval = State()

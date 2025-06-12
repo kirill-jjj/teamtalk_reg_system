@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import List
 
 # --- Конфигурация: явное определение констант ---
-PROJECT_NAME = "teamtalk_reg_system"  # MODIFIED
+PROJECT_NAME = "teamtalk_reg_system"
 COPYRIGHT_HOLDER = "kirill-jjj"
 LOCALE_DOMAIN = "messages"
 BABEL_CONFIG = "babel.cfg"
@@ -26,14 +26,14 @@ BABEL_CONFIG = "babel.cfg"
 # --- Пути: использование pathlib для надежности ---
 try:
     BASE_DIR = Path(__file__).resolve().parent
-    LOCALE_DIR = BASE_DIR / "locales"  # MODIFIED
+    LOCALE_DIR = BASE_DIR / "locales"
     POT_FILE = LOCALE_DIR / f"{LOCALE_DOMAIN}.pot"
 except NameError:
     # This fallback might occur if the script is run in an environment
     # where __file__ is not defined (e.g., some forms of exec).
     # Using Path.cwd() as a best guess for BASE_DIR in such cases.
     BASE_DIR = Path.cwd()
-    LOCALE_DIR = BASE_DIR / "locales"  # MODIFIED
+    LOCALE_DIR = BASE_DIR / "locales"
     POT_FILE = LOCALE_DIR / f"{LOCALE_DOMAIN}.pot"
 
 def run_command(command: List[str]) -> None:

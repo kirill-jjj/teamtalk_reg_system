@@ -1,5 +1,5 @@
 import asyncio
-import functools  # Added for partial
+import functools
 import logging
 
 from aiogram import Bot as AiogramBot
