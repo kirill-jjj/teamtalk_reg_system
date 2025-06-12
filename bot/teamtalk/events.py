@@ -1,10 +1,11 @@
-import logging
 import asyncio
+import logging
 
-from .connection import pytalk_bot, force_restart_instance_on_event
-from pytalk.server import Server as TeamTalkServer
-from pytalk.message import Message
 from pytalk import Channel as TeamTalkChannel
+from pytalk.message import Message
+from pytalk.server import Server as TeamTalkServer
+
+from .connection import force_restart_instance_on_event, pytalk_bot
 
 logger = logging.getLogger(__name__)
 

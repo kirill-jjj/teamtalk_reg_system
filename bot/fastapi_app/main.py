@@ -1,12 +1,14 @@
 import logging
+import os
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pathlib import Path
-from bot.core.localization import get_translator, DEFAULT_LANG_CODE
-from bot.core.config import FORCE_USER_LANG
 
-import os
+from bot.core.config import FORCE_USER_LANG
+from bot.core.localization import DEFAULT_LANG_CODE, get_translator
+
 logger = logging.getLogger(__name__)
 
 app = FastAPI(root_path=os.getenv("ROOT_PATH", "/"))
@@ -51,14 +53,16 @@ app.state.base_client_zip_path_on_disk = Path("dummy_base_client.zip")
 app.mount("/static", StaticFiles(directory="bot/fastapi_app/static"), name="static")
 
 # --- Startup and Shutdown Event Handlers ---
+import shutil
+
 from bot.core import config as core_config
 from bot.core.localization import refresh_translations
 from bot.fastapi_app.utils import (
-    get_generated_files_path, 
-    get_generated_zips_path, 
-    create_and_save_base_client_zip
+    create_and_save_base_client_zip,
+    get_generated_files_path,
+    get_generated_zips_path,
 )
-import shutil
+
 
 @app.on_event("startup")
 async def initial_fastapi_app_setup():
@@ -126,6 +130,7 @@ async def cleanup_fastapi_resources():
 
 # Import and include registration router
 from bot.fastapi_app.routers import registration
+
 app.include_router(registration.router)
 
 @app.get("/")

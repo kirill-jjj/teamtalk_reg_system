@@ -2,9 +2,10 @@ import logging
 
 from aiogram import Router
 
+from .reg_callback_handlers import callback_router
+
 # Import routers from the new handler files
 from .reg_command_handlers import command_router
-from .reg_callback_handlers import callback_router
 from .reg_fsm_message_handlers import fsm_router
 
 logger = logging.getLogger(__name__)

@@ -1,12 +1,13 @@
 import asyncio
 import logging
-from bot.core.db.session import AsyncSessionLocal
+
+from bot.core import config as core_config
 from bot.core.db import (
+    cleanup_expired_download_tokens,
     cleanup_expired_pending_registrations,
     cleanup_expired_registered_ips,
-    cleanup_expired_download_tokens
 )
-from bot.core import config as core_config
+from bot.core.db.session import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
 

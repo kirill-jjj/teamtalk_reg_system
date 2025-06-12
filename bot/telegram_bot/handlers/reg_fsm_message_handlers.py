@@ -1,18 +1,21 @@
 import logging
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from aiogram import Bot as AiogramBot, Router, types
+from aiogram import Bot as AiogramBot
+from aiogram import Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core import config
 from ...core.db import is_telegram_id_registered
-from ...teamtalk import users as tt_users_service
 from ...core.localization import get_translator
+from ...teamtalk import users as tt_users_service
 from ..states import RegistrationStates
-
-from .reg_logic_helpers import _ask_nickname_preference, _handle_registration_continuation
 from .reg_callback_data import TTAccountTypeCallback
+from .reg_logic_helpers import (
+    _ask_nickname_preference,
+    _handle_registration_continuation,
+)
 
 logger = logging.getLogger(__name__)
 

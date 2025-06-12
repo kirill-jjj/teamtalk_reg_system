@@ -1,10 +1,12 @@
+import asyncio
 import logging
 from typing import Optional
-import asyncio
+
 import pytalk
-from pytalk.enums import TeamTalkServerInfo, Status
+from pytalk.enums import Status, TeamTalkServerInfo
 
 from bot.core import config
+
 from .backoff import Backoff
 
 logger = logging.getLogger(__name__)

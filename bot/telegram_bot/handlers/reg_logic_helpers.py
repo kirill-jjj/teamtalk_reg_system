@@ -1,23 +1,21 @@
 import logging
-from typing import Dict, Optional, Any
-from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
+from typing import Any, Dict, Optional
 
-from aiogram import Bot as AiogramBot, types
+from aiogram import Bot as AiogramBot
+from aiogram import types
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from pytalk.enums import UserType as PyTalkUserType
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core import config
-from ...core.db import add_telegram_registration
-from ...teamtalk import users as tt_users_service
+from ...core.db import add_pending_telegram_registration, add_telegram_registration
 from ...core.localization import get_admin_lang_code, get_translator
+from ...teamtalk import users as tt_users_service
 from ...utils.file_generator import generate_tt_file_content, generate_tt_link
 from ..states import RegistrationStates
-from pytalk.enums import UserType as PyTalkUserType
-
-import uuid
-from ...core.db import add_telegram_registration, add_pending_telegram_registration
-
 from .reg_callback_data import AdminVerificationCallback, NicknameChoiceCallback
 
 logger = logging.getLogger(__name__)

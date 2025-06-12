@@ -1,15 +1,20 @@
 import logging
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from aiogram import Bot as AiogramBot, Router, types
+from aiogram import Bot as AiogramBot
+from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core import config
-from ...core.db import is_telegram_id_registered
 from ...core.config import FORCE_USER_LANG
-from ...core.localization import get_admin_lang_code, get_available_languages_for_display, get_translator
+from ...core.db import is_telegram_id_registered
+from ...core.localization import (
+    get_admin_lang_code,
+    get_available_languages_for_display,
+    get_translator,
+)
 from ..states import RegistrationStates
 from .reg_callback_data import LanguageCallback
 

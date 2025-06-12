@@ -1,12 +1,12 @@
+import configparser
+import io
+import logging
 import os
 import secrets
 import string
-import configparser
-import io
-from zipfile import ZipFile, ZIP_DEFLATED
-from urllib.parse import quote_plus
 from typing import Optional, Tuple
-import logging
+from urllib.parse import quote_plus
+from zipfile import ZIP_DEFLATED, ZipFile
 
 logger = logging.getLogger(__name__)
 

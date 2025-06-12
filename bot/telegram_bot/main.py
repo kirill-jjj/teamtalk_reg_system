@@ -1,15 +1,16 @@
 import asyncio
+import functools  # Added for partial
 import logging
-import functools # Added for partial
 
-from aiogram import Bot as AiogramBot, Dispatcher
+from aiogram import Bot as AiogramBot
+from aiogram import Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from ..core import config
-from ..core.db.session import init_db, close_db_engine
-from .middlewares.db_middleware import DbSessionMiddleware
+from ..core.db.session import close_db_engine, init_db
 from .handlers.admin import router as admin_router
 from .handlers.registration import router as registration_router
+from .middlewares.db_middleware import DbSessionMiddleware
 
 logger = logging.getLogger(__name__)
 

@@ -1,13 +1,17 @@
 import asyncio
+import logging
 import os
 from pathlib import Path
-from fastapi import FastAPI, BackgroundTasks # FastAPI import might not be needed by cleanup_temp_file_and_token_task directly
-import logging
+
 import aiofiles
 import aiofiles.os
+from fastapi import (  # FastAPI import might not be needed by cleanup_temp_file_and_token_task directly
+    BackgroundTasks,
+    FastAPI,
+)
 
-from bot.core.db.session import AsyncSessionLocal
 from bot.core.db import remove_fastapi_download_token
+from bot.core.db.session import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -69,14 +73,14 @@ def schedule_temp_file_deletion(
     logger.info(f"Scheduled cleanup for token {token_to_remove}, file {full_file_path} in {delay_seconds}s")
 
 
-import shutil
+import configparser  # For modify_teamtalk_ini_from_template
+import io  # For modify_teamtalk_ini_from_template
 import secrets
+import shutil
 from pathlib import Path
-from zipfile import ZipFile, ZIP_DEFLATED
-import configparser # For modify_teamtalk_ini_from_template
-import io # For modify_teamtalk_ini_from_template
+from zipfile import ZIP_DEFLATED, ZipFile
 
-from fastapi import FastAPI, Request, BackgroundTasks
+from fastapi import BackgroundTasks, FastAPI, Request
 
 from bot.core import config as core_config
 

@@ -1,5 +1,6 @@
-import time
 import random
+import time
+
 
 class Backoff:
     def __init__(self, base: int = 1, exponent: float = 2, max_value: float = 60, max_tries: int = None):

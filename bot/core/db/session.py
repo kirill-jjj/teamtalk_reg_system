@@ -1,5 +1,6 @@
 import logging
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 # Assuming config.py is in the parent directory 'core' relative to 'db' directory.
 # If bot.core.config is the reliable absolute path, that could be used too.
@@ -7,7 +8,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 # which was in the same dir as config.py. Now session.py is in a 'db' subdirectory.
 # So, `from ..config import DB_NAME_CONFIG` should be correct.
 from ..config import DB_NAME_CONFIG
-from .models import Base # Base is now in models.py in the same 'db' directory
+from .models import Base  # Base is now in models.py in the same 'db' directory
 
 logger = logging.getLogger(__name__)
 

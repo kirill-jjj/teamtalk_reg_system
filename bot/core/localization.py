@@ -1,7 +1,9 @@
-import os
 import logging
+import os
 from pathlib import Path
+
 import babel.support
+
 from .config import CFG_ADMIN_LANG
 
 logger = logging.getLogger(__name__)

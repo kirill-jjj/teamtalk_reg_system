@@ -1,5 +1,6 @@
 from aiogram.filters.callback_data import CallbackData
 
+
 # CallbackData classes for registration flow
 class LanguageCallback(CallbackData, prefix="reg_lang"): # Changed prefix for clarity
     action: str # e.g., "select"

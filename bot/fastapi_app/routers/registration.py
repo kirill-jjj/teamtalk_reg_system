@@ -1,37 +1,44 @@
-from fastapi import APIRouter, Request, HTTPException, Depends, Form, BackgroundTasks
-from fastapi.responses import FileResponse, RedirectResponse, HTMLResponse
-from pathlib import Path
-from typing import Optional, Dict, Any, Tuple
+import logging
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from pytalk.enums import UserType as PyTalkUserType
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Import DB dependency and CRUD functions
-from ..dependencies import get_db_session
+from bot.core import config as core_config
+from bot.core.config import FORCE_USER_LANG
 from bot.core.db import (
-    is_fastapi_ip_registered,
-    add_fastapi_registered_ip,
     add_fastapi_download_token,
+    add_fastapi_registered_ip,
     get_fastapi_download_token,
-    mark_fastapi_download_token_used
+    is_fastapi_ip_registered,
+    mark_fastapi_download_token_used,
+)
+from bot.core.localization import (
+    DEFAULT_LANG_CODE,
+    get_admin_lang_code,
+    get_available_languages_for_display,
+    get_translator,
 )
 
 # Assuming utils.py contains schedule_temp_file_deletion, generate_random_token,
 # get_generated_files_path, get_generated_zips_path, generate_tt_file_content, create_client_zip_for_user
 from bot.fastapi_app.utils import (
-    schedule_temp_file_deletion,
+    create_client_zip_for_user,
     generate_random_token,
     get_generated_files_path,
     get_generated_zips_path,
-    create_client_zip_for_user,
     get_user_ip_fastapi,
+    schedule_temp_file_deletion,
 )
-from bot.utils.file_generator import generate_tt_file_content, generate_tt_link
-from bot.core.localization import get_translator, get_admin_lang_code, DEFAULT_LANG_CODE, get_available_languages_for_display
-from bot.core.config import FORCE_USER_LANG
-from bot.core import config as core_config
 from bot.teamtalk import users as teamtalk_users_service
-import logging
-from pytalk.enums import UserType as PyTalkUserType
+from bot.utils.file_generator import generate_tt_file_content, generate_tt_link
+
+# Import DB dependency and CRUD functions
+from ..dependencies import get_db_session
 
 logger = logging.getLogger(__name__)
 

@@ -1,11 +1,11 @@
 import logging
-from typing import Optional, Tuple, Dict, Any, List # Added List
+from typing import Any, Dict, List, Optional, Tuple  # Added List
 
 import pytalk
 from pytalk.enums import UserType as PyTalkUserType
-from pytalk.permission import Permission as PyTalkPermission
-from pytalk.instance import TeamTalkInstance
 from pytalk.implementation.TeamTalkPy import TeamTalk5 as sdk
+from pytalk.instance import TeamTalkInstance
+from pytalk.permission import Permission as PyTalkPermission
 
 from .connection import pytalk_bot
 

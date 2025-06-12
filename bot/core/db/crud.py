@@ -1,13 +1,19 @@
 import logging
-from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
 
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError as SQLAlchemyIntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.core.config import ADMIN_IDS
-from .models import TelegramRegistration, PendingTelegramRegistration, FastapiRegisteredIp, FastapiDownloadToken
+
+from .models import (
+    FastapiDownloadToken,
+    FastapiRegisteredIp,
+    PendingTelegramRegistration,
+    TelegramRegistration,
+)
 
 logger = logging.getLogger(__name__)
 

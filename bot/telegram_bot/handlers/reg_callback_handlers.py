@@ -1,21 +1,35 @@
 import logging
-from typing import Dict, Any, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Any, Dict, Optional
 
-from aiogram import Bot as AiogramBot, F, Router, types
+from aiogram import Bot as AiogramBot
+from aiogram import F, Router, types
+
 # CallbackData itself is no longer defined here, but imported for type hinting if needed,
 # or used by the imported CallbackData classes.
 from aiogram.fsm.context import FSMContext
-from aiogram.utils.keyboard import InlineKeyboardBuilder # Not used directly in this file after refactor
+from aiogram.utils.keyboard import (
+    InlineKeyboardBuilder,  # Not used directly in this file after refactor
+)
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..states import RegistrationStates
 from ...core import config
-from ...core.db import is_telegram_id_registered, get_and_remove_pending_telegram_registration
+from ...core.db import (
+    get_and_remove_pending_telegram_registration,
+    is_telegram_id_registered,
+)
 from ...core.localization import get_admin_lang_code, get_translator
-
-from .reg_logic_helpers import _ask_nickname_preference, _process_actual_registration, _handle_registration_continuation
-from .reg_callback_data import LanguageCallback, NicknameChoiceCallback, AdminVerificationCallback, TTAccountTypeCallback
-
+from ..states import RegistrationStates
+from .reg_callback_data import (
+    AdminVerificationCallback,
+    LanguageCallback,
+    NicknameChoiceCallback,
+    TTAccountTypeCallback,
+)
+from .reg_logic_helpers import (
+    _ask_nickname_preference,
+    _handle_registration_continuation,
+    _process_actual_registration,
+)
 
 logger = logging.getLogger(__name__)
 
