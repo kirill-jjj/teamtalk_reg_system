@@ -66,11 +66,14 @@ async def check_username_exists(username: str) -> Optional[bool]:
     try:
         user_accounts_list = await active_server_instance.list_user_accounts()
         for account_obj in user_accounts_list:
-            if hasattr(account_obj, 'username') and isinstance(account_obj.username, str):
+            try:
                 if account_obj.username.strip().lower() == username.strip().lower():
                     return True
-            else:
-                logger.warning(f"UserAccount object {type(account_obj)} from pytalk doesn't have a direct 'username' string attribute as expected.")
+            except AttributeError:
+                # This is expected if an object in the list doesn't conform,
+                # or if 'username' is not a direct attribute in some cases with pytalk.
+                # As per user feedback, no warning log is needed here.
+                pass
         return False
     except IndexError:
         logger.error("No active TeamTalk server connections in check_username_exists (IndexError).")
