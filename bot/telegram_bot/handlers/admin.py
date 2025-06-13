@@ -67,7 +67,8 @@ async def generate_deeplink_handler(message: types.Message, bot: AiogramBot, db_
         # by escaping any special Markdown characters within it if necessary,
         # though for a URL, this is usually not an issue with backticks.
         # For simplicity, assuming deeplink_url is safe for direct insertion into MarkdownV2 backticks.
-        reply_text = _("Generated deeplink (expires in {num_minutes} minutes):\n`{deeplink}`").format(
+        # Escaping parentheses for MarkdownV2
+        reply_text = _("Generated deeplink \\(expires in {num_minutes} minutes\\):\n`{deeplink}`").format(
             num_minutes=token_expiry_minutes,
             deeplink=deeplink_url
         )
