@@ -1,13 +1,47 @@
 import asyncio
 import logging
+from typing import List
 
 from pytalk import Channel as TeamTalkChannel
+from pytalk import UserAccount, User, UserType, TeamTalkInstance
 from pytalk.message import Message
 from pytalk.server import Server as TeamTalkServer
+
 
 from .connection import force_restart_instance_on_event, pytalk_bot
 
 logger = logging.getLogger(__name__)
+
+
+def get_admin_users(teamtalk_instance: TeamTalkInstance) -> List[User]:
+    """
+    Retrieves a list of admin users from the server.
+
+    Args:
+        teamtalk_instance: The TeamTalkInstance to get users from.
+
+    Returns:
+        A list of pytalk.User objects who are admins.
+    """
+    admin_users: List[User] = []
+    if not teamtalk_instance or not hasattr(teamtalk_instance, 'server'):
+        logger.warning("get_admin_users: Invalid teamtalk_instance or server attribute missing.")
+        return admin_users
+
+    try:
+        all_users: List[User] = teamtalk_instance.server.get_users()
+    except Exception as e:
+        logger.error(f"get_admin_users: Error getting users from server: {e}")
+        return admin_users
+
+    for user in all_users:
+        try:
+            if hasattr(user, 'user_type') and user.user_type == UserType.ADMIN:
+                admin_users.append(user)
+        except Exception as e:
+            logger.error(f"get_admin_users: Error processing user {getattr(user, 'id', 'UnknownID')}: {e}")
+            # Continue processing other users
+    return admin_users
 
 @pytalk_bot.event
 async def on_ready():
@@ -114,3 +148,76 @@ async def on_my_kicked_from_channel(channel: TeamTalkChannel):
         asyncio.create_task(force_restart_instance_on_event(*tt_instance.server_info_tuple))
     else:
         logger.error(f"Could not trigger instance restart for server {server_host} after kick: server_info_tuple not found on instance or instance unavailable.")
+
+
+@pytalk_bot.event
+async def on_user_account_new(account: UserAccount):
+    """
+    Handles the event when a new user account is created on the server.
+    Notifies admin users about the account creation.
+    """
+    account_username = getattr(account, 'username', 'UnknownUser')
+    logger.info(f"User account '{account_username}' created (on_user_account_new event).")
+    print(f"User account '{account_username}' created.")
+
+    if not hasattr(account, 'teamtalk_instance'):
+        logger.error(f"on_user_account_new: 'teamtalk_instance' not found on account object for user '{account_username}'. Cannot notify admins.")
+        return
+
+    teamtalk_instance = account.teamtalk_instance
+    admin_users = get_admin_users(teamtalk_instance)
+
+    if not admin_users:
+        logger.info(f"on_user_account_new: No admin users found on server {getattr(teamtalk_instance.server_info, 'host', 'UnknownHost')} to notify about new user '{account_username}'.")
+        return
+
+    message_string = (
+        f"User account '{account_username}' has been CREATED. "
+        f"(Note: The admin who performed this action cannot be identified by the bot at this time.)"
+    )
+
+    for admin_user in admin_users:
+        admin_username = getattr(admin_user, 'username', 'UnknownAdmin')
+        try:
+            logger.info(f"on_user_account_new: Notifying admin '{admin_username}' about new user account '{account_username}'.")
+            await asyncio.to_thread(admin_user.send_message, message_string)
+            # Consider adding a small delay if sending many messages rapidly:
+            # await asyncio.sleep(0.1)
+        except Exception as e:
+            logger.error(f"on_user_account_new: Failed to send notification to admin '{admin_username}' about new user '{account_username}'. Error: {e}")
+
+@pytalk_bot.event
+async def on_user_account_remove(account: UserAccount):
+    """
+    Handles the event when a user account is removed from the server.
+    Notifies admin users about the account removal.
+    """
+    account_username = getattr(account, 'username', 'UnknownUser')
+    logger.info(f"User account '{account_username}' removed (on_user_account_remove event).")
+    print(f"User account '{account_username}' removed.")
+
+    if not hasattr(account, 'teamtalk_instance'):
+        logger.error(f"on_user_account_remove: 'teamtalk_instance' not found on account object for user '{account_username}'. Cannot notify admins.")
+        return
+
+    teamtalk_instance = account.teamtalk_instance
+    admin_users = get_admin_users(teamtalk_instance)
+
+    if not admin_users:
+        logger.info(f"on_user_account_remove: No admin users found on server {getattr(teamtalk_instance.server_info, 'host', 'UnknownHost')} to notify about removed user '{account_username}'.")
+        return
+
+    message_string = (
+        f"User account '{account_username}' has been REMOVED. "
+        f"(Note: The admin who performed this action cannot be identified by the bot at this time.)"
+    )
+
+    for admin_user in admin_users:
+        admin_username = getattr(admin_user, 'username', 'UnknownAdmin')
+        try:
+            logger.info(f"on_user_account_remove: Notifying admin '{admin_username}' about removed user account '{account_username}'.")
+            await asyncio.to_thread(admin_user.send_message, message_string)
+            # Consider adding a small delay if sending many messages rapidly:
+            # await asyncio.sleep(0.1)
+        except Exception as e:
+            logger.error(f"on_user_account_remove: Failed to send notification to admin '{admin_username}' about removed user '{account_username}'. Error: {e}")
