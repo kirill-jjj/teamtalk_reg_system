@@ -59,8 +59,9 @@ async def language_selection_handler(callback_query: types.CallbackQuery, callba
 
     data = await state.get_data()
     is_admin_registrar = data.get("is_admin_registrar", False)
+    is_deeplink_user = data.get("is_deeplink_registration", False)
 
-    if not is_admin_registrar and await is_telegram_id_registered(db_session, user.id):
+    if not is_admin_registrar and not is_deeplink_user and await is_telegram_id_registered(db_session, user.id):
         await bot.send_message(user.id, _("You have already registered one TeamTalk account from this Telegram account. Only one registration is allowed."))
         await state.clear()
         return

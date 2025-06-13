@@ -6,6 +6,7 @@ from bot.core.db import (
     cleanup_expired_download_tokens,
     cleanup_expired_pending_registrations,
     cleanup_expired_registered_ips,
+    delete_expired_or_used_tokens,
 )
 from bot.core.db.session import AsyncSessionLocal
 
@@ -44,6 +45,12 @@ async def periodic_database_cleanup(db_ready_event: asyncio.Event):
                 deleted_tokens = await cleanup_expired_download_tokens(db)
                 if deleted_tokens > 0:
                     logger.info(f"Cleaned up {deleted_tokens} expired or used download tokens.")
+
+                deleted_deeplinks_count = await delete_expired_or_used_tokens(db)
+                if deleted_deeplinks_count > 0:
+                    logger.info(f"Periodic cleanup: Deleted {deleted_deeplinks_count} expired or used deeplink tokens.")
+                else:
+                    logger.debug("Periodic cleanup: No expired or used deeplink tokens to delete.")
 
                 await db.commit() # Commit all changes made during this cleanup cycle
                 logger.info("Database cleanup cycle finished.")

@@ -13,6 +13,7 @@ from .models import (
     FastapiRegisteredIp,
     PendingTelegramRegistration,
     TelegramRegistration,
+    DeeplinkToken,
 )
 
 logger = logging.getLogger(__name__)
@@ -222,4 +223,60 @@ async def cleanup_expired_download_tokens(db: AsyncSession) -> int:
     deleted_count = result.rowcount
     if deleted_count > 0:
         logger.info(f"Cleaned up {deleted_count} expired or used download tokens.")
+    return deleted_count
+
+
+# --- DeeplinkToken CRUD ---
+
+async def create_deeplink_token(db: AsyncSession, token_str: str, expires_at: datetime, generated_by_admin_id: Optional[int] = None) -> DeeplinkToken:
+    new_token = DeeplinkToken(
+        token=token_str,
+        expires_at=expires_at,
+        generated_by_admin_id=generated_by_admin_id
+    )
+    db.add(new_token)
+    await db.commit() # Commit to make it available for refresh and subsequent operations
+    await db.refresh(new_token)
+    logger.info(f"Created deeplink token: {token_str} expiring at {expires_at}")
+    return new_token
+
+async def get_valid_deeplink_token(db: AsyncSession, token_str: str) -> Optional[DeeplinkToken]:
+    stmt = select(DeeplinkToken).where(
+        DeeplinkToken.token == token_str,
+        DeeplinkToken.is_used == False,
+        DeeplinkToken.expires_at > datetime.utcnow()
+    )
+    result = await db.execute(stmt)
+    token = result.scalar_one_or_none()
+    if token:
+        logger.info(f"Valid deeplink token found: {token_str}")
+    else:
+        # It's useful to know why it wasn't valid for debugging, but avoid being too verbose in standard operation.
+        # A more detailed check could be added if needed, e.g., checking if it exists but is used/expired.
+        logger.info(f"No valid deeplink token found for: {token_str} (either not found, already used, or expired).")
+    return token
+
+async def mark_deeplink_token_as_used(db: AsyncSession, token_obj: DeeplinkToken) -> DeeplinkToken:
+    if token_obj: # Ensure the object exists before trying to modify it
+        token_obj.is_used = True
+        await db.commit() # Commit the change
+        await db.refresh(token_obj) # Refresh to get the updated state from DB
+        logger.info(f"Marked deeplink token as used: {token_obj.token}")
+    return token_obj
+
+async def delete_expired_or_used_tokens(db: AsyncSession) -> int:
+    # Delete used tokens first
+    stmt_delete_used = delete(DeeplinkToken).where(DeeplinkToken.is_used == True)
+    result_used = await db.execute(stmt_delete_used)
+
+    # Then delete expired tokens (that might not have been marked as used)
+    # This ensures all non-valid tokens are cleaned up.
+    # Using current time directly in the query
+    stmt_delete_expired = delete(DeeplinkToken).where(DeeplinkToken.expires_at <= datetime.utcnow())
+    result_expired = await db.execute(stmt_delete_expired)
+
+    deleted_count = result_used.rowcount + result_expired.rowcount
+    if deleted_count > 0:
+        await db.commit() # Commit if any deletions occurred
+        logger.info(f"Deleted {deleted_count} expired or used deeplink tokens.")
     return deleted_count
