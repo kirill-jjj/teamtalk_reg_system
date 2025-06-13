@@ -156,35 +156,39 @@ async def on_user_account_new(account: UserAccount):
     Handles the event when a new user account is created on the server.
     Notifies admin users about the account creation.
     """
-    account_username = getattr(account, 'username', 'UnknownUser')
-    logger.info(f"User account '{account_username}' created (on_user_account_new event).")
-    print(f"User account '{account_username}' created.")
+    raw_account_username = getattr(account, 'username', 'UnknownUser')
+    account_username_str = raw_account_username.decode('utf-8') if isinstance(raw_account_username, bytes) else str(raw_account_username)
+
+    logger.info(f"User account '{account_username_str}' created (on_user_account_new event).")
+    print(f"User account '{account_username_str}' created.")
 
     if not hasattr(account, 'teamtalk_instance'):
-        logger.error(f"on_user_account_new: 'teamtalk_instance' not found on account object for user '{account_username}'. Cannot notify admins.")
+        logger.error(f"on_user_account_new: 'teamtalk_instance' not found on account object for user '{account_username_str}'. Cannot notify admins.")
         return
 
     teamtalk_instance = account.teamtalk_instance
     admin_users = get_admin_users(teamtalk_instance)
 
     if not admin_users:
-        logger.info(f"on_user_account_new: No admin users found on server {getattr(teamtalk_instance.server_info, 'host', 'UnknownHost')} to notify about new user '{account_username}'.")
+        logger.info(f"on_user_account_new: No admin users found on server {getattr(teamtalk_instance.server_info, 'host', 'UnknownHost')} to notify about new user '{account_username_str}'.")
         return
 
     message_string = (
-        f"User account '{account_username}' has been CREATED. "
+        f"User account '{account_username_str}' has been CREATED. "
         f"(Note: The admin who performed this action cannot be identified by the bot at this time.)"
     )
+    message_bytes = message_string.encode('utf-8')
 
     for admin_user in admin_users:
-        admin_username = getattr(admin_user, 'username', 'UnknownAdmin')
+        raw_admin_username = getattr(admin_user, 'username', 'UnknownAdmin')
+        admin_username_str = raw_admin_username.decode('utf-8') if isinstance(raw_admin_username, bytes) else str(raw_admin_username)
         try:
-            logger.info(f"on_user_account_new: Notifying admin '{admin_username}' about new user account '{account_username}'.")
-            await asyncio.to_thread(admin_user.send_message, message_string)
+            logger.info(f"on_user_account_new: Notifying admin '{admin_username_str}' about new user account '{account_username_str}'.")
+            await asyncio.to_thread(admin_user.send_message, message_bytes)
             # Consider adding a small delay if sending many messages rapidly:
             # await asyncio.sleep(0.1)
         except Exception as e:
-            logger.error(f"on_user_account_new: Failed to send notification to admin '{admin_username}' about new user '{account_username}'. Error: {e}")
+            logger.error(f"on_user_account_new: Failed to send notification to admin '{admin_username_str}' about new user '{account_username_str}'. Error: {e}")
 
 @pytalk_bot.event
 async def on_user_account_remove(account: UserAccount):
@@ -192,32 +196,36 @@ async def on_user_account_remove(account: UserAccount):
     Handles the event when a user account is removed from the server.
     Notifies admin users about the account removal.
     """
-    account_username = getattr(account, 'username', 'UnknownUser')
-    logger.info(f"User account '{account_username}' removed (on_user_account_remove event).")
-    print(f"User account '{account_username}' removed.")
+    raw_account_username = getattr(account, 'username', 'UnknownUser')
+    account_username_str = raw_account_username.decode('utf-8') if isinstance(raw_account_username, bytes) else str(raw_account_username)
+
+    logger.info(f"User account '{account_username_str}' removed (on_user_account_remove event).")
+    print(f"User account '{account_username_str}' removed.")
 
     if not hasattr(account, 'teamtalk_instance'):
-        logger.error(f"on_user_account_remove: 'teamtalk_instance' not found on account object for user '{account_username}'. Cannot notify admins.")
+        logger.error(f"on_user_account_remove: 'teamtalk_instance' not found on account object for user '{account_username_str}'. Cannot notify admins.")
         return
 
     teamtalk_instance = account.teamtalk_instance
     admin_users = get_admin_users(teamtalk_instance)
 
     if not admin_users:
-        logger.info(f"on_user_account_remove: No admin users found on server {getattr(teamtalk_instance.server_info, 'host', 'UnknownHost')} to notify about removed user '{account_username}'.")
+        logger.info(f"on_user_account_remove: No admin users found on server {getattr(teamtalk_instance.server_info, 'host', 'UnknownHost')} to notify about removed user '{account_username_str}'.")
         return
 
     message_string = (
-        f"User account '{account_username}' has been REMOVED. "
+        f"User account '{account_username_str}' has been REMOVED. "
         f"(Note: The admin who performed this action cannot be identified by the bot at this time.)"
     )
+    message_bytes = message_string.encode('utf-8')
 
     for admin_user in admin_users:
-        admin_username = getattr(admin_user, 'username', 'UnknownAdmin')
+        raw_admin_username = getattr(admin_user, 'username', 'UnknownAdmin')
+        admin_username_str = raw_admin_username.decode('utf-8') if isinstance(raw_admin_username, bytes) else str(raw_admin_username)
         try:
-            logger.info(f"on_user_account_remove: Notifying admin '{admin_username}' about removed user account '{account_username}'.")
-            await asyncio.to_thread(admin_user.send_message, message_string)
+            logger.info(f"on_user_account_remove: Notifying admin '{admin_username_str}' about removed user account '{account_username_str}'.")
+            await asyncio.to_thread(admin_user.send_message, message_bytes)
             # Consider adding a small delay if sending many messages rapidly:
             # await asyncio.sleep(0.1)
         except Exception as e:
-            logger.error(f"on_user_account_remove: Failed to send notification to admin '{admin_username}' about removed user '{account_username}'. Error: {e}")
+            logger.error(f"on_user_account_remove: Failed to send notification to admin '{admin_username_str}' about removed user '{account_username_str}'. Error: {e}")
