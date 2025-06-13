@@ -129,20 +129,88 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
     if decision_action == "verify":
         await callback_query.answer(_("User {} registration approved.").format(username_val), show_alert=True)
         source_info_from_request["approved_by_admin_id"] = callback_query.from_user.id
-        await _process_actual_registration(
+
+        # Perform the actual registration
+        reg_success, _, _ = await _process_actual_registration( # We only need success status here
             db_session=db_session, registrant_user_id=registrant_user_tg_id,
             username_val=username_val, password_val_reg=password_val_cb, nickname_val=nickname_val,
-            source_info=source_info_from_request, state=None, bot=bot
+            source_info=source_info_from_request, state=None, bot=bot # Pass bot here
         )
-        try:
-            await bot.send_message(registrant_user_tg_id, _user_specific_translator("Your registration has been approved by the administrator. You can now use TeamTalk."))
-        except Exception as e: logger.warning(f"Could not send approval notification to user {registrant_user_tg_id}: {e}")
+
+        # Notify the registrant
+        if reg_success:
+            try:
+                await bot.send_message(registrant_user_tg_id, _user_specific_translator("Your registration has been approved by the administrator. You can now use TeamTalk."))
+            except Exception as e:
+                logger.warning(f"Could not send approval notification to user {registrant_user_tg_id}: {e}")
+
+            # Notify other admins
+            acting_admin_id = callback_query.from_user.id
+            acting_admin_name = callback_query.from_user.full_name
+            approved_tt_username = username_val
+            approved_registrant_tg_id = registrant_user_tg_id
+
+            notification_message = (
+                f"ℹ️ Registration APPROVED by admin {acting_admin_name} (ID: {acting_admin_id}).\n\n"
+                f"TeamTalk User: {approved_tt_username}\n"
+                f"Registrant Telegram ID: {approved_registrant_tg_id}"
+            )
+
+            if config.ADMIN_IDS:
+                for other_admin_id_str in config.ADMIN_IDS:
+                    try:
+                        other_admin_id = int(other_admin_id_str)
+                        if other_admin_id != acting_admin_id:
+                            logger.info(f"Notifying admin {other_admin_id} about registration approval by {acting_admin_id} for TT user {approved_tt_username}")
+                            await bot.send_message(chat_id=other_admin_id, text=notification_message)
+                    except ValueError:
+                        logger.error(f"Invalid Telegram admin ID format in config: '{other_admin_id_str}'. Must be an integer.")
+                    except Exception as e:
+                        logger.error(f"Failed to send approval notification to admin {other_admin_id_str} for TT user {approved_tt_username}. Error: {e}")
+            else:
+                logger.info("No ADMIN_IDS configured, skipping notification to other admins.")
+        else:
+            # If registration itself failed after approval, it's an internal issue.
+            # Admin who approved already got an answer. Registrant might not be notified of this internal failure.
+            logger.error(f"Registration for TT user {username_val} (TG ID: {registrant_user_tg_id}) was approved by admin {callback_query.from_user.id}, but _process_actual_registration failed.")
+            # Optionally, notify admin who approved about this internal failure.
+            try:
+                await bot.send_message(callback_query.from_user.id, _("CRITICAL: Registration for {} was approved, but the final registration step failed. Please check logs.").format(username_val))
+            except Exception as e_admin_crit:
+                logger.error(f"Failed to send critical failure notice to approving admin {callback_query.from_user.id}: {e_admin_crit}")
+
 
     elif decision_action == "reject":
         await callback_query.answer(_("User {} registration declined.").format(username_val), show_alert=True)
         try:
             await bot.send_message(registrant_user_tg_id, _user_specific_translator("Your registration has been declined by the administrator."))
         except Exception as e: logger.warning(f"Could not send decline notification to user {registrant_user_tg_id}: {e}")
+
+        # Notify other admins about the rejection
+        acting_admin_id = callback_query.from_user.id
+        acting_admin_name = callback_query.from_user.full_name
+        rejected_tt_username = username_val
+        rejected_registrant_tg_id = registrant_user_tg_id
+
+        notification_message = (
+            f"ℹ️ Registration REJECTED by admin {acting_admin_name} (ID: {acting_admin_id}).\n\n"
+            f"TeamTalk User: {rejected_tt_username}\n"
+            f"Registrant Telegram ID: {rejected_registrant_tg_id}"
+        )
+
+        if config.ADMIN_IDS:
+            for other_admin_id_str in config.ADMIN_IDS:
+                try:
+                    other_admin_id = int(other_admin_id_str)
+                    if other_admin_id != acting_admin_id:
+                        logger.info(f"Notifying admin {other_admin_id} about registration rejection by {acting_admin_id} for TT user {rejected_tt_username}")
+                        await bot.send_message(chat_id=other_admin_id, text=notification_message)
+                except ValueError:
+                    logger.error(f"Invalid Telegram admin ID format in config: '{other_admin_id_str}'. Must be an integer.")
+                except Exception as e:
+                    logger.error(f"Failed to send rejection notification to admin {other_admin_id_str} for TT user {rejected_tt_username}. Error: {e}")
+        else:
+            logger.info("No ADMIN_IDS configured, skipping notification to other admins about rejection.")
 
     try:
         await callback_query.message.edit_reply_markup(reply_markup=None)
