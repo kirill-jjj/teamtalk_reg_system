@@ -7,7 +7,7 @@ from pytalk import UserAccount, user, UserType, TeamTalkInstance
 from pytalk.message import Message
 from pytalk.server import Server as TeamTalkServer
 
-
+from bot.core import config
 from .connection import force_restart_instance_on_event, pytalk_bot
 
 logger = logging.getLogger(__name__)
@@ -154,78 +154,72 @@ async def on_my_kicked_from_channel(channel: TeamTalkChannel):
 async def on_user_account_new(account: UserAccount):
     """
     Handles the event when a new user account is created on the server.
-    Notifies admin users about the account creation.
+    Notifies admin users via Telegram about the account creation.
     """
     raw_account_username = getattr(account, 'username', 'UnknownUser')
     account_username_str = raw_account_username.decode('utf-8') if isinstance(raw_account_username, bytes) else str(raw_account_username)
 
     logger.info(f"User account '{account_username_str}' created (on_user_account_new event).")
-    print(f"User account '{account_username_str}' created.")
+    print(f"User account '{account_username_str}' created.") # Keep console print for immediate feedback
 
-    if not hasattr(account, 'teamtalk_instance'):
-        logger.error(f"on_user_account_new: 'teamtalk_instance' not found on account object for user '{account_username_str}'. Cannot notify admins.")
+    aiogram_bot = pytalk_bot.aiogram_bot_ref
+    if not aiogram_bot:
+        logger.error("on_user_account_new: Aiogram bot reference not found on pytalk_bot. Cannot send Telegram notifications.")
         return
 
-    teamtalk_instance = account.teamtalk_instance
-    admin_users = get_admin_users(teamtalk_instance)
-
-    if not admin_users:
-        logger.info(f"on_user_account_new: No admin users found on server {getattr(teamtalk_instance.server_info, 'host', 'UnknownHost')} to notify about new user '{account_username_str}'.")
+    if not config.ADMIN_IDS:
+        logger.warning("on_user_account_new: No ADMIN_IDS configured in bot.core.config. Cannot send Telegram notifications.")
         return
 
-    message_string = (
-        f"User account '{account_username_str}' has been CREATED. "
+    message_to_send = (
+        f"TeamTalk: User account '{account_username_str}' has been CREATED. "
         f"(Note: The admin who performed this action cannot be identified by the bot at this time.)"
     )
-    message_bytes = message_string.encode('utf-8')
 
-    for admin_user in admin_users:
-        raw_admin_username = getattr(admin_user, 'username', 'UnknownAdmin')
-        admin_username_str = raw_admin_username.decode('utf-8') if isinstance(raw_admin_username, bytes) else str(raw_admin_username)
+    for admin_id in config.ADMIN_IDS:
         try:
-            logger.info(f"on_user_account_new: Notifying admin '{admin_username_str}' about new user account '{account_username_str}'.")
-            await asyncio.to_thread(admin_user.send_message, message_bytes)
-            # Consider adding a small delay if sending many messages rapidly:
-            # await asyncio.sleep(0.1)
+            # Ensure admin_id is an integer, as expected by aiogram
+            chat_id_int = int(admin_id)
+            logger.info(f"Attempting to send TeamTalk new account notification for '{account_username_str}' to Telegram admin ID: {chat_id_int}")
+            await aiogram_bot.send_message(chat_id=chat_id_int, text=message_to_send)
+        except ValueError:
+            logger.error(f"Invalid Telegram admin ID format in config: '{admin_id}'. Must be an integer.")
         except Exception as e:
-            logger.error(f"on_user_account_new: Failed to send notification to admin '{admin_username_str}' about new user '{account_username_str}'. Error: {e}")
+            logger.error(f"Failed to send TeamTalk new account notification to Telegram admin ID {admin_id} for user '{account_username_str}'. Error: {e}")
 
 @pytalk_bot.event
 async def on_user_account_remove(account: UserAccount):
     """
     Handles the event when a user account is removed from the server.
-    Notifies admin users about the account removal.
+    Notifies admin users via Telegram about the account removal.
     """
     raw_account_username = getattr(account, 'username', 'UnknownUser')
     account_username_str = raw_account_username.decode('utf-8') if isinstance(raw_account_username, bytes) else str(raw_account_username)
 
     logger.info(f"User account '{account_username_str}' removed (on_user_account_remove event).")
-    print(f"User account '{account_username_str}' removed.")
+    print(f"User account '{account_username_str}' removed.") # Keep console print for immediate feedback
 
-    if not hasattr(account, 'teamtalk_instance'):
-        logger.error(f"on_user_account_remove: 'teamtalk_instance' not found on account object for user '{account_username_str}'. Cannot notify admins.")
+    aiogram_bot = pytalk_bot.aiogram_bot_ref
+    if not aiogram_bot:
+        logger.error("on_user_account_remove: Aiogram bot reference not found on pytalk_bot. Cannot send Telegram notifications.")
         return
 
-    teamtalk_instance = account.teamtalk_instance
-    admin_users = get_admin_users(teamtalk_instance)
-
-    if not admin_users:
-        logger.info(f"on_user_account_remove: No admin users found on server {getattr(teamtalk_instance.server_info, 'host', 'UnknownHost')} to notify about removed user '{account_username_str}'.")
+    if not config.ADMIN_IDS:
+        logger.warning("on_user_account_remove: No ADMIN_IDS configured in bot.core.config. Cannot send Telegram notifications.")
         return
 
-    message_string = (
-        f"User account '{account_username_str}' has been REMOVED. "
+    message_to_send = (
+        f"TeamTalk: User account '{account_username_str}' has been REMOVED. "
         f"(Note: The admin who performed this action cannot be identified by the bot at this time.)"
     )
-    message_bytes = message_string.encode('utf-8')
 
-    for admin_user in admin_users:
-        raw_admin_username = getattr(admin_user, 'username', 'UnknownAdmin')
-        admin_username_str = raw_admin_username.decode('utf-8') if isinstance(raw_admin_username, bytes) else str(raw_admin_username)
+    for admin_id in config.ADMIN_IDS:
         try:
-            logger.info(f"on_user_account_remove: Notifying admin '{admin_username_str}' about removed user account '{account_username_str}'.")
-            await asyncio.to_thread(admin_user.send_message, message_bytes)
-            # Consider adding a small delay if sending many messages rapidly:
-            # await asyncio.sleep(0.1)
+            # Ensure admin_id is an integer, as expected by aiogram
+            chat_id_int = int(admin_id)
+            logger.info(f"Attempting to send TeamTalk account removal notification for '{account_username_str}' to Telegram admin ID: {chat_id_int}")
+            await aiogram_bot.send_message(chat_id=chat_id_int, text=message_to_send)
+        except ValueError:
+            logger.error(f"Invalid Telegram admin ID format in config: '{admin_id}'. Must be an integer.")
         except Exception as e:
-            logger.error(f"on_user_account_remove: Failed to send notification to admin '{admin_username_str}' about removed user '{account_username_str}'. Error: {e}")
+            logger.error(f"Failed to send TeamTalk account removal notification to Telegram admin ID {admin_id} for user '{account_username_str}'. Error: {e}")

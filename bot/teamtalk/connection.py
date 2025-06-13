@@ -2,6 +2,7 @@ import asyncio
 import logging
 from typing import Optional
 
+from aiogram import Bot as AiogramBot
 import pytalk
 from pytalk.enums import Status, TeamTalkServerInfo
 
@@ -12,7 +13,15 @@ from .backoff import Backoff
 logger = logging.getLogger(__name__)
 
 pytalk_bot = pytalk.TeamTalkBot(client_name=config.CLIENT_NAME)
+pytalk_bot.aiogram_bot_ref: Optional[AiogramBot] = None # Holds the Aiogram Bot instance
 active_instance_restarts = {} # Key: server_host_port, Value: asyncio.Task
+
+def set_aiogram_bot_instance(bot: AiogramBot):
+    """Sets the Aiogram Bot instance on the global pytalk_bot."""
+    global pytalk_bot
+    pytalk_bot.aiogram_bot_ref = bot
+    bot_id_info = getattr(bot, 'id', 'N/A') if bot else 'None'
+    logger.info(f"Aiogram bot instance (ID: {bot_id_info}) set on pytalk_bot.")
 
 async def initialize_teamtalk_connection(
     host_name: str, tcp_port: int, udp_port: int, user_name: str, password: str,

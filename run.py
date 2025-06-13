@@ -61,12 +61,11 @@ import uvicorn
 
 # Now that .env is loaded (or attempted), these imports can proceed and config will see the right values
 from bot.fastapi_app.main import app as fastapi_app
-from bot.teamtalk.connection import launch_teamtalk_service
+from bot.teamtalk.connection import launch_teamtalk_service, close_teamtalk_connection, set_aiogram_bot_instance
 from bot.teamtalk import events as _ # To register core TT event handlers
 from bot.core import config as core_config # This should now see env vars from custom .env
 from bot.telegram_bot.main import run_telegram_bot, start_telegram_polling
 from bot.core.db import close_db_engine
-from bot.teamtalk.connection import close_teamtalk_connection
 from pathlib import Path
 
 # Configure logging AFTER .env load, as .env might contain logging settings in a real app
@@ -181,6 +180,13 @@ async def main():
             shutdown_handler_callback=on_aiogram_shutdown_handler,
             db_ready_event=db_initialized_event
         )
+
+        # Set the Aiogram bot instance for TeamTalk bot to use
+        if actual_aiogram_bot_instance:
+            set_aiogram_bot_instance(actual_aiogram_bot_instance)
+            logger.info("Aiogram bot instance passed to TeamTalk connection module.")
+        else:
+            logger.warning("Aiogram bot instance was not available after run_telegram_bot. Cannot set on pytalk_bot.")
 
         # 2. Pass Bot instance to FastAPI app state
 
