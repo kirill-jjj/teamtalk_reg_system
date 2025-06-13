@@ -3,7 +3,7 @@ import logging
 from typing import List
 
 from pytalk import Channel as TeamTalkChannel
-from pytalk import UserAccount, User, UserType, TeamTalkInstance
+from pytalk import UserAccount, user, UserType, TeamTalkInstance
 from pytalk.message import Message
 from pytalk.server import Server as TeamTalkServer
 
@@ -13,7 +13,7 @@ from .connection import force_restart_instance_on_event, pytalk_bot
 logger = logging.getLogger(__name__)
 
 
-def get_admin_users(teamtalk_instance: TeamTalkInstance) -> List[User]:
+def get_admin_users(teamtalk_instance: TeamTalkInstance) -> List[user]:
     """
     Retrieves a list of admin users from the server.
 
@@ -23,13 +23,13 @@ def get_admin_users(teamtalk_instance: TeamTalkInstance) -> List[User]:
     Returns:
         A list of pytalk.User objects who are admins.
     """
-    admin_users: List[User] = []
+    admin_users: List[user] = []
     if not teamtalk_instance or not hasattr(teamtalk_instance, 'server'):
         logger.warning("get_admin_users: Invalid teamtalk_instance or server attribute missing.")
         return admin_users
 
     try:
-        all_users: List[User] = teamtalk_instance.server.get_users()
+        all_users: List[user] = teamtalk_instance.server.get_users()
     except Exception as e:
         logger.error(f"get_admin_users: Error getting users from server: {e}")
         return admin_users
