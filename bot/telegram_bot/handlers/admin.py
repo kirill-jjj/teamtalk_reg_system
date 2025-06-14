@@ -5,20 +5,26 @@ from datetime import datetime, timedelta
 import logging # Ensure logging is imported if not already at the top
 from aiogram import types, Bot as AiogramBot, F, Router
 from aiogram.filters import Command
-from aiogram.filters.callback_data import CallbackData # Added import
+from aiogram.filters.callback_data import CallbackData
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from sqlalchemy import select # Added import
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core import config
 from ...core.db.crud import (
     create_deeplink_token,
-    # get_user_by_identifier, # Removed as it was only used by the deleted handler
     delete_telegram_registration,
     get_all_telegram_registrations,
+    add_banned_user,
+    get_banned_users, # Added import
+    remove_banned_user, # Added import
 )
+from ...core.db.models import TelegramRegistration
 from ...core.localization import get_translator, get_admin_lang_code
 from ..keyboards.admin_keyboards import get_admin_panel_keyboard, CALLBACK_DATA_DELETE_USER
-# AdminActions import is already removed effectively by prior comment
+from ..states import AdminActions # Added import
+from aiogram.fsm.context import FSMContext # Added import
+from aiogram.types import InlineKeyboardMarkup # Added import
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +32,11 @@ logger = logging.getLogger(__name__)
 class AdminDeleteCallback(CallbackData, prefix="admin_del"):
     user_telegram_id: int
     # action: str # Optional: for future actions like "info", "ban"
+
+# Define CallbackData for ban list actions
+class AdminBanListActionCallback(CallbackData, prefix="admin_banlist"):
+    action: str  # "view", "unban", "add_prompt"
+    target_telegram_id: int | None = None
 
 router = Router()
 
@@ -39,9 +50,21 @@ KEY_USER_NOT_FOUND = "admin_delete_user_not_found"
 KEY_INVALID_INPUT_FOR_DELETION = "admin_delete_invalid_input"
 KEY_ADMIN_DELETE_NO_USERS_FOUND = "admin_delete_no_users_found"
 KEY_ADMIN_DELETE_SELECT_USER = "admin_delete_select_user"
-KEY_ADMIN_DELETE_CONFIRMED_SUCCESS = "admin_delete_confirmed_success" # New key
-KEY_ADMIN_DELETE_CONFIRMED_FAIL = "admin_delete_confirmed_fail" # New key
-KEY_ADMIN_DELETE_INVALID_ID_FORMAT = "admin_delete_invalid_id_format" # New key
+KEY_ADMIN_DELETE_CONFIRMED_SUCCESS = "admin_delete_confirmed_success"
+KEY_ADMIN_DELETE_CONFIRMED_FAIL = "admin_delete_confirmed_fail"
+KEY_ADMIN_DELETE_INVALID_ID_FORMAT = "admin_delete_invalid_id_format"
+
+# New Localization Keys for Ban List Management
+KEY_ADMIN_BANLIST_TITLE = "admin_banlist_title"
+KEY_ADMIN_BANLIST_EMPTY = "admin_banlist_empty"
+KEY_BUTTON_UNBAN = "admin_button_unban"
+KEY_BUTTON_ADD_TO_BANLIST_MANUAL = "admin_button_add_to_banlist_manual"
+KEY_ADMIN_UNBAN_SUCCESS = "admin_unban_success"
+KEY_ADMIN_UNBAN_FAIL = "admin_unban_fail"
+KEY_ADMIN_MANUAL_BAN_PROMPT = "admin_manual_ban_prompt"
+KEY_ADMIN_MANUAL_BAN_SUCCESS = "admin_manual_ban_success"
+KEY_ADMIN_MANUAL_BAN_INVALID_ID = "admin_manual_ban_invalid_id"
+KEY_ADMIN_MANUAL_BAN_FAIL = "admin_manual_ban_fail"
 
 
 @router.message(Command("adminpanel"))
@@ -145,17 +168,36 @@ async def confirm_delete_user_handler(callback_query: types.CallbackQuery, db_se
 
     # Get telegram_id directly from callback_data
     telegram_id_to_delete = callback_data.user_telegram_id
-    # Removed manual parsing and associated try-except block for format errors,
-    # as CallbackData handles parsing and validation.
+
+    # Fetch TelegramRegistration to get teamtalk_username before deleting
+    tt_username_for_ban: str | None = None
+    user_reg_stmt = select(TelegramRegistration).where(TelegramRegistration.telegram_id == telegram_id_to_delete)
+    user_reg_result = await db_session.execute(user_reg_stmt)
+    user_reg = user_reg_result.scalar_one_or_none()
+    if user_reg:
+        tt_username_for_ban = user_reg.teamtalk_username
+        logger.info(f"Found TeamTalk username '{tt_username_for_ban}' for Telegram ID {telegram_id_to_delete} before deletion.")
+    else:
+        logger.warning(f"Could not find TelegramRegistration record for Telegram ID {telegram_id_to_delete} before deletion. Will ban without TT username.")
 
     deletion_successful = await delete_telegram_registration(db_session, telegram_id_to_delete)
 
     if deletion_successful:
-        reply_text = _(KEY_ADMIN_DELETE_CONFIRMED_SUCCESS).format(telegram_id=callback_data.user_telegram_id)
-        logger.info(f"Admin {callback_query.from_user.id} successfully deleted user with Telegram ID: {callback_data.user_telegram_id}")
+        logger.info(f"Admin {callback_query.from_user.id} successfully deleted TelegramRegistration for ID: {telegram_id_to_delete}")
+
+        # Now, also ban the user
+        await add_banned_user(
+            db_session=db_session,
+            telegram_id=telegram_id_to_delete,
+            teamtalk_username=tt_username_for_ban,
+            admin_id=callback_query.from_user.id,
+            reason="Deleted via bot admin panel"
+        )
+        logger.info(f"User {telegram_id_to_delete} (TT: {tt_username_for_ban}) also added to ban list by admin {callback_query.from_user.id}.")
+        reply_text = _(KEY_ADMIN_DELETE_CONFIRMED_SUCCESS).format(telegram_id=telegram_id_to_delete)
     else:
-        reply_text = _(KEY_ADMIN_DELETE_CONFIRMED_FAIL).format(telegram_id=callback_data.user_telegram_id)
-        logger.warning(f"Admin {callback_query.from_user.id} failed to delete user with Telegram ID: {callback_data.user_telegram_id} (possibly already deleted or DB error).")
+        reply_text = _(KEY_ADMIN_DELETE_CONFIRMED_FAIL).format(telegram_id=telegram_id_to_delete)
+        logger.warning(f"Admin {callback_query.from_user.id} failed to delete TelegramRegistration for ID: {telegram_id_to_delete} (possibly already deleted or DB error). Ban not applied.")
 
     await callback_query.answer(reply_text, show_alert=True)
 
@@ -167,6 +209,136 @@ async def confirm_delete_user_handler(callback_query: types.CallbackQuery, db_se
         # Optionally send a new message if editing fails and it's critical to display status,
         # but an alert might be sufficient.
         # await callback_query.message.answer(reply_text)
+
+# --- Ban List Management Handlers ---
+
+async def _build_ban_list_message_and_keyboard(db_session: AsyncSession, _translator) -> tuple[str, InlineKeyboardMarkup]:
+    banned_users = await get_banned_users(db_session)
+    builder = InlineKeyboardBuilder()
+
+    message_lines = [_translator(KEY_ADMIN_BANLIST_TITLE)]
+    if not banned_users:
+        message_lines.append(_translator(KEY_ADMIN_BANLIST_EMPTY))
+    else:
+        for buser in banned_users:
+            reason_text = buser.reason if buser.reason else "N/A"
+            tt_user_text = buser.teamtalk_username if buser.teamtalk_username else "N/A"
+            # Ensure TG ID is a string for formatting if it's not already
+            tg_id_str = str(buser.telegram_id)
+            message_lines.append(f"TG ID: {tg_id_str} - TT User: {tt_user_text} (Reason: {reason_text})")
+            builder.button(
+                text=f"{_translator(KEY_BUTTON_UNBAN)} ({tg_id_str})",
+                callback_data=AdminBanListActionCallback(action="unban", target_telegram_id=buser.telegram_id).pack()
+            )
+
+    builder.button(
+        text=_translator(KEY_BUTTON_ADD_TO_BANLIST_MANUAL),
+        callback_data=AdminBanListActionCallback(action="add_prompt", target_telegram_id=None).pack()
+    )
+    builder.adjust(1) # One button per row for unban, then add_manual button
+    return "\n".join(message_lines), builder.as_markup()
+
+@router.callback_query(AdminBanListActionCallback.filter(F.action == "view"))
+async def view_ban_list_handler(callback_query: types.CallbackQuery, db_session: AsyncSession):
+    await callback_query.answer() # Acknowledge the callback immediately
+    admin_lang = get_admin_lang_code()
+    _ = get_translator(admin_lang)
+
+    message_text, reply_markup = await _build_ban_list_message_and_keyboard(db_session, _)
+    try:
+        await callback_query.message.edit_text(message_text, reply_markup=reply_markup)
+    except Exception as e: # Handle cases where message cannot be edited (e.g. too old or no change)
+        logger.debug(f"Failed to edit message for ban list view (might be no change or too old): {e}")
+        # If editing fails because message is not modified, it's not an error.
+        # If it's too old, send a new one. For simplicity, just try answering.
+        # Consider sending a new message if edit_text fails for other reasons.
+        await callback_query.message.answer(message_text, reply_markup=reply_markup)
+
+
+@router.callback_query(AdminBanListActionCallback.filter(F.action == "unban"))
+async def unban_user_handler(callback_query: types.CallbackQuery, callback_data: AdminBanListActionCallback, db_session: AsyncSession):
+    admin_lang = get_admin_lang_code()
+    _ = get_translator(admin_lang)
+
+    target_id = callback_data.target_telegram_id
+    if target_id is None: # Should not happen if buttons are generated correctly
+        await callback_query.answer("Error: No target user ID specified for unban.", show_alert=True)
+        return
+
+    success = await remove_banned_user(db_session, target_id)
+    alert_text = ""
+    if success:
+        alert_text = _(KEY_ADMIN_UNBAN_SUCCESS).format(target_telegram_id=target_id)
+        logger.info(f"Admin {callback_query.from_user.id} unbanned user {target_id}.")
+    else:
+        alert_text = _(KEY_ADMIN_UNBAN_FAIL).format(target_telegram_id=target_id)
+        logger.warning(f"Admin {callback_query.from_user.id} failed to unban user {target_id}.")
+    await callback_query.answer(alert_text, show_alert=True)
+
+    # Refresh the ban list message
+    message_text, reply_markup = await _build_ban_list_message_and_keyboard(db_session, _)
+    try:
+        await callback_query.message.edit_text(message_text, reply_markup=reply_markup)
+    except Exception as e:
+        logger.warning(f"Failed to refresh ban list after unban: {e}")
+        # Optionally, send a new message if editing fails
+        await callback_query.message.answer(text=_("Action processed. Could not refresh list immediately."), reply_markup=None)
+
+@router.callback_query(AdminBanListActionCallback.filter(F.action == "add_prompt"))
+async def manual_ban_prompt_handler(callback_query: types.CallbackQuery, state: FSMContext):
+    await callback_query.answer() # Acknowledge
+    admin_lang = get_admin_lang_code()
+    _ = get_translator(admin_lang)
+    try:
+        await callback_query.message.edit_text(_(KEY_ADMIN_MANUAL_BAN_PROMPT))
+    except Exception as e:
+        logger.debug(f"Could not edit message for manual ban prompt (maybe no change): {e}")
+        await callback_query.message.answer(_(KEY_ADMIN_MANUAL_BAN_PROMPT)) # Send as new if edit fails
+    await state.set_state(AdminActions.awaiting_manual_ban_id_reason)
+
+@router.message(AdminActions.awaiting_manual_ban_id_reason, F.text)
+async def process_manual_ban_handler(message: types.Message, state: FSMContext, db_session: AsyncSession):
+    await state.clear() # Clear state first
+    admin_lang = get_admin_lang_code()
+    _ = get_translator(admin_lang)
+
+    parts = message.text.splitlines()
+    if not parts: # Should not happen with F.text but good practice
+        await message.reply(_(KEY_ADMIN_MANUAL_BAN_INVALID_ID)) # Or a more generic error
+        return
+
+    telegram_id_str = parts[0].strip()
+    reason = parts[1].strip() if len(parts) > 1 else None
+
+    try:
+        target_telegram_id = int(telegram_id_str)
+        tt_username = None
+
+        # Attempt to find associated TeamTalk username
+        user_reg_stmt = select(TelegramRegistration.teamtalk_username).where(TelegramRegistration.telegram_id == target_telegram_id)
+        user_reg_res = await db_session.execute(user_reg_stmt)
+        tt_username_tuple = user_reg_res.first() # first() returns a Row or None
+        if tt_username_tuple:
+            tt_username = tt_username_tuple[0]
+
+        banned_user = await add_banned_user(
+            db_session,
+            telegram_id=target_telegram_id,
+            teamtalk_username=tt_username, # Will be None if not found
+            admin_id=message.from_user.id,
+            reason=reason
+        )
+        # add_banned_user now typically returns the BannedUser object.
+        # Success is implied if no exception was raised and banned_user is not None.
+        await message.reply(_(KEY_ADMIN_MANUAL_BAN_SUCCESS).format(telegram_id=target_telegram_id))
+        logger.info(f"Admin {message.from_user.id} manually banned user {target_telegram_id} with reason: '{reason}'. TT username: {tt_username}")
+
+    except ValueError:
+        logger.warning(f"Admin {message.from_user.id} provided invalid Telegram ID for manual ban: {telegram_id_str}")
+        await message.reply(_(KEY_ADMIN_MANUAL_BAN_INVALID_ID))
+    except Exception as e:
+        logger.error(f"Failed to manually ban user {telegram_id_str} by admin {message.from_user.id}: {e}", exc_info=True)
+        await message.reply(_(KEY_ADMIN_MANUAL_BAN_FAIL).format(telegram_id=telegram_id_str))
 
 
 @router.message(Command("generate"))

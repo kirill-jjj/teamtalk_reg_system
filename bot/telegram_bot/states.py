@@ -14,4 +14,4 @@ class RegistrationStates(StatesGroup):
 class AdminActions(StatesGroup):
     # This state group is currently empty.
     # It can be used for future admin-related states.
-    pass
+    awaiting_manual_ban_id_reason = State()

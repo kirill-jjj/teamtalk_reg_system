@@ -14,6 +14,7 @@ from .models import (
     PendingTelegramRegistration,
     TelegramRegistration,
     DeeplinkToken,
+    BannedUser, # Added BannedUser import
 )
 
 logger = logging.getLogger(__name__)
@@ -342,3 +343,72 @@ async def delete_expired_or_used_tokens(db: AsyncSession) -> int:
         await db.commit() # Commit if any deletions occurred
         logger.info(f"Deleted {deleted_count} expired or used deeplink tokens.")
     return deleted_count
+
+
+# --- BannedUser CRUD ---
+
+async def add_banned_user(
+    db_session: AsyncSession,
+    telegram_id: int,
+    teamtalk_username: str | None = None,
+    admin_id: int | None = None,
+    reason: str | None = None
+) -> BannedUser:
+    # Check if already banned, if so, update; otherwise, create new.
+    # This is an upsert-like behavior.
+    stmt = select(BannedUser).where(BannedUser.telegram_id == telegram_id)
+    result = await db_session.execute(stmt)
+    banned_user = result.scalar_one_or_none()
+
+    if banned_user:
+        banned_user.teamtalk_username = teamtalk_username if teamtalk_username is not None else banned_user.teamtalk_username
+        banned_user.banned_at = datetime.utcnow() # Update ban time
+        banned_user.banned_by_admin_id = admin_id if admin_id is not None else banned_user.banned_by_admin_id
+        banned_user.reason = reason if reason is not None else banned_user.reason
+        logger.info(f"Updating existing ban for Telegram ID: {telegram_id}")
+    else:
+        banned_user = BannedUser(
+            telegram_id=telegram_id,
+            teamtalk_username=teamtalk_username,
+            banned_by_admin_id=admin_id,
+            reason=reason
+            # banned_at is defaulted in model
+        )
+        db_session.add(banned_user)
+        logger.info(f"Adding new ban for Telegram ID: {telegram_id}")
+
+    await db_session.commit()
+    await db_session.refresh(banned_user) # Refresh to get DB defaults like banned_at
+    return banned_user
+
+async def remove_banned_user(db_session: AsyncSession, telegram_id: int) -> bool:
+    stmt = delete(BannedUser).where(BannedUser.telegram_id == telegram_id)
+    result = await db_session.execute(stmt)
+    await db_session.commit()
+    if result.rowcount > 0:
+        logger.info(f"Removed ban for Telegram ID: {telegram_id}")
+        return True
+    logger.info(f"No ban found for Telegram ID: {telegram_id} to remove.")
+    return False
+
+async def is_user_banned(db_session: AsyncSession, telegram_id: int) -> bool:
+    stmt = select(BannedUser).where(BannedUser.telegram_id == telegram_id)
+    # Efficiently check for existence without loading the object
+    result = await db_session.execute(select(stmt.exists()))
+    return result.scalar_one()
+
+async def get_banned_users(db_session: AsyncSession) -> list[BannedUser]:
+    stmt = select(BannedUser).order_by(BannedUser.banned_at.desc())
+    result = await db_session.execute(stmt)
+    return list(result.scalars().all()) # Ensure it's a list, not just an iterable
+
+async def get_telegram_id_by_teamtalk_username(db_session: AsyncSession, teamtalk_username: str) -> int | None:
+    # This function assumes TelegramRegistration table links TT usernames and TG IDs
+    stmt = select(TelegramRegistration.telegram_id).where(TelegramRegistration.teamtalk_username == teamtalk_username)
+    result = await db_session.execute(stmt)
+    telegram_id = result.scalar_one_or_none()
+    if telegram_id:
+        logger.debug(f"Found Telegram ID {telegram_id} for TeamTalk username '{teamtalk_username}'.")
+    else:
+        logger.debug(f"No Telegram ID found for TeamTalk username '{teamtalk_username}'.")
+    return telegram_id

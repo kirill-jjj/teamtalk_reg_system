@@ -58,3 +58,16 @@ class DeeplinkToken(Base):
 
     def __repr__(self):
         return f"<DeeplinkToken(token='{self.token}', expires_at='{self.expires_at}', is_used={self.is_used})>"
+
+
+class BannedUser(Base):
+    __tablename__ = "banned_users"
+
+    telegram_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    teamtalk_username: Mapped[str | None] = mapped_column(String, index=True, nullable=True)
+    banned_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    banned_by_admin_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True) # Assuming admin IDs can be large
+    reason: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    def __repr__(self):
+        return f"<BannedUser(telegram_id={self.telegram_id}, teamtalk_username='{self.teamtalk_username}')>"

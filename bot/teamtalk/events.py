@@ -8,9 +8,33 @@ from pytalk.message import Message
 from pytalk.server import Server as TeamTalkServer
 
 from bot.core import config
+from bot.core.db.crud import add_banned_user, get_telegram_id_by_teamtalk_username # Added imports
+from bot.core.db.session import AsyncSessionLocal # Added import
 from .connection import force_restart_instance_on_event, pytalk_bot
 
 logger = logging.getLogger(__name__)
+
+
+# Helper function for banning
+async def _handle_banning_on_tt_account_removal(tt_username: str, server_host_info: str):
+    logger.info(f"Attempting to process ban for TeamTalk user '{tt_username}' deleted from server '{server_host_info}'.")
+    async with AsyncSessionLocal() as session:
+        try:
+            telegram_id = await get_telegram_id_by_teamtalk_username(session, tt_username)
+            if telegram_id:
+                logger.info(f"Found Telegram ID {telegram_id} for TeamTalk user '{tt_username}'. Proceeding to ban.")
+                await add_banned_user(
+                    db_session=session,
+                    telegram_id=telegram_id,
+                    teamtalk_username=tt_username,
+                    reason=f"Account deleted from TeamTalk server: {server_host_info}"
+                    # banned_by_admin_id will be None by default (auto-ban)
+                )
+                logger.info(f"Successfully processed ban for Telegram ID {telegram_id} (TeamTalk: {tt_username}).")
+            else:
+                logger.warning(f"No Telegram ID found for TeamTalk user '{tt_username}'. Cannot add to bot's ban list.")
+        except Exception as e:
+            logger.error(f"Error during automatic banning process for TeamTalk user '{tt_username}': {e}", exc_info=True)
 
 
 def get_admin_users(teamtalk_instance: TeamTalkInstance) -> List[user]:
@@ -198,6 +222,32 @@ async def on_user_account_remove(account: UserAccount):
 
     logger.info(f"User account '{account_username_str}' removed (on_user_account_remove event).")
     print(f"User account '{account_username_str}' removed.") # Keep console print for immediate feedback
+
+    # Determine server_host_info
+    server_host_info = "Unknown Server"
+    # The 'account' object from pytalk's on_user_account_remove might not directly have server info.
+    # We might need to infer it from the pytalk_bot instance or pass it if available.
+    # For now, let's assume we might not have direct access to specific server instance here easily.
+    # If multiple servers are connected, this becomes more complex.
+    # A more robust solution might involve iterating through pytalk_bot.teamtalks
+    # but that might be slow or error-prone if the account object doesn't link back to its server.
+    # For a single server setup, it might be okay to fetch from config or a shared state.
+    # Let's use a placeholder and log a warning.
+    # A better approach would be to get the server from the instance that triggered the event,
+    # if the `account` object had a reference to its `TeamTalkInstance` or `Server`.
+    # Pytalk's `account` in `on_user_account_remove` doesn't directly provide server details.
+    # We will try to get it from the first available instance, assuming single server context for this feature.
+    if pytalk_bot.teamtalks:
+        first_instance = pytalk_bot.teamtalks[0] # Get the first (presumably only) instance
+        if hasattr(first_instance, 'server_info_tuple') and first_instance.server_info_tuple:
+            server_host_info = first_instance.server_info_tuple[0]
+        elif first_instance.server and hasattr(first_instance.server, 'info') and first_instance.server.info:
+             server_host_info = first_instance.server.info.host
+    logger.info(f"Using server host info: {server_host_info} for banning context.")
+
+
+    # Call the helper function to handle banning
+    asyncio.create_task(_handle_banning_on_tt_account_removal(account_username_str, server_host_info))
 
     aiogram_bot = pytalk_bot.aiogram_bot_ref
     if not aiogram_bot:

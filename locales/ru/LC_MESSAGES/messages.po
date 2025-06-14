@@ -350,3 +350,36 @@ msgstr "Не удалось удалить пользователя с Telegram 
 
 msgid "admin_delete_invalid_id_format"
 msgstr "Ошибка: Неверный формат ID пользователя для удаления."
+
+msgid "admin_button_manage_ban_list"
+msgstr "Управление бан-листом"
+
+msgid "admin_banlist_title"
+msgstr "Список забаненных пользователей:"
+
+msgid "admin_banlist_empty"
+msgstr "Бан-лист пуст."
+
+msgid "admin_button_unban"
+msgstr "Разбанить"
+
+msgid "admin_button_add_to_banlist_manual"
+msgstr "Добавить в бан-лист"
+
+msgid "admin_unban_success"
+msgstr "Пользователь {target_telegram_id} разбанен."
+
+msgid "admin_unban_fail"
+msgstr "Не удалось разбанить пользователя {target_telegram_id}."
+
+msgid "admin_manual_ban_prompt"
+msgstr "Отправьте Telegram ID пользователя для бана. На следующей строке можно указать причину (необязательно)."
+
+msgid "admin_manual_ban_success"
+msgstr "Пользователь {telegram_id} забанен вручную."
+
+msgid "admin_manual_ban_invalid_id"
+msgstr "Неверный формат Telegram ID. Пожалуйста, введите только цифры."
+
+msgid "admin_manual_ban_fail"
+msgstr "Не удалось забанить пользователя {telegram_id} вручную."

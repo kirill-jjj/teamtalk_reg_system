@@ -11,6 +11,7 @@ from ..core.db.session import close_db_engine, init_db
 from .handlers.admin import router as admin_router
 from .handlers.registration import router as registration_router
 from .middlewares.db_middleware import DbSessionMiddleware
+from .middlewares.ban_middleware import UserBanMiddleware # Added import
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,12 @@ async def run_telegram_bot(shutdown_handler_callback: callable = None, db_ready_
 
     # Register DbSessionMiddleware
     dp.update.outer_middleware(DbSessionMiddleware())
+
+    # Register UserBanMiddleware for message and callback query handlers
+    # It should run after DbSessionMiddleware to have access to db_session
+    dp.message.outer_middleware(UserBanMiddleware())
+    dp.callback_query.outer_middleware(UserBanMiddleware())
+    # Potentially for other handlers like inline_query if needed in the future
 
     # Register startup and shutdown handlers
     if db_ready_event:
