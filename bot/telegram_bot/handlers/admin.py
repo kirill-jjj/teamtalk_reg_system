@@ -367,7 +367,7 @@ async def list_all_tt_accounts_handler(callback_query: types.CallbackQuery): # R
     if pytalk_bot.teamtalks and len(pytalk_bot.teamtalks) > 0:
         tt_instance = pytalk_bot.teamtalks[0] # Assuming one primary TT instance
 
-    if not tt_instance or not tt_instance.is_connected() or not hasattr(tt_instance, 'server'):
+    if not tt_instance or not tt_instance.connected or not hasattr(tt_instance, 'server'): # Changed is_connected() to connected
         logger.warning("list_all_tt_accounts_handler: TeamTalk instance not available or not connected.")
         try:
             await callback_query.message.edit_text(_(KEY_ADMIN_TT_LIST_CONNECTION_ERROR), reply_markup=None)
@@ -376,25 +376,28 @@ async def list_all_tt_accounts_handler(callback_query: types.CallbackQuery): # R
             await callback_query.message.answer(_(KEY_ADMIN_TT_LIST_CONNECTION_ERROR), reply_markup=None)
         return
 
-    user_accounts_data = []
+    user_accounts_display = []
     try:
-        # This is the placeholder line. The actual method in pytalk might differ.
-        # It should return a list of objects, each representing a UserAccount,
-        # and each object should have a 'username' attribute (bytes or str).
-        all_accounts_raw = tt_instance.server.get_user_accounts()
+        # Use the correct async method: list_user_accounts()
+        # This method is expected to return a List[TeamTalkUserAccount]
+        user_accounts_sdk = await tt_instance.list_user_accounts()
 
-        if all_accounts_raw:
-            for acc in all_accounts_raw:
-                if hasattr(acc, 'username'):
-                    username_bytes = acc.username
-                    user_accounts_data.append({"username": username_bytes.decode('utf-8') if isinstance(username_bytes, bytes) else str(username_bytes)})
+        if user_accounts_sdk:
+            for acc_sdk in user_accounts_sdk: # acc_sdk is a TeamTalkUserAccount object
+                # The TeamTalkUserAccount object should have a 'username' attribute.
+                # It might also have other attributes like user_id, user_type, etc.
+                if hasattr(acc_sdk, 'username'):
+                    raw_username = acc_sdk.username
+                    username_str = raw_username.decode('utf-8') if isinstance(raw_username, bytes) else str(raw_username)
+                    user_accounts_display.append({"username": username_str})
                 else:
-                    logger.warning(f"TeamTalk account object {acc} does not have a direct 'username' attribute during listing.")
+                    # This case should ideally not happen if list_user_accounts() returns standardized objects.
+                    logger.warning(f"TeamTalk UserAccount object {acc_sdk} (type: {type(acc_sdk)}) does not have 'username' attribute.")
 
-        logger.info(f"Fetched {len(user_accounts_data)} accounts from TeamTalk server.")
+        logger.info(f"Fetched {len(user_accounts_display)} accounts from TeamTalk server using list_user_accounts.")
 
     except Exception as e:
-        logger.error(f"Error fetching TeamTalk accounts: {e}", exc_info=True)
+        logger.error(f"Error fetching TeamTalk accounts using list_user_accounts: {e}", exc_info=True)
         try:
             await callback_query.message.edit_text(_(KEY_ADMIN_TT_LIST_CONNECTION_ERROR), reply_markup=None)
         except Exception as e_edit:
@@ -403,11 +406,11 @@ async def list_all_tt_accounts_handler(callback_query: types.CallbackQuery): # R
         return
 
     builder = InlineKeyboardBuilder()
-    if not user_accounts_data:
+    if not user_accounts_display: # Check the processed list
         message_text = _(KEY_ADMIN_TT_LIST_NO_ACCOUNTS)
     else:
         lines = [_(KEY_ADMIN_TT_LIST_TITLE)]
-        for acc_data in user_accounts_data:
+        for acc_data in user_accounts_display: # Iterate over the processed list
             tt_username = acc_data["username"]
             lines.append(f"- {tt_username}")
             builder.button(
@@ -419,11 +422,11 @@ async def list_all_tt_accounts_handler(callback_query: types.CallbackQuery): # R
     builder.adjust(1)
 
     try:
-        await callback_query.message.edit_text(message_text, reply_markup=builder.as_markup() if user_accounts_data else None)
+        await callback_query.message.edit_text(message_text, reply_markup=builder.as_markup() if user_accounts_display else None)
     except Exception as e:
         logger.warning(f"Failed to edit message for TT account list (maybe no change or too old): {e}")
         # Fallback to sending a new message if editing fails for critical reasons
-        await callback_query.message.answer(message_text, reply_markup=builder.as_markup() if user_accounts_data else None)
+        await callback_query.message.answer(message_text, reply_markup=builder.as_markup() if user_accounts_display else None)
 
 
 @router.callback_query(AdminTTAccountsCallback.filter(F.action == "delete_prompt"))
@@ -485,7 +488,7 @@ async def confirm_delete_tt_account_handler(callback_query: types.CallbackQuery,
     if pytalk_bot.teamtalks and len(pytalk_bot.teamtalks) > 0:
         tt_instance = pytalk_bot.teamtalks[0] # Assuming one primary TT instance
 
-    if not tt_instance or not tt_instance.is_connected() or not hasattr(tt_instance, 'server'):
+    if not tt_instance or not tt_instance.connected or not hasattr(tt_instance, 'server'): # Changed is_connected() to connected
         logger.warning(f"confirm_delete_tt_account_handler: TeamTalk instance not available or not connected for deleting {tt_username}.")
         connection_error_text = _(KEY_ADMIN_TT_DELETE_CONNECTION_ERROR)
         await callback_query.answer(connection_error_text, show_alert=True)
@@ -500,42 +503,41 @@ async def confirm_delete_tt_account_handler(callback_query: types.CallbackQuery,
     try:
         logger.info(f"Admin {callback_query.from_user.id} requesting deletion of TeamTalk user: {tt_username}")
 
-        # CRITICAL PLACEHOLDER: Actual pytalk method to delete a user account by username.
-        # This is a guess. The actual method name and parameters are crucial and depend on the pytalk library.
-        # Common patterns might be `do_remove_useraccount(username=tt_username)` or finding user by name then deleting by ID.
-        # Example: `await tt_instance.server.remove_user_account(username=tt_username)`
-        # For this subtask, we assume a method `do_removeuseraccount` exists on the server object.
+        # Call the correct pytalk method.
+        # Assumed to be synchronous based on documentation (def delete_user_account(...)).
+        deletion_command_sent = tt_instance.delete_user_account(username=tt_username)
 
-        # Check if the method exists before calling (defensive coding for placeholder)
-        if hasattr(tt_instance.server, 'do_removeuseraccount') and callable(getattr(tt_instance.server, 'do_removeuseraccount')):
-            # The actual call might need to be awaited if it's an async method in pytalk.
-            # Assuming it's synchronous based on some pytalk patterns, but this is a major guess.
-            # If it's async: result = await tt_instance.server.do_removeuseraccount(username=tt_username)
-            tt_instance.server.do_removeuseraccount(username=tt_username) # Placeholder call
-            # If no exception is raised by the above call, we assume the command was accepted by the server.
-            # The actual deletion confirmation will be handled by the `on_user_account_remove` event,
-            # which will then trigger the bot-side ban.
+        if deletion_command_sent: # Returns True on success as per pytalk docs
             final_message = _(KEY_ADMIN_TT_DELETE_SUCCESS).format(tt_username=tt_username)
-            await callback_query.answer(final_message, show_alert=False) # Show a less intrusive alert for "sent"
-            logger.info(f"Deletion request for TeamTalk user '{tt_username}' sent to server by admin {callback_query.from_user.id}.")
+            # Changed show_alert to True as this is the final user feedback on this action.
+            await callback_query.answer(final_message, show_alert=True)
+            logger.info(f"TeamTalk user '{tt_username}' deletion command successfully processed by bot for admin {callback_query.from_user.id}. Waiting for server event for actual ban.")
         else:
-            logger.error(f"confirm_delete_tt_account_handler: `do_removeuseraccount` method not found on tt_instance.server. Cannot delete TT user {tt_username}.")
-            final_message = _(KEY_ADMIN_TT_DELETE_FAIL).format(tt_username=tt_username, error="Bot configuration error: TeamTalk command not found.")
+            # This case implies the method returned False without raising an exception,
+            # which might be unexpected if the library usually raises for errors.
+            logger.warning(f"TeamTalk user '{tt_username}' deletion command returned False for admin {callback_query.from_user.id} without raising an exception.")
+            final_message = _(KEY_ADMIN_TT_DELETE_FAIL).format(tt_username=tt_username, error="TeamTalk command indicated failure but no specific error.")
             await callback_query.answer(final_message, show_alert=True)
 
-    except Exception as e:
-        logger.error(f"Error attempting to delete TeamTalk user '{tt_username}': {e}", exc_info=True)
-        # Provide a more specific error if possible, otherwise generic.
-        error_detail = str(e) if str(e) else "Unknown server error"
-        final_message = _(KEY_ADMIN_TT_DELETE_FAIL).format(tt_username=tt_username, error=error_detail)
+    except PermissionError as e: # Specific exception from pytalk for permission issues
+        logger.error(f"Permission error deleting TeamTalk user '{tt_username}' by admin {callback_query.from_user.id}: {e}", exc_info=True)
+        final_message = _(KEY_ADMIN_TT_DELETE_FAIL).format(tt_username=tt_username, error=f"Permission denied: {e}")
+        await callback_query.answer(final_message, show_alert=True)
+    except ValueError as e: # Specific exception from pytalk (e.g., user not found, invalid username)
+        logger.error(f"Value error (e.g., user not found) deleting TeamTalk user '{tt_username}' by admin {callback_query.from_user.id}: {e}", exc_info=True)
+        final_message = _(KEY_ADMIN_TT_DELETE_FAIL).format(tt_username=tt_username, error=f"Invalid request/user not found: {e}")
+        await callback_query.answer(final_message, show_alert=True)
+    except Exception as e: # Catch-all for other unexpected errors from the TeamTalk library or other issues
+        logger.error(f"Generic error deleting TeamTalk user '{tt_username}' by admin {callback_query.from_user.id}: {e}", exc_info=True)
+        final_message = _(KEY_ADMIN_TT_DELETE_FAIL).format(tt_username=tt_username, error=f"Unexpected error: {e}")
         await callback_query.answer(final_message, show_alert=True)
 
     try:
         await callback_query.message.edit_text(final_message, reply_markup=None)
     except Exception as e_edit:
-        logger.debug(f"Failed to edit message after TT delete confirmation: {e_edit}")
-        # If editing fails, the user already got an alert. Optionally send a new message.
-        # await callback_query.message.answer(final_message, reply_markup=None)
+        logger.debug(f"Failed to edit message after TT delete confirmation for user {tt_username}: {e_edit}")
+        # The user already received an alert, so editing is for cleanup.
+        # If it fails, it's not critical to send another message.
 
 
 @router.message(Command("generate"))
