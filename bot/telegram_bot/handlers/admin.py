@@ -23,11 +23,15 @@ from ...core.db.crud import (
 from ...core.db.models import TelegramRegistration
 from ...core.localization import get_translator, get_admin_lang_code
 # Import the callbacks from the new location
-from ..callbacks.admin_callbacks import AdminDeleteCallback, AdminBanListActionCallback
+from ..callbacks.admin_callbacks import AdminDeleteCallback, AdminBanListActionCallback, AdminTTAccountsCallback # Added AdminTTAccountsCallback
 from ..keyboards.admin_keyboards import get_admin_panel_keyboard, CALLBACK_DATA_DELETE_USER
 from ..states import AdminActions
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup
+
+# For TeamTalk interaction
+from ...teamtalk.connection import pytalk_bot
+# from pytalk import UserAccount # For type hinting, if directly used. Pytalk objects are often dynamic.
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +64,22 @@ KEY_ADMIN_MANUAL_BAN_PROMPT = "admin_manual_ban_prompt"
 KEY_ADMIN_MANUAL_BAN_SUCCESS = "admin_manual_ban_success"
 KEY_ADMIN_MANUAL_BAN_INVALID_ID = "admin_manual_ban_invalid_id"
 KEY_ADMIN_MANUAL_BAN_FAIL = "admin_manual_ban_fail"
+
+# New Localization Keys for TT Account Listing
+KEY_ADMIN_TT_LIST_TITLE = "admin_tt_list_title"
+KEY_ADMIN_TT_LIST_NO_ACCOUNTS = "admin_tt_list_no_accounts"
+KEY_ADMIN_TT_LIST_CONNECTION_ERROR = "admin_tt_list_connection_error"
+KEY_BUTTON_DELETE_FROM_TT = "admin_button_delete_from_tt"
+
+# Localization Keys for TT Account Deletion Prompt
+KEY_ADMIN_TT_DELETE_PROMPT_TEXT = "admin_tt_delete_prompt_text"
+KEY_BUTTON_CONFIRM_DELETE_FROM_TT = "admin_button_confirm_delete_from_tt"
+KEY_BUTTON_CANCEL_TT_DELETE = "admin_button_cancel_tt_delete"
+
+# Localization Keys for TT Account Deletion Confirmation
+KEY_ADMIN_TT_DELETE_SUCCESS = "admin_tt_delete_success"
+KEY_ADMIN_TT_DELETE_FAIL = "admin_tt_delete_fail"
+KEY_ADMIN_TT_DELETE_CONNECTION_ERROR = "admin_tt_delete_connection_error"
 
 
 @router.message(Command("adminpanel"))
@@ -334,6 +354,188 @@ async def process_manual_ban_handler(message: types.Message, state: FSMContext, 
     except Exception as e:
         logger.error(f"Failed to manually ban user {telegram_id_str} by admin {message.from_user.id}: {e}", exc_info=True)
         await message.reply(_(KEY_ADMIN_MANUAL_BAN_FAIL).format(telegram_id=telegram_id_str))
+
+# --- TeamTalk Account Listing Handler ---
+
+@router.callback_query(AdminTTAccountsCallback.filter(F.action == "list_all"))
+async def list_all_tt_accounts_handler(callback_query: types.CallbackQuery): # Removed db_session as not used
+    await callback_query.answer()
+    admin_lang = get_admin_lang_code()
+    _ = get_translator(admin_lang)
+
+    tt_instance = None
+    if pytalk_bot.teamtalks and len(pytalk_bot.teamtalks) > 0:
+        tt_instance = pytalk_bot.teamtalks[0] # Assuming one primary TT instance
+
+    if not tt_instance or not tt_instance.is_connected() or not hasattr(tt_instance, 'server'):
+        logger.warning("list_all_tt_accounts_handler: TeamTalk instance not available or not connected.")
+        try:
+            await callback_query.message.edit_text(_(KEY_ADMIN_TT_LIST_CONNECTION_ERROR), reply_markup=None)
+        except Exception as e_edit:
+            logger.debug(f"Failed to edit message for TT connection error: {e_edit}")
+            await callback_query.message.answer(_(KEY_ADMIN_TT_LIST_CONNECTION_ERROR), reply_markup=None)
+        return
+
+    user_accounts_data = []
+    try:
+        # This is the placeholder line. The actual method in pytalk might differ.
+        # It should return a list of objects, each representing a UserAccount,
+        # and each object should have a 'username' attribute (bytes or str).
+        all_accounts_raw = tt_instance.server.get_user_accounts()
+
+        if all_accounts_raw:
+            for acc in all_accounts_raw:
+                if hasattr(acc, 'username'):
+                    username_bytes = acc.username
+                    user_accounts_data.append({"username": username_bytes.decode('utf-8') if isinstance(username_bytes, bytes) else str(username_bytes)})
+                else:
+                    logger.warning(f"TeamTalk account object {acc} does not have a direct 'username' attribute during listing.")
+
+        logger.info(f"Fetched {len(user_accounts_data)} accounts from TeamTalk server.")
+
+    except Exception as e:
+        logger.error(f"Error fetching TeamTalk accounts: {e}", exc_info=True)
+        try:
+            await callback_query.message.edit_text(_(KEY_ADMIN_TT_LIST_CONNECTION_ERROR), reply_markup=None)
+        except Exception as e_edit:
+            logger.debug(f"Failed to edit message for TT account fetching error: {e_edit}")
+            await callback_query.message.answer(_(KEY_ADMIN_TT_LIST_CONNECTION_ERROR), reply_markup=None)
+        return
+
+    builder = InlineKeyboardBuilder()
+    if not user_accounts_data:
+        message_text = _(KEY_ADMIN_TT_LIST_NO_ACCOUNTS)
+    else:
+        lines = [_(KEY_ADMIN_TT_LIST_TITLE)]
+        for acc_data in user_accounts_data:
+            tt_username = acc_data["username"]
+            lines.append(f"- {tt_username}")
+            builder.button(
+                text=f"{_(KEY_BUTTON_DELETE_FROM_TT)} ({tt_username})",
+                callback_data=AdminTTAccountsCallback(action="delete_prompt", tt_username=tt_username).pack()
+            )
+        message_text = "\n".join(lines)
+
+    builder.adjust(1)
+
+    try:
+        await callback_query.message.edit_text(message_text, reply_markup=builder.as_markup() if user_accounts_data else None)
+    except Exception as e:
+        logger.warning(f"Failed to edit message for TT account list (maybe no change or too old): {e}")
+        # Fallback to sending a new message if editing fails for critical reasons
+        await callback_query.message.answer(message_text, reply_markup=builder.as_markup() if user_accounts_data else None)
+
+
+@router.callback_query(AdminTTAccountsCallback.filter(F.action == "delete_prompt"))
+async def prompt_delete_tt_account_handler(callback_query: types.CallbackQuery, callback_data: AdminTTAccountsCallback):
+    await callback_query.answer() # Acknowledge the callback immediately
+    admin_lang = get_admin_lang_code()
+    _ = get_translator(admin_lang)
+
+    tt_username = callback_data.tt_username
+    if not tt_username:
+        logger.warning("prompt_delete_tt_account_handler: tt_username missing in callback_data.")
+        # Attempt to edit the message to show an error, or send a new one.
+        error_text = "Error: Username not provided for deletion. Please try again." # This should be localized ideally
+        try:
+            await callback_query.message.edit_text(error_text, reply_markup=None)
+        except Exception as e_edit:
+            logger.debug(f"Failed to edit message for missing tt_username error: {e_edit}")
+            await callback_query.message.answer(error_text, reply_markup=None)
+        return
+
+    prompt_text = _(KEY_ADMIN_TT_DELETE_PROMPT_TEXT).format(tt_username=tt_username)
+
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=_(KEY_BUTTON_CONFIRM_DELETE_FROM_TT),
+        callback_data=AdminTTAccountsCallback(action="delete_confirm", tt_username=tt_username).pack()
+    )
+    builder.button(
+        text=_(KEY_BUTTON_CANCEL_TT_DELETE),
+        callback_data=AdminTTAccountsCallback(action="list_all", tt_username=None).pack() # Go back to the list
+    )
+    builder.adjust(2) # Confirm and Cancel side-by-side or stacked (adjust(1) for stacked)
+
+    try:
+        await callback_query.message.edit_text(prompt_text, reply_markup=builder.as_markup())
+    except Exception as e:
+        logger.error(f"Error editing message for TT delete prompt: {e}", exc_info=True)
+        # Fallback to sending a new message if edit fails (e.g., message too old)
+        await callback_query.message.answer(prompt_text, reply_markup=builder.as_markup())
+
+
+@router.callback_query(AdminTTAccountsCallback.filter(F.action == "delete_confirm"))
+async def confirm_delete_tt_account_handler(callback_query: types.CallbackQuery, callback_data: AdminTTAccountsCallback):
+    admin_lang = get_admin_lang_code()
+    _ = get_translator(admin_lang)
+
+    tt_username = callback_data.tt_username
+    if not tt_username:
+        logger.error("confirm_delete_tt_account_handler: tt_username missing in callback_data during delete confirmation.")
+        # This message should ideally be localized too if it were user-facing beyond an immediate error.
+        await callback_query.answer("Error: Username missing. Cannot delete.", show_alert=True)
+        try:
+            await callback_query.message.edit_text("Internal error: Username was not provided for deletion.", reply_markup=None)
+        except Exception as e_edit:
+            logger.debug(f"Failed to edit message for missing tt_username on confirm: {e_edit}")
+        return
+
+    tt_instance = None
+    if pytalk_bot.teamtalks and len(pytalk_bot.teamtalks) > 0:
+        tt_instance = pytalk_bot.teamtalks[0] # Assuming one primary TT instance
+
+    if not tt_instance or not tt_instance.is_connected() or not hasattr(tt_instance, 'server'):
+        logger.warning(f"confirm_delete_tt_account_handler: TeamTalk instance not available or not connected for deleting {tt_username}.")
+        connection_error_text = _(KEY_ADMIN_TT_DELETE_CONNECTION_ERROR)
+        await callback_query.answer(connection_error_text, show_alert=True)
+        try:
+            await callback_query.message.edit_text(connection_error_text, reply_markup=None)
+        except Exception as e_edit:
+            logger.debug(f"Failed to edit message for TT connection error on confirm: {e_edit}")
+            await callback_query.message.answer(connection_error_text, reply_markup=None) # Send as new if edit fails
+        return
+
+    final_message = ""
+    try:
+        logger.info(f"Admin {callback_query.from_user.id} requesting deletion of TeamTalk user: {tt_username}")
+
+        # CRITICAL PLACEHOLDER: Actual pytalk method to delete a user account by username.
+        # This is a guess. The actual method name and parameters are crucial and depend on the pytalk library.
+        # Common patterns might be `do_remove_useraccount(username=tt_username)` or finding user by name then deleting by ID.
+        # Example: `await tt_instance.server.remove_user_account(username=tt_username)`
+        # For this subtask, we assume a method `do_removeuseraccount` exists on the server object.
+
+        # Check if the method exists before calling (defensive coding for placeholder)
+        if hasattr(tt_instance.server, 'do_removeuseraccount') and callable(getattr(tt_instance.server, 'do_removeuseraccount')):
+            # The actual call might need to be awaited if it's an async method in pytalk.
+            # Assuming it's synchronous based on some pytalk patterns, but this is a major guess.
+            # If it's async: result = await tt_instance.server.do_removeuseraccount(username=tt_username)
+            tt_instance.server.do_removeuseraccount(username=tt_username) # Placeholder call
+            # If no exception is raised by the above call, we assume the command was accepted by the server.
+            # The actual deletion confirmation will be handled by the `on_user_account_remove` event,
+            # which will then trigger the bot-side ban.
+            final_message = _(KEY_ADMIN_TT_DELETE_SUCCESS).format(tt_username=tt_username)
+            await callback_query.answer(final_message, show_alert=False) # Show a less intrusive alert for "sent"
+            logger.info(f"Deletion request for TeamTalk user '{tt_username}' sent to server by admin {callback_query.from_user.id}.")
+        else:
+            logger.error(f"confirm_delete_tt_account_handler: `do_removeuseraccount` method not found on tt_instance.server. Cannot delete TT user {tt_username}.")
+            final_message = _(KEY_ADMIN_TT_DELETE_FAIL).format(tt_username=tt_username, error="Bot configuration error: TeamTalk command not found.")
+            await callback_query.answer(final_message, show_alert=True)
+
+    except Exception as e:
+        logger.error(f"Error attempting to delete TeamTalk user '{tt_username}': {e}", exc_info=True)
+        # Provide a more specific error if possible, otherwise generic.
+        error_detail = str(e) if str(e) else "Unknown server error"
+        final_message = _(KEY_ADMIN_TT_DELETE_FAIL).format(tt_username=tt_username, error=error_detail)
+        await callback_query.answer(final_message, show_alert=True)
+
+    try:
+        await callback_query.message.edit_text(final_message, reply_markup=None)
+    except Exception as e_edit:
+        logger.debug(f"Failed to edit message after TT delete confirmation: {e_edit}")
+        # If editing fails, the user already got an alert. Optionally send a new message.
+        # await callback_query.message.answer(final_message, reply_markup=None)
 
 
 @router.message(Command("generate"))
