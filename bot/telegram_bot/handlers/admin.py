@@ -2,12 +2,13 @@ import logging
 import secrets
 from datetime import datetime, timedelta
 
-import logging # Ensure logging is imported if not already at the top
+import logging
 from aiogram import types, Bot as AiogramBot, F, Router
 from aiogram.filters import Command
-from aiogram.filters.callback_data import CallbackData
+# CallbackData itself is not directly used here anymore, but kept if other CBs are defined inline
+# from aiogram.filters.callback_data import CallbackData
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import select # Added import
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core import config
@@ -16,27 +17,21 @@ from ...core.db.crud import (
     delete_telegram_registration,
     get_all_telegram_registrations,
     add_banned_user,
-    get_banned_users, # Added import
-    remove_banned_user, # Added import
+    get_banned_users,
+    remove_banned_user,
 )
 from ...core.db.models import TelegramRegistration
 from ...core.localization import get_translator, get_admin_lang_code
+# Import the callbacks from the new location
+from ..callbacks.admin_callbacks import AdminDeleteCallback, AdminBanListActionCallback
 from ..keyboards.admin_keyboards import get_admin_panel_keyboard, CALLBACK_DATA_DELETE_USER
-from ..states import AdminActions # Added import
-from aiogram.fsm.context import FSMContext # Added import
-from aiogram.types import InlineKeyboardMarkup # Added import
+from ..states import AdminActions
+from aiogram.fsm.context import FSMContext
+from aiogram.types import InlineKeyboardMarkup
 
 logger = logging.getLogger(__name__)
 
-# Define CallbackData for admin delete actions
-class AdminDeleteCallback(CallbackData, prefix="admin_del"):
-    user_telegram_id: int
-    # action: str # Optional: for future actions like "info", "ban"
-
-# Define CallbackData for ban list actions
-class AdminBanListActionCallback(CallbackData, prefix="admin_banlist"):
-    action: str  # "view", "unban", "add_prompt"
-    target_telegram_id: int | None = None
+# Removed AdminDeleteCallback and AdminBanListActionCallback class definitions from here
 
 router = Router()
 

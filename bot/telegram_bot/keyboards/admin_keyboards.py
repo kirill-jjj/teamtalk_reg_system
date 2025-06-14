@@ -1,8 +1,8 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from ...core.localization import get_translator, get_admin_lang_code # Added imports
+from ...core.localization import get_translator, get_admin_lang_code
 
-from ..handlers.admin import AdminBanListActionCallback # Import new CallbackData
+from ..callbacks.admin_callbacks import AdminBanListActionCallback # Changed import path
 
 # Define the callback data for the button
 CALLBACK_DATA_DELETE_USER = "admin_delete_user_start"
