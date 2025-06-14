@@ -185,6 +185,7 @@ async def _process_actual_registration(
         await bot.send_message(registrant_user_id, _("Registration error. Please try again later or contact an administrator."))
 
     if state: await state.clear()
+    return success, reg_msg_key_or_detail, artefact_data_val
 
 
 async def _handle_registration_continuation(
