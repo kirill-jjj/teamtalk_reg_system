@@ -52,6 +52,17 @@ async def get_teamtalk_username_by_telegram_id(session: AsyncSession, telegram_i
     return user.teamtalk_username if user else None
 
 
+async def get_all_telegram_registrations(db_session: AsyncSession) -> list[TelegramRegistration]:
+    """
+    Retrieves all entries from the TelegramRegistration table.
+    """
+    stmt = select(TelegramRegistration)
+    result = await db_session.execute(stmt)
+    users = result.scalars().all()
+    logger.info(f"Retrieved {len(users)} Telegram registrations.")
+    return users
+
+
 async def get_user_by_identifier(db_session: AsyncSession, identifier: str) -> Optional[TelegramRegistration]:
     """
     Retrieves a user by Telegram ID (if identifier is numeric) or TeamTalk username.

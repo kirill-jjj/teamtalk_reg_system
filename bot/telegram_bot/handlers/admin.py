@@ -5,16 +5,27 @@ from datetime import datetime, timedelta
 import logging # Ensure logging is imported if not already at the top
 from aiogram import types, Bot as AiogramBot, F, Router
 from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext # Added import
+from aiogram.filters.callback_data import CallbackData # Added import
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core import config
-from ...core.db.crud import create_deeplink_token, get_user_by_identifier, delete_telegram_registration # Added CRUD imports
+from ...core.db.crud import (
+    create_deeplink_token,
+    # get_user_by_identifier, # Removed as it was only used by the deleted handler
+    delete_telegram_registration,
+    get_all_telegram_registrations,
+)
 from ...core.localization import get_translator, get_admin_lang_code
 from ..keyboards.admin_keyboards import get_admin_panel_keyboard, CALLBACK_DATA_DELETE_USER
-from ..states import AdminActions
+# AdminActions import is already removed effectively by prior comment
 
 logger = logging.getLogger(__name__)
+
+# Define CallbackData for admin delete actions
+class AdminDeleteCallback(CallbackData, prefix="admin_del"):
+    user_telegram_id: int
+    # action: str # Optional: for future actions like "info", "ban"
 
 router = Router()
 
@@ -26,6 +37,11 @@ KEY_USER_DELETED_SUCCESSFULLY = "admin_delete_success"
 KEY_FAILED_TO_DELETE_USER = "admin_delete_fail_db"
 KEY_USER_NOT_FOUND = "admin_delete_user_not_found"
 KEY_INVALID_INPUT_FOR_DELETION = "admin_delete_invalid_input"
+KEY_ADMIN_DELETE_NO_USERS_FOUND = "admin_delete_no_users_found"
+KEY_ADMIN_DELETE_SELECT_USER = "admin_delete_select_user"
+KEY_ADMIN_DELETE_CONFIRMED_SUCCESS = "admin_delete_confirmed_success" # New key
+KEY_ADMIN_DELETE_CONFIRMED_FAIL = "admin_delete_confirmed_fail" # New key
+KEY_ADMIN_DELETE_INVALID_ID_FORMAT = "admin_delete_invalid_id_format" # New key
 
 
 @router.message(Command("adminpanel"))
@@ -53,7 +69,7 @@ async def admin_panel_handler(message: types.Message):
 
 
 @router.callback_query(F.data == CALLBACK_DATA_DELETE_USER)
-async def delete_user_start_handler(callback_query: types.CallbackQuery, state: FSMContext):
+async def delete_user_start_handler(callback_query: types.CallbackQuery, db_session: AsyncSession): # Removed FSMContext, added db_session
     # Admin check (important for callback queries too)
     admin_ids_int = []
     if config.ADMIN_IDS:
@@ -74,54 +90,83 @@ async def delete_user_start_handler(callback_query: types.CallbackQuery, state: 
     # For now, let's just edit the text. A more sophisticated approach might remove the keyboard.
     admin_lang = get_admin_lang_code() # For localization
     _ = get_translator(admin_lang)
-    processing_text = _(KEY_PROCESSING_DELETE_REQUEST) # Using simple string for now
-    try:
-        await callback_query.message.edit_text(processing_text)
-    except Exception as e:
-        logger.debug(f"Could not edit message text on delete_user_start_handler: {e}")
 
+    # Removed old processing text edit, prompt, and state set.
+    # New logic:
+    users = await get_all_telegram_registrations(db_session)
 
-    # Send a new message asking for user identifier
-    prompt_text = _(KEY_PROMPT_USER_IDENTIFIER_FOR_DELETION) # Using simple string for now
-    await callback_query.message.answer(prompt_text)
-
-    # Set the state
-    await state.set_state(AdminActions.awaiting_user_identifier_for_deletion)
-    logger.info(f"Admin {callback_query.from_user.id} initiated user deletion process. Awaiting user identifier.")
-
-
-@router.message(AdminActions.awaiting_user_identifier_for_deletion)
-async def receive_user_identifier_for_deletion_handler(message: types.Message, state: FSMContext, db_session: AsyncSession):
-    identifier = message.text
-    admin_lang = get_admin_lang_code() # For localization
-    _ = get_translator(admin_lang)
-
-    if not identifier or len(identifier) == 0:
-        reply_text = _(KEY_INVALID_INPUT_FOR_DELETION) # Simple string
-        await message.reply(reply_text)
-        # We could keep the state or clear it. For now, let's clear, forcing them to restart.
-        # Potentially, we could reprompt.
-        await state.clear()
+    if not users:
+        try:
+            await callback_query.message.edit_text(_(KEY_ADMIN_DELETE_NO_USERS_FOUND))
+        except Exception as e: # Handle cases where message cannot be edited (e.g. too old)
+            logger.warning(f"Could not edit message for no users found: {e}")
+            await callback_query.message.answer(_(KEY_ADMIN_DELETE_NO_USERS_FOUND))
         return
 
-    user_to_delete = await get_user_by_identifier(db_session, identifier)
+    builder = InlineKeyboardBuilder()
+    for user in users:
+        button_text = f"TG ID: {user.telegram_id} - TT User: {user.teamtalk_username}"
+        # Use AdminDeleteCallback to create callback data
+        callback_data = AdminDeleteCallback(user_telegram_id=user.telegram_id)
+        builder.button(text=button_text, callback_data=callback_data)
 
-    if user_to_delete:
-        deletion_successful = await delete_telegram_registration(db_session, user_to_delete.telegram_id)
-        if deletion_successful:
-            reply_text = _(KEY_USER_DELETED_SUCCESSFULLY).format(identifier=identifier) # Simple string
-            await message.reply(reply_text)
-            logger.info(f"Admin {message.from_user.id} successfully deleted user: {identifier} (TG ID: {user_to_delete.telegram_id})")
-        else:
-            reply_text = _(KEY_FAILED_TO_DELETE_USER).format(identifier=identifier) # Simple string
-            await message.reply(reply_text)
-            logger.error(f"Admin {message.from_user.id} failed to delete user: {identifier} (TG ID: {user_to_delete.telegram_id}) from database, though user was found.")
+    builder.adjust(1) # One button per row
+
+    reply_text = _(KEY_ADMIN_DELETE_SELECT_USER)
+    try:
+        await callback_query.message.edit_text(reply_text, reply_markup=builder.as_markup())
+    except Exception as e: # Handle potential errors editing the message
+        logger.warning(f"Could not edit message to show user list: {e}")
+        # Fallback to sending a new message if editing fails
+        await callback_query.message.answer(reply_text, reply_markup=builder.as_markup())
+
+    logger.info(f"Admin {callback_query.from_user.id} requested user list for deletion.")
+
+# Removed receive_user_identifier_for_deletion_handler as it's no longer used.
+
+@router.callback_query(AdminDeleteCallback.filter()) # Changed to use AdminDeleteCallback.filter()
+async def confirm_delete_user_handler(callback_query: types.CallbackQuery, db_session: AsyncSession, callback_data: AdminDeleteCallback): # Added callback_data parameter
+    # Admin check
+    admin_ids_int = []
+    if config.ADMIN_IDS:
+        for admin_id_str in config.ADMIN_IDS:
+            try:
+                admin_ids_int.append(int(admin_id_str))
+            except ValueError:
+                logger.warning(f"Invalid admin ID in config for callback: {admin_id_str}. Skipping.")
+
+    if callback_query.from_user.id not in admin_ids_int:
+        logger.warning(f"User {callback_query.from_user.id} (not an admin) tried to use confirm delete user callback.")
+        await callback_query.answer("Permission denied.", show_alert=True)
+        return
+
+    admin_lang = get_admin_lang_code()
+    _ = get_translator(admin_lang)
+
+    # Get telegram_id directly from callback_data
+    telegram_id_to_delete = callback_data.user_telegram_id
+    # Removed manual parsing and associated try-except block for format errors,
+    # as CallbackData handles parsing and validation.
+
+    deletion_successful = await delete_telegram_registration(db_session, telegram_id_to_delete)
+
+    if deletion_successful:
+        reply_text = _(KEY_ADMIN_DELETE_CONFIRMED_SUCCESS).format(telegram_id=callback_data.user_telegram_id)
+        logger.info(f"Admin {callback_query.from_user.id} successfully deleted user with Telegram ID: {callback_data.user_telegram_id}")
     else:
-        reply_text = _(KEY_USER_NOT_FOUND).format(identifier=identifier) # Simple string
-        await message.reply(reply_text)
-        logger.info(f"Admin {message.from_user.id} attempted to delete user: {identifier}, but user was not found.")
+        reply_text = _(KEY_ADMIN_DELETE_CONFIRMED_FAIL).format(telegram_id=callback_data.user_telegram_id)
+        logger.warning(f"Admin {callback_query.from_user.id} failed to delete user with Telegram ID: {callback_data.user_telegram_id} (possibly already deleted or DB error).")
 
-    await state.clear()
+    await callback_query.answer(reply_text, show_alert=True)
+
+    try:
+        # Try to edit the original message to show the final status and remove keyboard
+        await callback_query.message.edit_text(reply_text, reply_markup=None)
+    except Exception as e:
+        logger.debug(f"Could not edit original message after deletion confirmation: {e}. The alert was shown.")
+        # Optionally send a new message if editing fails and it's critical to display status,
+        # but an alert might be sufficient.
+        # await callback_query.message.answer(reply_text)
 
 
 @router.message(Command("generate"))

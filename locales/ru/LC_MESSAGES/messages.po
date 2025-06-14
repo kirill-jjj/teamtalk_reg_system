@@ -335,3 +335,18 @@ msgstr "Пользователь {identifier} не найден."
 
 msgid "admin_delete_invalid_input"
 msgstr "Неверный ввод. Пожалуйста, отправьте действительный Telegram ID или TeamTalk имя пользователя."
+
+msgid "admin_delete_no_users_found"
+msgstr "Зарегистрированные пользователи не найдены."
+
+msgid "admin_delete_select_user"
+msgstr "Выберите пользователя для удаления:"
+
+msgid "admin_delete_confirmed_success"
+msgstr "Пользователь с Telegram ID {telegram_id} успешно удален."
+
+msgid "admin_delete_confirmed_fail"
+msgstr "Не удалось удалить пользователя с Telegram ID {telegram_id} (возможно, уже удален или ошибка базы данных)."
+
+msgid "admin_delete_invalid_id_format"
+msgstr "Ошибка: Неверный формат ID пользователя для удаления."

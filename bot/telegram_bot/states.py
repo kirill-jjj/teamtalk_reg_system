@@ -12,4 +12,6 @@ class RegistrationStates(StatesGroup):
 
 
 class AdminActions(StatesGroup):
-    awaiting_user_identifier_for_deletion = State()
+    # This state group is currently empty.
+    # It can be used for future admin-related states.
+    pass
