@@ -9,3 +9,7 @@ class RegistrationStates(StatesGroup):
     awaiting_nickname = State()
     awaiting_tt_account_type = State()
     waiting_admin_approval = State()
+
+
+class AdminActions(StatesGroup):
+    awaiting_user_identifier_for_deletion = State()

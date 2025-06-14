@@ -2,17 +2,127 @@ import logging
 import secrets
 from datetime import datetime, timedelta
 
+import logging # Ensure logging is imported if not already at the top
 from aiogram import types, Bot as AiogramBot, F, Router
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext # Added import
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core import config
-from ...core.db.crud import create_deeplink_token
+from ...core.db.crud import create_deeplink_token, get_user_by_identifier, delete_telegram_registration # Added CRUD imports
 from ...core.localization import get_translator, get_admin_lang_code
+from ..keyboards.admin_keyboards import get_admin_panel_keyboard, CALLBACK_DATA_DELETE_USER
+from ..states import AdminActions
 
 logger = logging.getLogger(__name__)
 
 router = Router()
+
+# Localization Keys (replacing old placeholders)
+KEY_ADMIN_PANEL_TITLE = "admin_panel_title"
+KEY_PROMPT_USER_IDENTIFIER_FOR_DELETION = "admin_delete_prompt_identifier"
+KEY_PROCESSING_DELETE_REQUEST = "admin_delete_processing"
+KEY_USER_DELETED_SUCCESSFULLY = "admin_delete_success"
+KEY_FAILED_TO_DELETE_USER = "admin_delete_fail_db"
+KEY_USER_NOT_FOUND = "admin_delete_user_not_found"
+KEY_INVALID_INPUT_FOR_DELETION = "admin_delete_invalid_input"
+
+
+@router.message(Command("adminpanel"))
+async def admin_panel_handler(message: types.Message):
+    # Admin check
+    admin_ids_int = []
+    if config.ADMIN_IDS:
+        for admin_id_str in config.ADMIN_IDS:
+            try:
+                admin_ids_int.append(int(admin_id_str))
+            except ValueError:
+                logger.warning(f"Invalid admin ID in config: {admin_id_str}. Skipping.")
+
+    if message.from_user.id not in admin_ids_int:
+        logger.warning(f"User {message.from_user.id} (not an admin) tried to use /adminpanel.")
+        return
+
+    # For now, using a simple string. Localization can be added later.
+    admin_lang = get_admin_lang_code() # This would be needed for localization
+    _ = get_translator(admin_lang)
+    reply_text = _(KEY_ADMIN_PANEL_TITLE) # Using simple string for now
+
+    keyboard = get_admin_panel_keyboard()
+    await message.reply(reply_text, reply_markup=keyboard)
+
+
+@router.callback_query(F.data == CALLBACK_DATA_DELETE_USER)
+async def delete_user_start_handler(callback_query: types.CallbackQuery, state: FSMContext):
+    # Admin check (important for callback queries too)
+    admin_ids_int = []
+    if config.ADMIN_IDS:
+        for admin_id_str in config.ADMIN_IDS:
+            try:
+                admin_ids_int.append(int(admin_id_str))
+            except ValueError:
+                logger.warning(f"Invalid admin ID in config for callback: {admin_id_str}. Skipping.")
+
+    if callback_query.from_user.id not in admin_ids_int:
+        logger.warning(f"User {callback_query.from_user.id} (not an admin) tried to use delete user callback.")
+        await callback_query.answer("Permission denied.", show_alert=True) # Notify user
+        return
+
+    await callback_query.answer() # Acknowledge the callback
+
+    # Edit the original message (e.g., remove keyboard or show status)
+    # For now, let's just edit the text. A more sophisticated approach might remove the keyboard.
+    admin_lang = get_admin_lang_code() # For localization
+    _ = get_translator(admin_lang)
+    processing_text = _(KEY_PROCESSING_DELETE_REQUEST) # Using simple string for now
+    try:
+        await callback_query.message.edit_text(processing_text)
+    except Exception as e:
+        logger.debug(f"Could not edit message text on delete_user_start_handler: {e}")
+
+
+    # Send a new message asking for user identifier
+    prompt_text = _(KEY_PROMPT_USER_IDENTIFIER_FOR_DELETION) # Using simple string for now
+    await callback_query.message.answer(prompt_text)
+
+    # Set the state
+    await state.set_state(AdminActions.awaiting_user_identifier_for_deletion)
+    logger.info(f"Admin {callback_query.from_user.id} initiated user deletion process. Awaiting user identifier.")
+
+
+@router.message(AdminActions.awaiting_user_identifier_for_deletion)
+async def receive_user_identifier_for_deletion_handler(message: types.Message, state: FSMContext, db_session: AsyncSession):
+    identifier = message.text
+    admin_lang = get_admin_lang_code() # For localization
+    _ = get_translator(admin_lang)
+
+    if not identifier or len(identifier) == 0:
+        reply_text = _(KEY_INVALID_INPUT_FOR_DELETION) # Simple string
+        await message.reply(reply_text)
+        # We could keep the state or clear it. For now, let's clear, forcing them to restart.
+        # Potentially, we could reprompt.
+        await state.clear()
+        return
+
+    user_to_delete = await get_user_by_identifier(db_session, identifier)
+
+    if user_to_delete:
+        deletion_successful = await delete_telegram_registration(db_session, user_to_delete.telegram_id)
+        if deletion_successful:
+            reply_text = _(KEY_USER_DELETED_SUCCESSFULLY).format(identifier=identifier) # Simple string
+            await message.reply(reply_text)
+            logger.info(f"Admin {message.from_user.id} successfully deleted user: {identifier} (TG ID: {user_to_delete.telegram_id})")
+        else:
+            reply_text = _(KEY_FAILED_TO_DELETE_USER).format(identifier=identifier) # Simple string
+            await message.reply(reply_text)
+            logger.error(f"Admin {message.from_user.id} failed to delete user: {identifier} (TG ID: {user_to_delete.telegram_id}) from database, though user was found.")
+    else:
+        reply_text = _(KEY_USER_NOT_FOUND).format(identifier=identifier) # Simple string
+        await message.reply(reply_text)
+        logger.info(f"Admin {message.from_user.id} attempted to delete user: {identifier}, but user was not found.")
+
+    await state.clear()
+
 
 @router.message(Command("generate"))
 async def generate_deeplink_handler(message: types.Message, bot: AiogramBot, db_session: AsyncSession):

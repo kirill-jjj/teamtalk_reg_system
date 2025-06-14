@@ -311,3 +311,27 @@ msgstr "Нет"
 #: bot/telegram_bot/handlers/reg_logic_helpers.py:268
 msgid "Registration request sent to administrators. Please wait for approval."
 msgstr "Запрос на регистрацию отправлен администраторам. Пожалуйста, ожидайте одобрения."
+
+msgid "admin_keyboard_delete_user"
+msgstr "Удалить пользователя"
+
+msgid "admin_panel_title"
+msgstr "Панель администратора"
+
+msgid "admin_delete_processing"
+msgstr "Обработка запроса на удаление..."
+
+msgid "admin_delete_prompt_identifier"
+msgstr "Пожалуйста, отправьте Telegram ID или TeamTalk имя пользователя для удаления."
+
+msgid "admin_delete_success"
+msgstr "Пользователь {identifier} успешно удален."
+
+msgid "admin_delete_fail_db"
+msgstr "Не удалось удалить пользователя {identifier} из базы данных."
+
+msgid "admin_delete_user_not_found"
+msgstr "Пользователь {identifier} не найден."
+
+msgid "admin_delete_invalid_input"
+msgstr "Неверный ввод. Пожалуйста, отправьте действительный Telegram ID или TeamTalk имя пользователя."

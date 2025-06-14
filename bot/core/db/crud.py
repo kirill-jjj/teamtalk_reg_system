@@ -51,14 +51,65 @@ async def get_teamtalk_username_by_telegram_id(session: AsyncSession, telegram_i
     user = await session.get(TelegramRegistration, telegram_id)
     return user.teamtalk_username if user else None
 
+
+async def get_user_by_identifier(db_session: AsyncSession, identifier: str) -> Optional[TelegramRegistration]:
+    """
+    Retrieves a user by Telegram ID (if identifier is numeric) or TeamTalk username.
+    """
+    stmt = None
+    if identifier.isdigit():
+        try:
+            telegram_id = int(identifier)
+            stmt = select(TelegramRegistration).where(TelegramRegistration.telegram_id == telegram_id)
+            logger.info(f"Attempting to find user by Telegram ID: {telegram_id}")
+        except ValueError:
+            # This case should ideally not be hit if isdigit() is true, but as a safeguard.
+            logger.warning(f"Identifier '{identifier}' is all digits but failed to convert to int.")
+            # Fallback to searching by username if conversion failed unexpectedly.
+            stmt = select(TelegramRegistration).where(TelegramRegistration.teamtalk_username == identifier)
+            logger.info(f"Attempting to find user by TeamTalk username (fallback): {identifier}")
+    else:
+        stmt = select(TelegramRegistration).where(TelegramRegistration.teamtalk_username == identifier)
+        logger.info(f"Attempting to find user by TeamTalk username: {identifier}")
+
+    if stmt is not None:
+        result = await db_session.execute(stmt)
+        user = result.scalars().first()
+        if user:
+            logger.info(f"User found: {user.telegram_id} / {user.teamtalk_username}")
+            return user
+        else:
+            logger.info(f"User not found with identifier: {identifier}")
+            return None
+    return None # Should not be reached if logic is correct, but as a failsafe.
+
+
+async def delete_telegram_registration(db_session: AsyncSession, telegram_id: int) -> bool:
+    """
+    Deletes a user from the TelegramRegistration table based on telegram_id and commits.
+    Returns True if deletion was successful, False otherwise.
+    """
+    logger.info(f"Attempting to delete registration for Telegram ID: {telegram_id}")
+    stmt = delete(TelegramRegistration).where(TelegramRegistration.telegram_id == telegram_id)
+    result = await db_session.execute(stmt)
+    if result.rowcount > 0:
+        await db_session.commit()
+        logger.info(f"Successfully deleted registration for Telegram ID: {telegram_id}. Rows affected: {result.rowcount}")
+        return True
+    # No need to commit if nothing was deleted.
+    logger.info(f"No registration found for Telegram ID: {telegram_id} to delete.")
+    return False
+
+
 async def delete_telegram_registration_by_id(session: AsyncSession, telegram_id: int) -> bool:
     '''Deletes a TelegramRegistration record by telegram_id.'''
     logger.info(f"Attempting to delete registration for Telegram ID: {telegram_id}")
     stmt = delete(TelegramRegistration).where(TelegramRegistration.telegram_id == telegram_id)
     result = await session.execute(stmt)
     # await session.flush() # Not strictly necessary for delete if not immediately checking, but good practice
+    # This version does not commit, relying on the caller to manage the transaction.
     if result.rowcount > 0:
-        logger.info(f"Successfully deleted registration for Telegram ID: {telegram_id}. Rows affected: {result.rowcount}")
+        logger.info(f"Successfully marked registration for deletion for Telegram ID: {telegram_id}. Rows affected: {result.rowcount}. Commit pending.")
         return True
     logger.info(f"No registration found for Telegram ID: {telegram_id} to delete.")
     return False
