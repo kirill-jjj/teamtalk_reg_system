@@ -56,6 +56,7 @@ _early_load_env_file(_env_file_to_load)
 
 import asyncio
 import logging
+import uvloop
 
 import uvicorn
 
@@ -348,6 +349,14 @@ if __name__ == "__main__":
     logger.info(f"Application starting with arguments: {sys.argv}")
     logger.info(f"NICK_NAME from config: {core_config.NICK_NAME}")
     try:
+        if sys.platform in ("linux", "darwin"):  # uvloop is not supported on Windows
+            try:
+                uvloop.install()
+                logger.info("uvloop installed as the asyncio event loop policy.")
+            except Exception as e:
+                logger.warning(f"Failed to install uvloop, falling back to default asyncio event loop: {e}")
+        else:
+            logger.info("uvloop is not supported on this platform (Windows). Using default asyncio event loop.")
         asyncio.run(main())
     except KeyboardInterrupt:
         # Using print here as logger might not be available or configured if asyncio.run(main()) fails very early
