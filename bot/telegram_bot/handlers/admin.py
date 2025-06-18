@@ -594,8 +594,8 @@ async def generate_deeplink_handler(message: types.Message, bot: AiogramBot, db_
         # though for a URL, this is usually not an issue with backticks.
         # For simplicity, assuming deeplink_url is safe for direct insertion into MarkdownV2 backticks.
         # Reply with only the deeplink URL formatted as code.
-        reply_text = f"`{deeplink_url}`"
-        await message.reply(reply_text, parse_mode="MarkdownV2")
+        reply_text = deeplink_url
+        await message.reply(reply_text)
         logger.info(f"Admin {acting_admin_id} generated deeplink: {deeplink_url}")
 
     except Exception as e:
