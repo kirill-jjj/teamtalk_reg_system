@@ -107,7 +107,7 @@ def get_generated_zips_path(app: FastAPI) -> Path:
 
 # --- Token and Link Generation ---
 def generate_random_token() -> str:
-    return secrets.token_hex(16)
+    return secrets.token_urlsafe(16)
 
 
 # --- INI Modification ---

@@ -568,7 +568,7 @@ async def generate_deeplink_handler(message: types.Message, bot: AiogramBot, db_
         return
 
     try:
-        token = secrets.token_urlsafe(32)
+        token = secrets.token_urlsafe(16)
         # For simplicity, let's make token expiry a fixed value, e.g. 5 minutes
         # This could be made configurable via config.py if needed.
         token_expiry_minutes = 5
