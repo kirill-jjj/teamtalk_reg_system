@@ -117,7 +117,7 @@ async def start_command_handler(message: types.Message, command: CommandObject, 
                             selected_language=initial_lang_code) # Store initial lang
 
     # is_admin_registrar check
-    is_admin_registrar = telegram_id in config.ADMIN_IDS_INT # Assuming ADMIN_IDS_INT is pre-calculated list of ints
+    is_admin_registrar = telegram_id in config.ADMIN_IDS # Assuming ADMIN_IDS_INT is pre-calculated list of ints
     await state.update_data(is_admin_registrar=is_admin_registrar)
     logger.info(f"User {telegram_id} starting public registration. Admin registrar: {is_admin_registrar}. Language set to {initial_lang_code}.")
 
