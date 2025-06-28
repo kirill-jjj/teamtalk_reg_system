@@ -122,7 +122,10 @@ async def perform_teamtalk_registration(
     source_info: Optional[Dict] = None,
     broadcast_message_text: Optional[str] = None
 ) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
-
+    """
+    Performs the TeamTalk user registration using the provided details.
+    This function is called by various registration flows (Telegram, Web direct before approval, Web via approval).
+    """
     if not pytalk_bot.teamtalks:
         logger.error("TeamTalk bot (pytalk_bot) has no active server connections for registration.")
         return False, "MODULE_UNAVAILABLE", None
@@ -176,3 +179,55 @@ async def perform_teamtalk_registration(
     except Exception as e_reg:
         logger.exception(f"General error during SDK registration for user {username_str}: {e_reg}")
         return False, f"UNEXPECTED_ERROR:{str(e_reg)}", None
+
+async def create_teamtalk_account_from_pending_data(
+    username_str: str,
+    password_str: str,
+    nickname_str: Optional[str],
+    source_info_data: Dict[str, Any], # Should include IP, user_lang, potentially admin_id who approved
+    # Core config items needed by perform_teamtalk_registration
+    teamtalk_default_user_rights: List[str],
+    registration_broadcast_enabled: bool, # This will be passed through
+    host_name: str,
+    tcp_port: int,
+    udp_port: int,
+    encrypted: bool,
+    server_name: str,
+    teamtalk_public_hostname: Optional[str],
+    # Broadcast message is now constructed by the caller (e.g., admin approval handler)
+    # and passed directly to perform_teamtalk_registration via this wrapper.
+    custom_broadcast_message_text: Optional[str] = None
+) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
+    """
+    Creates a TeamTalk account using data typically from a pending request (e.g., after admin approval).
+    This function acts as a wrapper around `perform_teamtalk_registration`,
+    allowing the caller to specify a custom broadcast message.
+    """
+
+    # Call the main registration function, passing the custom broadcast message if provided
+    reg_success_bool, msg_key, tt_artefact_data = await perform_teamtalk_registration(
+        username_str=username_str,
+        password_str=password_str,
+        usertype_to_create=PyTalkUserType.DEFAULT, # Standard user type for these registrations
+        nickname_str=nickname_str,
+        source_info=source_info_data, # Pass along all source info
+        broadcast_message_text=custom_broadcast_message_text, # Use the message prepared by the caller
+        teamtalk_default_user_rights=teamtalk_default_user_rights,
+        registration_broadcast_enabled=registration_broadcast_enabled, # Honor this setting
+        host_name=host_name,
+        tcp_port=tcp_port,
+        udp_port=udp_port,
+        encrypted=encrypted,
+        server_name=server_name,
+        teamtalk_public_hostname=teamtalk_public_hostname
+    )
+
+    if not reg_success_bool:
+        # Log details available in source_info_data, like IP address if present
+        ip_address = source_info_data.get("ip_address", "N/A")
+        logger.error(f"TeamTalk account creation failed for user {username_str} (IP: {ip_address}). Reason: {msg_key}")
+        return False, msg_key, None
+
+    ip_address = source_info_data.get("ip_address", "N/A")
+    logger.info(f"TeamTalk account successfully created for user {username_str} (IP: {ip_address}).")
+    return True, msg_key, tt_artefact_data
