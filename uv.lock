@@ -913,6 +913,7 @@ dependencies = [
     { name = "python-multipart" },
     { name = "sqlalchemy" },
     { name = "uvicorn", extra = ["standard"] },
+    { name = "uvloop", marker = "sys_platform != 'win32'" },
 ]
 
 [package.metadata]
@@ -928,6 +929,7 @@ requires-dist = [
     { name = "python-multipart", specifier = "~=0.0.20" },
     { name = "sqlalchemy", specifier = "~=2.0.41" },
     { name = "uvicorn", extras = ["standard"], specifier = "~=0.34.3" },
+    { name = "uvloop", marker = "sys_platform != 'win32'", specifier = ">=0.21.0" },
 ]
 
 [[package]]
