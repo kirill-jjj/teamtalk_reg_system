@@ -599,9 +599,17 @@ async def generate_deeplink_handler(message: types.Message, bot: AiogramBot, db_
             generated_by_admin_id=acting_admin_id
         )
 
-        bot_info = await bot.get_me()
-        bot_username = bot_info.username
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        # Используем закешированное имя пользователя бота
+        if not hasattr(bot, 'username') or not bot.username:
+            # Это аварийный случай, если на старте не удалось получить имя
+            logger.error("Bot username not found in cache. Cannot generate deeplink.")
+            await message.reply("Internal error: bot username is not available. Please contact support.")
+            return
+
+        bot_username = bot.username
         deeplink_url = f"https://t.me/{bot_username}?start={token}"
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
         admin_lang = get_admin_lang_code()
         _ = get_translator(admin_lang)

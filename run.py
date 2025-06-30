@@ -185,6 +185,19 @@ async def main():
         if actual_aiogram_bot_instance:
             set_aiogram_bot_instance(actual_aiogram_bot_instance)
             logger.info("Aiogram bot instance passed to TeamTalk connection module.")
+
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            # Получаем информацию о боте один раз при старте и кешируем его username
+            try:
+                bot_info = await actual_aiogram_bot_instance.get_me()
+                actual_aiogram_bot_instance.username = bot_info.username
+                logger.info(f"Telegram bot username '{bot_info.username}' cached successfully.")
+            except Exception as e:
+                logger.error(f"Could not get Telegram bot info on startup. Deeplinks may not work. Error: {e}")
+                # На случай ошибки установим None, чтобы в коде можно было это проверить
+                actual_aiogram_bot_instance.username = None
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
         else:
             logger.warning("Aiogram bot instance was not available after run_telegram_bot. Cannot set on pytalk_bot.")
 
