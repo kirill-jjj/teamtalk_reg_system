@@ -33,15 +33,30 @@ async def _send_broadcast_message_directly(active_server_instance: TeamTalkInsta
     try:
         msg = sdk.TextMessage()
         msg.nMsgType = sdk.TextMsgType.MSGTYPE_BROADCAST
-        msg.nFromUserID = active_server_instance.getMyUserID()
 
-        my_account = active_server_instance.getMyUserAccount()
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        # Используем кешированные данные, если они доступны
+        if hasattr(active_server_instance, 'cached_my_user_id') and active_server_instance.cached_my_user_id is not None:
+            msg.nFromUserID = active_server_instance.cached_my_user_id
+        else:
+            # Аварийный вариант, если кеш по какой-то причине не создался
+            logger.warning("Bot UserID not found in cache. Fetching from server (fallback).")
+            msg.nFromUserID = active_server_instance.getMyUserID()
 
-        if my_account:
+        if hasattr(active_server_instance, 'cached_my_user_account') and active_server_instance.cached_my_user_account:
+            my_account = active_server_instance.cached_my_user_account
             msg.szFromUsername = my_account.szUsername
         else:
-            logger.warning("Could not retrieve own user account for broadcast message sender username. Using default 'Bot'.")
-            msg.szFromUsername = sdk.ttstr("Bot")
+            # Аварийный вариант для имени пользователя
+            logger.warning("Bot UserAccount not found in cache. Fetching from server (fallback).")
+            my_account = active_server_instance.getMyUserAccount()
+            if my_account:
+                msg.szFromUsername = my_account.szUsername
+            else:
+                # Самый крайний случай, если и с сервера не удалось получить
+                logger.error("Could not retrieve own user account for broadcast message (cache and fallback failed). Using default 'Bot'.")
+                msg.szFromUsername = sdk.ttstr("Bot")
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
         msg.nToUserID = 0
         msg.nChannelID = 0

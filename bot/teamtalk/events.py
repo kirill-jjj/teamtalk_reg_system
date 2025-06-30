@@ -84,7 +84,34 @@ async def on_my_login(server: TeamTalkServer):
                 break
 
     if tt_instance:
-        logger.info(f"Bot's user ID on {host_info}: {tt_instance.getMyUserID()}")
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        # Кешируем ID и аккаунт бота, чтобы не запрашивать их каждый раз
+        try:
+            bot_user_id = tt_instance.getMyUserID()
+            bot_user_account = tt_instance.getMyUserAccount() # Это объект sdk.UserAccount
+
+            # Сохраняем данные прямо в объекте экземпляра соединения
+            tt_instance.cached_my_user_id = bot_user_id
+            tt_instance.cached_my_user_account = bot_user_account
+
+            # Логируем для проверки
+            bot_username = bot_user_account.szUsername
+            if isinstance(bot_username, bytes):
+                bot_username = bot_username.decode('utf-8')
+
+            logger.info(f"Bot's info cached on login. UserID: {bot_user_id}, Username: '{bot_username}'")
+
+        except Exception as e:
+            logger.error(f"Failed to cache bot user info on login: {e}", exc_info=True)
+            # Устанавливаем None в случае ошибки, чтобы другие части кода могли это обработать
+            tt_instance.cached_my_user_id = None
+            tt_instance.cached_my_user_account = None
+
+        # Используем кешированное значение для лога, если оно есть
+        log_user_id = getattr(tt_instance, 'cached_my_user_id', 'N/A')
+        logger.info(f"Bot's user ID on {host_info}: {log_user_id}")
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
         current_channel_id = tt_instance.getMyChannelID()
         if current_channel_id > 0:
             try:
