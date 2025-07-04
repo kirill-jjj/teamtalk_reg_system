@@ -16,7 +16,6 @@ from bot.core.db import (
     get_fastapi_download_token,
     is_fastapi_ip_registered,
     mark_fastapi_download_token_used,
-    add_pending_web_registration, # New import for pending web registration
 )
 from bot.core.localization import (
     DEFAULT_LANG_CODE,
@@ -36,33 +35,14 @@ from bot.fastapi_app.utils import (
     schedule_temp_file_deletion,
 )
 from bot.teamtalk import users as teamtalk_users_service
-# from bot.utils.file_generator import generate_tt_file_content, generate_tt_link # No longer needed here
+from bot.utils.file_generator import generate_tt_file_content, generate_tt_link
 
 # Import DB dependency and CRUD functions
 from ..dependencies import get_db_session
 
-# For admin notifications
-import secrets # For generating request_key
-from aiogram import Bot as AiogramBot
-from bot.core.config import ADMIN_IDS, TG_BOT_TOKEN # For notifying admins
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-# Initialize Aiogram Bot instance for notifications
-# This assumes TG_BOT_TOKEN is correctly set in the environment / config
-# A better approach for a large app might be to have a shared bot instance,
-# but for this specific task, initializing it here is acceptable.
-# Ensure this is handled carefully in production (e.g., lifecycle management if needed).
-# bot_instance_for_notification = AiogramBot(token=TG_BOT_TOKEN)
-# ^^ This might be problematic if the bot is already running elsewhere.
-# A safer way is to get the bot instance from the request's app state if it's stored there,
-# or use a dependency injection system. For now, we'll assume a helper or direct init.
-# Let's assume the bot instance is available via request.app.state.bot if set up in main.py
-# For simplicity in this focused change, we might have to pass it or initialize it.
-# Given the current structure, direct initialization is the most straightforward path
-# without larger refactoring of how the bot instance is shared with FastAPI.
 
 # Helper function for validation
 async def _validate_web_registration_request(
@@ -98,9 +78,133 @@ async def _validate_web_registration_request(
 
     return None # All validations passed
 
-# _execute_tt_registration_for_web and _prepare_downloadables_for_web are removed as web registration
-# will now go into a pending state and be processed by admins. File generation will occur
-# after approval, likely triggered by the admin approval action.
+async def _execute_tt_registration_for_web(
+    username: str,
+    password: str,
+    nickname: Optional[str],
+    source_info_data: dict,
+) -> Tuple[bool, Optional[Dict[str, Any]]]: # Return success status and artefact_data
+    try:
+        broadcast_text_for_tt = None
+        if core_config.REGISTRATION_BROADCAST_ENABLED:
+            # Use admin language for the broadcast message from web context as well
+            admin_lang_translator = get_translator(get_admin_lang_code())
+            broadcast_text_for_tt = admin_lang_translator("User {} was registered.").format(username)
+
+        reg_success_bool, _msg_key, tt_artefact_data = await teamtalk_users_service.perform_teamtalk_registration(
+            username_str=username,
+            password_str=password,
+            usertype_to_create=PyTalkUserType.DEFAULT, # Explicitly default for web
+            nickname_str=nickname,
+            source_info=source_info_data,
+            broadcast_message_text=broadcast_text_for_tt,
+            teamtalk_default_user_rights=core_config.TEAMTALK_DEFAULT_USER_RIGHTS,
+            registration_broadcast_enabled=core_config.REGISTRATION_BROADCAST_ENABLED,
+            host_name=core_config.HOST_NAME,
+            tcp_port=core_config.TCP_PORT,
+            udp_port=core_config.UDP_PORT,
+            encrypted=core_config.ENCRYPTED,
+            server_name=core_config.SERVER_NAME,
+            teamtalk_public_hostname=core_config.TEAMTALK_PUBLIC_HOSTNAME
+        )
+        if not reg_success_bool:
+            logger.error(f"TeamTalk registration failed for user {username} via web, perform_teamtalk_registration returned False.")
+            return False, None
+        logger.info(f"TeamTalk registration successful for user {username} via web.")
+        return True, tt_artefact_data
+    except Exception as e:
+        logger.error(f"Exception during TeamTalk registration for web user {username}: {e}", exc_info=True)
+        return False, None
+
+async def _prepare_downloadables_for_web(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    artefact_data: Dict[str, Any],
+    db: AsyncSession
+) -> Dict[str, Any]:
+    username = artefact_data["username"]
+    password = artefact_data["password"]
+    file_generation_nickname = artefact_data["final_nickname"]
+    user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
+    translator = get_translator(user_lang_code)
+
+    tt_content = generate_tt_file_content(
+        server_name_val=artefact_data["server_name"],
+        host_val=artefact_data["effective_hostname"],
+        tcpport_val=artefact_data["tcp_port"],
+        udpport_val=artefact_data["udp_port"],
+        encrypted_val=artefact_data["encrypted"],
+        username_val=username,
+        password_val=password,
+        nickname_val=file_generation_nickname
+    )
+    tt_file_name_for_user = f"{artefact_data['server_name']}.tt"
+    tt_file_path = get_generated_files_path(request.app) / tt_file_name_for_user
+
+    try:
+        with open(tt_file_path, "w", encoding="utf-8") as f:
+            f.write(tt_content)
+    except IOError as e:
+        logger.error(f"Failed to write .tt file {tt_file_path}: {e}", exc_info=True)
+        return {
+            "tt_download_link_token": None, "tt_file_name_for_user": None,
+            "client_zip_token": None, "client_zip_filename_for_user": None,
+            "tt_quick_link": None, "file_generation_error": True
+        }
+
+    tt_token = generate_random_token()
+    expires_at_dt = datetime.utcnow() + timedelta(seconds=core_config.GENERATED_FILE_TTL_SECONDS)
+    await add_fastapi_download_token(
+        db=db,
+        token=tt_token,
+        filepath_on_server=tt_file_path.name, # Store only filename
+        original_filename=tt_file_name_for_user,
+        token_type="tt_config",
+        expires_at=expires_at_dt
+    )
+    # schedule_temp_file_deletion now needs the token to remove it from DB
+    schedule_temp_file_deletion(
+        background_tasks, request.app, tt_file_path.name, "files", tt_token, # Pass tt_file_path.name
+        delay_seconds=core_config.GENERATED_FILE_TTL_SECONDS
+    )
+
+    tt_quick_link = generate_tt_link(
+        host_val=artefact_data["effective_hostname"], tcpport_val=artefact_data["tcp_port"],
+        udpport_val=artefact_data["udp_port"], encrypted_val=artefact_data["encrypted"],
+        username_val=username, password_val=password, nickname_val=file_generation_nickname
+    )
+
+    zip_token: Optional[str] = None
+    actual_client_zip_filename_for_user: Optional[str] = None
+    if core_config.TEAMTALK_CLIENT_TEMPLATE_DIR:
+        zip_file_path_on_server, client_zip_user_download_name = create_client_zip_for_user(
+            app=request.app, username=username, password=password,
+            tt_file_name_on_server=tt_file_name_for_user, lang_code=user_lang_code
+        )
+        if zip_file_path_on_server and client_zip_user_download_name:
+            zip_token = generate_random_token()
+            actual_client_zip_filename_for_user = client_zip_user_download_name
+            await add_fastapi_download_token(
+                db=db,
+                token=zip_token,
+                filepath_on_server=zip_file_path_on_server.name, # Store only filename
+                original_filename=actual_client_zip_filename_for_user,
+                token_type="client_zip",
+                expires_at=expires_at_dt # Use same expiry for both tokens from one request
+            )
+            # schedule_temp_file_deletion now needs the token to remove it from DB
+            schedule_temp_file_deletion(
+                background_tasks, request.app, zip_file_path_on_server.name, "zips", zip_token, # Pass zip_file_path_on_server.name
+                delay_seconds=core_config.GENERATED_FILE_TTL_SECONDS
+            )
+        else:
+            logger.warning(f"Failed to create client ZIP for web user {username}")
+
+    return {
+        "tt_download_link_token": tt_token, "tt_file_name_for_user": tt_file_name_for_user,
+        "client_zip_token": zip_token, "client_zip_filename_for_user": actual_client_zip_filename_for_user,
+        "tt_quick_link": tt_quick_link, "file_generation_error": False
+    }
 
 @router.post("/set_lang_and_reload")
 async def set_language_and_reload(request: Request, lang_code: str = Form(...)):
@@ -171,7 +275,6 @@ async def register_page_post(
     user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     translator = get_translator(user_lang_code)
     user_ip = get_user_ip_fastapi(request)
-    user_agent = request.headers.get("user-agent", "N/A")
 
     validation_error = await _validate_web_registration_request(
         request, username, password, user_ip, translator, db
@@ -183,103 +286,30 @@ async def register_page_post(
             "request": request,
             "title": translator("registration_title"),
             "message": validation_error.detail,
-            "show_form": True, # Keep form visible for corrections
+            "show_form": True,
             "current_lang": user_lang_code,
             "server_name_from_env": request.app.state.cached_server_name,
-            "available_languages": available_languages,
-            "username_value": username, # Preserve entered username
-            "nickname_value": nickname   # Preserve entered nickname
+            "available_languages": available_languages
         }, status_code=validation_error.status_code)
 
-    # --- Validation successful, proceed to save as pending ---
+    # Prepare source_info for TeamTalk registration
     final_nickname = nickname if nickname and nickname.strip() else username
-    request_key = secrets.token_urlsafe(32) # Generate a unique key for this request
-
     source_info_data = {
-        "type": "web_pending_approval", # New type
+        "type": "web",
         "ip_address": user_ip,
-        "user_agent": user_agent,
         "user_lang": user_lang_code,
-        "nickname_chosen_by_user": nickname if nickname and nickname.strip() else None, # Store original choice
-        # Any other relevant info from the request can be added here
+        "nickname": final_nickname
     }
 
-    try:
-        await add_pending_web_registration(
-            db=db,
-            request_key=request_key,
-            username=username,
-            password_cleartext=password, # Storing password temporarily until approval
-            nickname=final_nickname, # This is what will be used if approved
-            ip_address=user_ip,
-            user_agent=user_agent,
-            source_info=source_info_data
-        )
-        logger.info(f"Pending web registration for user '{username}' (IP: {user_ip}) saved with request key {request_key}.")
+    registration_successful, tt_artefact_data_from_reg = await _execute_tt_registration_for_web(
+        username=username,
+        password=password,
+        nickname=final_nickname,
+        source_info_data=source_info_data
+    )
 
-        # Record the IP as having submitted a registration request (for rate limiting future *pending* requests)
-        try:
-            await add_fastapi_registered_ip(db, ip_address=user_ip, username=f"pending_{username}")
-        except Exception as e_ip_add:
-            logger.error(f"Failed to add/update registered IP {user_ip} for pending user {username} to DB: {e_ip_add}", exc_info=True)
-            # Continue, as this is not fatal for the pending registration itself.
-
-        # Notify admins
-        if ADMIN_IDS and TG_BOT_TOKEN:
-            # It's better to get the bot instance from app state if available, e.g., request.app.state.bot
-            # Fallback to initializing a new one for notification if not found.
-            bot_for_notification = getattr(request.app.state, "bot", None)
-            if not bot_for_notification:
-                logger.info("No shared bot instance found in app.state.bot, initializing new one for admin notification.")
-                bot_for_notification = AiogramBot(token=TG_BOT_TOKEN)
-
-            admin_message = (
-                f"📢 New Web Registration Pending Approval 📢\n\n"
-                f"Username: `{username}`\n"
-                f"Nickname: `{final_nickname}`\n"
-                f"IP Address: `{user_ip}`\n"
-                f"User Agent: `{user_agent[:100]}{'...' if len(user_agent) > 100 else ''}`\n\n" # Truncate user agent
-                f"Please review in the admin panel."
-            )
-            for admin_id_str in ADMIN_IDS:
-                try:
-                    admin_id = int(admin_id_str)
-                    await bot_for_notification.send_message(chat_id=admin_id, text=admin_message, parse_mode="Markdown")
-                except ValueError:
-                    logger.error(f"Invalid admin ID for notification: {admin_id_str}")
-                except Exception as e_notify:
-                    logger.error(f"Failed to send web registration notification to admin {admin_id_str}: {e_notify}")
-
-            # If bot was initialized here, close it if possible (though send_message might handle it)
-            # For a shared bot, this is not needed.
-            if not getattr(request.app.state, "bot", None) and bot_for_notification:
-                 # Check if session attribute exists and try to close, new aiogram might not need explicit close after send
-                if hasattr(bot_for_notification, 'session') and bot_for_notification.session:
-                    await bot_for_notification.session.close()
-
-
-        # Inform user their request is pending
-        pending_approval_title = translator("registration_pending_title")
-        pending_approval_message = translator("registration_pending_message")
-        available_languages = get_available_languages_for_display()
-
-        final_context = {
-            "request": request,
-            "title": pending_approval_title,
-            "message": pending_approval_message,
-            "message_class": "info", # Use a different class for pending status
-            "show_form": False, # Hide form, show pending message
-            "registration_complete": False, # Not complete, but pending
-            "registration_pending": True, # New flag for template
-            "current_lang": user_lang_code,
-            "server_name_from_env": request.app.state.cached_server_name,
-            "available_languages": available_languages,
-        }
-        return request.app.state.templates.TemplateResponse("register.html", final_context)
-
-    except Exception as e_pending:
-        logger.error(f"Failed to save pending web registration for user '{username}' (IP: {user_ip}): {e_pending}", exc_info=True)
-        message = translator("registration_failed_error") # Generic error for user
+    if not registration_successful or not tt_artefact_data_from_reg:
+        message = translator("registration_failed_error")
         available_languages = get_available_languages_for_display()
         return request.app.state.templates.TemplateResponse("register.html", {
             "request": request,
@@ -288,10 +318,58 @@ async def register_page_post(
             "show_form": True,
             "current_lang": user_lang_code,
             "server_name_from_env": request.app.state.cached_server_name,
-            "available_languages": available_languages,
-            "username_value": username,
-            "nickname_value": nickname
+            "available_languages": available_languages
         }, status_code=500)
+
+    # --- Registration successful, proceed to file generation ---
+    try:
+        await add_fastapi_registered_ip(db, ip_address=user_ip, username=username)
+    except Exception as e_ip_add: # Catch potential IntegrityError if IP somehow gets re-added before this by parallel requests
+        logger.error(f"Failed to add/update registered IP {user_ip} for user {username} to DB: {e_ip_add}", exc_info=True)
+        # Not necessarily a fatal error for the user flow, so log and continue.
+        # If this is critical, then return an error response.
+
+    downloadables_context = await _prepare_downloadables_for_web(
+        request,
+        background_tasks,
+        artefact_data=tt_artefact_data_from_reg, # Pass the whole dict
+        db=db
+    )
+
+    if downloadables_context.get("file_generation_error"):
+        message = translator("registration_failed_file_error")
+        available_languages = get_available_languages_for_display()
+        return request.app.state.templates.TemplateResponse("register.html", {
+            "request": request,
+            "title": translator("registration_title"),
+            "message": message,
+            "show_form": True,
+            "current_lang": user_lang_code,
+            "server_name_from_env": request.app.state.cached_server_name,
+            "available_languages": available_languages
+        }, status_code=500)
+    
+    success_title = translator("registration_successful_title")
+    success_message = translator("registration_successful_message")
+    available_languages = get_available_languages_for_display()
+
+    final_context = {
+        "request": request,
+        "title": success_title,
+        "message": success_message,
+        "message_class": "success",
+        "show_form": False,
+        "registration_complete": True,
+        "current_lang": user_lang_code,
+        "server_name_from_env": request.app.state.cached_server_name,
+        "available_languages": available_languages,
+        "tt_link": downloadables_context["tt_quick_link"],
+        "download_tt_token": downloadables_context["tt_download_link_token"],
+        "actual_tt_filename_for_user": downloadables_context["tt_file_name_for_user"],
+        "download_client_zip_token": downloadables_context["client_zip_token"],
+        "actual_client_zip_filename_for_user": downloadables_context["client_zip_filename_for_user"]
+    }
+    return request.app.state.templates.TemplateResponse("register.html", final_context)
 
 
 @router.get("/download_tt/{token}")

@@ -12,7 +12,6 @@ from .models import (
     FastapiDownloadToken,
     FastapiRegisteredIp,
     PendingTelegramRegistration,
-    PendingWebRegistration, # Added PendingWebRegistration import
     TelegramRegistration,
     DeeplinkToken,
     BannedUser, # Added BannedUser import
@@ -173,72 +172,6 @@ async def cleanup_expired_pending_registrations(db: AsyncSession, older_than_sec
     deleted_count = result.rowcount
     if deleted_count > 0:
         logger.info(f"Cleaned up {deleted_count} expired pending registrations older than {older_than_seconds} seconds.")
-    return deleted_count
-
-# --- PendingWebRegistration CRUD ---
-
-async def add_pending_web_registration(
-    db: AsyncSession,
-    request_key: str,
-    username: str,
-    password_cleartext: str,
-    nickname: str,
-    ip_address: str,
-    user_agent: Optional[str],
-    source_info: Dict[str, Any]
-) -> PendingWebRegistration:
-    pending_reg = PendingWebRegistration(
-        request_key=request_key,
-        username=username,
-        password_cleartext=password_cleartext,
-        nickname=nickname,
-        ip_address=ip_address,
-        user_agent=user_agent,
-        source_info=source_info
-    )
-    db.add(pending_reg)
-    await db.flush()
-    await db.refresh(pending_reg)
-    logger.info(f"Added pending web registration for username: {username}, IP: {ip_address}, request_key: {request_key}")
-    return pending_reg
-
-async def get_pending_web_registration_by_id(db: AsyncSession, registration_id: int) -> Optional[PendingWebRegistration]:
-    stmt = select(PendingWebRegistration).where(PendingWebRegistration.id == registration_id)
-    result = await db.execute(stmt)
-    pending_reg = result.scalars().first()
-    if pending_reg:
-        logger.info(f"Retrieved pending web registration ID: {registration_id}")
-    else:
-        logger.info(f"No pending web registration found for ID: {registration_id}")
-    return pending_reg
-
-async def get_all_pending_web_registrations(db: AsyncSession) -> list[PendingWebRegistration]:
-    stmt = select(PendingWebRegistration).order_by(PendingWebRegistration.created_at.asc())
-    result = await db.execute(stmt)
-    pending_regs = list(result.scalars().all())
-    logger.info(f"Retrieved {len(pending_regs)} pending web registrations.")
-    return pending_regs
-
-async def remove_pending_web_registration(db: AsyncSession, registration_id: int) -> bool:
-    stmt = delete(PendingWebRegistration).where(PendingWebRegistration.id == registration_id)
-    result = await db.execute(stmt)
-    if result.rowcount > 0:
-        # No explicit commit here as it's usually handled by the middleware or calling function
-        await db.flush()
-        logger.info(f"Removed pending web registration ID: {registration_id}. Rows affected: {result.rowcount}.")
-        return True
-    logger.info(f"No pending web registration found for ID: {registration_id} to remove.")
-    return False
-
-async def cleanup_expired_pending_web_registrations(db: AsyncSession, older_than_seconds: int) -> int:
-    expiration_time = datetime.utcnow() - timedelta(seconds=older_than_seconds)
-    stmt = delete(PendingWebRegistration).where(PendingWebRegistration.created_at < expiration_time)
-    result = await db.execute(stmt)
-    deleted_count = result.rowcount
-    # No explicit commit here
-    if deleted_count > 0:
-        await db.flush()
-        logger.info(f"Cleaned up {deleted_count} expired pending web registrations older than {older_than_seconds} seconds.")
     return deleted_count
 
 # --- FastapiRegisteredIp CRUD ---

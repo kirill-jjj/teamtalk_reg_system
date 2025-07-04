@@ -14,9 +14,5 @@ class AdminTTAccountsCallback(CallbackData, prefix="admin_tt_acc"):
     # tt_username will be used to identify the account for deletion
     tt_username: str | None = None
 
-class AdminWebApprovalCallback(CallbackData, prefix="admin_web_appr"):
-    action: str  # "view_pending", "approve", "reject"
-    request_id: int | None = None # ID of the PendingWebRegistration, None for "view_pending"
-
 # Add any other admin-related CallbackData classes here if they exist
 # and were contributing to a circular import or are better organized here.

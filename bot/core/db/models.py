@@ -26,22 +26,6 @@ class PendingTelegramRegistration(Base):
     source_info: Mapped[dict] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True, nullable=False)
 
-class PendingWebRegistration(Base):
-    __tablename__ = "pending_web_registrations"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True, autoincrement=True)
-    request_key: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
-    username: Mapped[str] = mapped_column(String, index=True, nullable=False)
-    password_cleartext: Mapped[str] = mapped_column(String, nullable=False)
-    nickname: Mapped[str] = mapped_column(String, nullable=False)
-    ip_address: Mapped[str] = mapped_column(String, nullable=False)
-    user_agent: Mapped[str] = mapped_column(String, nullable=True)
-    source_info: Mapped[dict] = mapped_column(JSON, nullable=False) # For things like user language preference
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True, nullable=False)
-
-    def __repr__(self):
-        return f"<PendingWebRegistration(id={self.id}, username='{self.username}', ip_address='{self.ip_address}')>"
-
 class FastapiRegisteredIp(Base):
     __tablename__ = "fastapi_registered_ips"
 

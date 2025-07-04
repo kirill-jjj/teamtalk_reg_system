@@ -19,15 +19,11 @@ from ...core.db.crud import (
     add_banned_user,
     get_banned_users,
     remove_banned_user,
-    # CRUD for PendingWebRegistration
-    get_all_pending_web_registrations,
-    get_pending_web_registration_by_id,
-    remove_pending_web_registration,
 )
-from ...core.db.models import TelegramRegistration # PendingWebRegistration will be used but not directly imported as a model here
-from ...core.localization import get_translator, get_admin_lang_code, DEFAULT_LANG_CODE
+from ...core.db.models import TelegramRegistration
+from ...core.localization import get_translator, get_admin_lang_code
 # Import the callbacks from the new location
-from ..callbacks.admin_callbacks import AdminDeleteCallback, AdminBanListActionCallback, AdminTTAccountsCallback, AdminWebApprovalCallback # Added AdminWebApprovalCallback
+from ..callbacks.admin_callbacks import AdminDeleteCallback, AdminBanListActionCallback, AdminTTAccountsCallback # Added AdminTTAccountsCallback
 from ..keyboards.admin_keyboards import get_admin_panel_keyboard, CALLBACK_DATA_DELETE_USER
 from ..states import AdminActions
 from aiogram.fsm.context import FSMContext
@@ -35,9 +31,7 @@ from aiogram.types import InlineKeyboardMarkup
 
 # For TeamTalk interaction
 from ...teamtalk.connection import pytalk_bot
-from ...teamtalk.users import create_teamtalk_account_from_pending_data # For approving web regs
 # from pytalk import UserAccount # For type hinting, if directly used. Pytalk objects are often dynamic.
-from pytalk.enums import UserType as PyTalkUserType # For when creating user
 
 logger = logging.getLogger(__name__)
 
@@ -86,17 +80,6 @@ KEY_BUTTON_CANCEL_TT_DELETE = "admin_button_cancel_tt_delete"
 KEY_ADMIN_TT_DELETE_SUCCESS = "admin_tt_delete_success"
 KEY_ADMIN_TT_DELETE_FAIL = "admin_tt_delete_fail"
 KEY_ADMIN_TT_DELETE_CONNECTION_ERROR = "admin_tt_delete_connection_error"
-
-# Localization Keys for Web Approvals
-KEY_ADMIN_WEB_APPROVAL_TITLE = "admin_web_approval_title"
-KEY_ADMIN_WEB_APPROVAL_NO_PENDING = "admin_web_approval_no_pending"
-KEY_ADMIN_WEB_APPROVAL_LIST_ITEM = "admin_web_approval_list_item" # Expects: username, nickname, ip_address, user_agent, created_at
-KEY_BUTTON_APPROVE_WEB_REG = "admin_button_approve_web_reg"
-KEY_BUTTON_REJECT_WEB_REG = "admin_button_reject_web_reg"
-KEY_ADMIN_WEB_APPROVAL_APPROVED = "admin_web_approval_approved" # Expects: username, ip_address
-KEY_ADMIN_WEB_APPROVAL_REJECTED = "admin_web_approval_rejected" # Expects: username, ip_address
-KEY_ADMIN_WEB_APPROVAL_REQUEST_NOT_FOUND = "admin_web_approval_request_not_found"
-KEY_ADMIN_WEB_APPROVAL_TT_REG_FAILED = "admin_web_approval_tt_reg_failed" # Expects: username, error
 
 
 @router.message(Command("adminpanel"))
@@ -628,188 +611,6 @@ async def generate_deeplink_handler(message: types.Message, bot: AiogramBot, db_
         admin_lang = get_admin_lang_code()
         _ = get_translator(admin_lang)
         await message.reply(_("An error occurred while generating the deeplink."))
-
-# --- Web Registration Approval Handlers ---
-
-@router.callback_query(AdminWebApprovalCallback.filter(F.action == "view_pending"))
-async def view_pending_web_registrations_handler(callback_query: types.CallbackQuery, db_session: AsyncSession):
-    await callback_query.answer()
-    admin_lang = get_admin_lang_code()
-    _ = get_translator(admin_lang)
-
-    pending_regs = await get_all_pending_web_registrations(db_session)
-
-    if not pending_regs:
-        await callback_query.message.edit_text(_(KEY_ADMIN_WEB_APPROVAL_NO_PENDING), reply_markup=None)
-        return
-
-    message_text = _(KEY_ADMIN_WEB_APPROVAL_TITLE) + "\n\n"
-    builder = InlineKeyboardBuilder()
-
-    for reg in pending_regs:
-        # Format created_at for display
-        created_at_display = reg.created_at.strftime("%Y-%m-%d %H:%M:%S UTC")
-        user_agent_display = reg.user_agent[:50] + '...' if reg.user_agent and len(reg.user_agent) > 50 else reg.user_agent
-
-        message_text += _(KEY_ADMIN_WEB_APPROVAL_LIST_ITEM).format(
-            id=reg.id,
-            username=reg.username,
-            nickname=reg.nickname,
-            ip_address=reg.ip_address,
-            user_agent=user_agent_display,
-            created_at=created_at_display
-        ) + "\n"
-
-        builder.button(
-            text=_(KEY_BUTTON_APPROVE_WEB_REG) + f" ({reg.username[:10]})",
-            callback_data=AdminWebApprovalCallback(action="approve", request_id=reg.id).pack()
-        )
-        builder.button(
-            text=_(KEY_BUTTON_REJECT_WEB_REG) + f" ({reg.username[:10]})",
-            callback_data=AdminWebApprovalCallback(action="reject", request_id=reg.id).pack()
-        )
-        # Adding a newline or separator visually in the message, buttons will be per item
-        message_text += "--------------------\n"
-
-
-    builder.adjust(2) # Two buttons (Approve, Reject) per row
-
-    # Check if message_text exceeds Telegram's limit (4096 chars)
-    # This is a simplified check; a more robust solution would paginate or summarize.
-    if len(message_text) > 4090: # Leave some buffer
-        message_text = message_text[:4090] + "..."
-        # Potentially send a follow-up message if there are too many to display
-        # For now, just truncate.
-        logger.warning("Pending web registrations list too long, truncated.")
-
-    try:
-        await callback_query.message.edit_text(message_text, reply_markup=builder.as_markup())
-    except Exception as e:
-        logger.warning(f"Failed to edit message for pending web registrations list: {e}")
-        # Fallback if edit fails (e.g. message too old or content identical)
-        await callback_query.message.answer(message_text, reply_markup=builder.as_markup())
-
-
-@router.callback_query(AdminWebApprovalCallback.filter(F.action == "approve"))
-async def approve_pending_web_registration_handler(
-    callback_query: types.CallbackQuery,
-    callback_data: AdminWebApprovalCallback,
-    db_session: AsyncSession,
-    bot: AiogramBot # For potential notifications to other admins
-):
-    await callback_query.answer()
-    admin_lang = get_admin_lang_code()
-    _ = get_translator(admin_lang)
-    admin_id_who_approved = callback_query.from_user.id
-
-    pending_reg = await get_pending_web_registration_by_id(db_session, callback_data.request_id)
-
-    if not pending_reg:
-        await callback_query.message.edit_text(_(KEY_ADMIN_WEB_APPROVAL_REQUEST_NOT_FOUND), reply_markup=None)
-        return
-
-    # Add admin who approved to source_info for logging/broadcast
-    pending_reg.source_info["approved_by_admin_id"] = admin_id_who_approved
-    pending_reg.source_info["approved_by_admin_username"] = callback_query.from_user.full_name
-
-
-    # Prepare broadcast message text using admin language
-    # Example: "User {username} (IP: {ip_address}) was registered via Web approval by admin {admin_username}."
-    # Ensure the key exists in your .po files for the admin language
-    broadcast_message_key = "web_user_approved_and_registered_broadcast"
-    # Using .get(key, default_format_string) in case key is missing
-    broadcast_format_string = _(broadcast_message_key, broadcast_message_key) # Fallback to key itself if not found
-
-    # Check if the format string is the key itself (meaning it wasn't found)
-    if broadcast_format_string == broadcast_message_key:
-         # Fallback to a hardcoded English format string if key is missing
-        logger.warning(f"Localization key '{broadcast_message_key}' not found for admin lang '{admin_lang}'. Using fallback.")
-        broadcast_message_text = f"User {pending_reg.username} (IP: {pending_reg.ip_address}) was registered via Web approval by admin {callback_query.from_user.full_name}."
-    else:
-        try:
-            broadcast_message_text = broadcast_format_string.format(
-                username=pending_reg.username,
-                ip_address=pending_reg.ip_address,
-                admin_username=callback_query.from_user.full_name # Or admin_id_who_approved
-            )
-        except KeyError as e_fmt:
-            logger.error(f"Missing key '{e_fmt}' in broadcast message format string for key '{broadcast_message_key}'. Using simplified message.")
-            broadcast_message_text = f"User {pending_reg.username} (IP: {pending_reg.ip_address}) registered via Web by admin."
-
-
-    success, reason, _artefact_data = await create_teamtalk_account_from_pending_data(
-        username_str=pending_reg.username,
-        password_str=pending_reg.password_cleartext,
-        nickname_str=pending_reg.nickname,
-        source_info_data=pending_reg.source_info,
-        teamtalk_default_user_rights=config.TEAMTALK_DEFAULT_USER_RIGHTS,
-        registration_broadcast_enabled=config.REGISTRATION_BROADCAST_ENABLED,
-        host_name=config.HOST_NAME,
-        tcp_port=config.TCP_PORT,
-        udp_port=config.UDP_PORT,
-        encrypted=config.ENCRYPTED,
-        server_name=config.SERVER_NAME,
-        teamtalk_public_hostname=config.TEAMTALK_PUBLIC_HOSTNAME,
-        custom_broadcast_message_text=broadcast_message_text if config.REGISTRATION_BROADCAST_ENABLED else None
-    )
-
-    if success:
-        await remove_pending_web_registration(db_session, pending_reg.id)
-        await db_session.commit() # Commit removal
-        response_text = _(KEY_ADMIN_WEB_APPROVAL_APPROVED).format(username=pending_reg.username, ip_address=pending_reg.ip_address)
-        logger.info(f"Admin {admin_id_who_approved} approved web registration for {pending_reg.username} (IP: {pending_reg.ip_address})")
-
-        # Notify other admins (optional, similar to Telegram approval)
-        # ...
-    else:
-        response_text = _(KEY_ADMIN_WEB_APPROVAL_TT_REG_FAILED).format(username=pending_reg.username, error=reason)
-        logger.error(f"Admin {admin_id_who_approved} tried to approve web reg for {pending_reg.username} but TT creation failed: {reason}")
-
-    try:
-        await callback_query.message.edit_text(response_text, reply_markup=None)
-    except Exception as e_edit:
-        logger.debug(f"Could not edit message after web approval/failure for {pending_reg.username}: {e_edit}")
-        await callback_query.message.answer(response_text) # Send as new message if edit fails
-
-    # Refresh the list for the admin who performed the action
-    await view_pending_web_registrations_handler(callback_query, db_session)
-
-
-@router.callback_query(AdminWebApprovalCallback.filter(F.action == "reject"))
-async def reject_pending_web_registration_handler(
-    callback_query: types.CallbackQuery,
-    callback_data: AdminWebApprovalCallback,
-    db_session: AsyncSession,
-    bot: AiogramBot # For potential notifications
-):
-    await callback_query.answer()
-    admin_lang = get_admin_lang_code()
-    _ = get_translator(admin_lang)
-    admin_id_who_rejected = callback_query.from_user.id
-
-    pending_reg = await get_pending_web_registration_by_id(db_session, callback_data.request_id)
-
-    if not pending_reg:
-        await callback_query.message.edit_text(_(KEY_ADMIN_WEB_APPROVAL_REQUEST_NOT_FOUND), reply_markup=None)
-        return
-
-    await remove_pending_web_registration(db_session, pending_reg.id)
-    await db_session.commit() # Commit removal
-
-    response_text = _(KEY_ADMIN_WEB_APPROVAL_REJECTED).format(username=pending_reg.username, ip_address=pending_reg.ip_address)
-    logger.info(f"Admin {admin_id_who_rejected} rejected web registration for {pending_reg.username} (IP: {pending_reg.ip_address})")
-
-    # Notify other admins (optional)
-    # ...
-
-    try:
-        await callback_query.message.edit_text(response_text, reply_markup=None)
-    except Exception as e_edit:
-        logger.debug(f"Could not edit message after web rejection for {pending_reg.username}: {e_edit}")
-        await callback_query.message.answer(response_text)
-
-    # Refresh the list for the admin
-    await view_pending_web_registrations_handler(callback_query, db_session)
 
 
 logger.info("Admin router initialized with /generate command handler.")
