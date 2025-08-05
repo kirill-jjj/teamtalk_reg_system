@@ -13,6 +13,7 @@ from bot.core import config
 from bot.core.db.crud import add_banned_user, get_telegram_id_by_teamtalk_username
 from bot.core.db.session import AsyncSessionLocal
 from .connection import force_restart_instance_on_event, pytalk_bot
+from ...core.localization import get_translator, get_admin_lang_code
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,9 @@ async def _send_delayed_removal_notification(username: str):
             logger.error("_send_delayed_removal_notification: Aiogram bot or ADMIN_IDS not configured.")
             return
 
-        message_to_send = f"TeamTalk: User account '{username}' has been REMOVED."
+        _ = get_translator(get_admin_lang_code())
+
+        message_to_send = _("TeamTalk: User account '{username}' has been REMOVED.").format(username=username)
 
         for admin_id in config.ADMIN_IDS:
             try:
@@ -197,8 +200,10 @@ async def on_user_account_new(account: UserAccount):
         logger.error("on_user_account_new: Aiogram bot or ADMIN_IDS not configured. Cannot send notifications.")
         return
 
+    _ = get_translator(get_admin_lang_code())
+
     log_prefix = "new account"
-    message_to_send = f"TeamTalk: User account '{account_username_str}' has been CREATED."
+    message_to_send = _("TeamTalk: User account '{account_username_str}' has been CREATED.").format(account_username_str=account_username_str)
 
     # Check if this "new" user is actually a recently deleted one (i.e., an update)
     if account_username_str in recently_deleted_users:
@@ -206,7 +211,7 @@ async def on_user_account_new(account: UserAccount):
         if time.time() - deletion_time <= DELETION_WINDOW_SECONDS:
             logger.info(f"Detected user '{account_username_str}' recreation within {DELETION_WINDOW_SECONDS}s. Treating as a CHANGE.")
             removal_task.cancel()
-            message_to_send = f"TeamTalk: User account '{account_username_str}' has been CHANGED."
+            message_to_send = _("TeamTalk: User account '{account_username_str}' has been CHANGED.").format(account_username_str=account_username_str)
             log_prefix = "changed"
         else:
             logger.info(f"User '{account_username_str}' was deleted but re-created outside the time window. Treating as NEW.")
