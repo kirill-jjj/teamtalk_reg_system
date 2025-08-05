@@ -39,49 +39,6 @@ logger = logging.getLogger(__name__)
 
 router = Router()
 
-# Localization Keys (replacing old placeholders)
-KEY_ADMIN_PANEL_TITLE = "admin_panel_title"
-KEY_PROMPT_USER_IDENTIFIER_FOR_DELETION = "admin_delete_prompt_identifier"
-KEY_PROCESSING_DELETE_REQUEST = "admin_delete_processing"
-KEY_USER_DELETED_SUCCESSFULLY = "admin_delete_success"
-KEY_FAILED_TO_DELETE_USER = "admin_delete_fail_db"
-KEY_USER_NOT_FOUND = "admin_delete_user_not_found"
-KEY_INVALID_INPUT_FOR_DELETION = "admin_delete_invalid_input"
-KEY_ADMIN_DELETE_NO_USERS_FOUND = "admin_delete_no_users_found"
-KEY_ADMIN_DELETE_SELECT_USER = "admin_delete_select_user"
-KEY_ADMIN_DELETE_CONFIRMED_SUCCESS = "admin_delete_confirmed_success"
-KEY_ADMIN_DELETE_CONFIRMED_FAIL = "admin_delete_confirmed_fail"
-KEY_ADMIN_DELETE_INVALID_ID_FORMAT = "admin_delete_invalid_id_format"
-
-# New Localization Keys for Ban List Management
-KEY_ADMIN_BANLIST_TITLE = "admin_banlist_title"
-KEY_ADMIN_BANLIST_EMPTY = "admin_banlist_empty"
-KEY_BUTTON_UNBAN = "admin_button_unban"
-KEY_BUTTON_ADD_TO_BANLIST_MANUAL = "admin_button_add_to_banlist_manual"
-KEY_ADMIN_UNBAN_SUCCESS = "admin_unban_success"
-KEY_ADMIN_UNBAN_FAIL = "admin_unban_fail"
-KEY_ADMIN_MANUAL_BAN_PROMPT = "admin_manual_ban_prompt"
-KEY_ADMIN_MANUAL_BAN_SUCCESS = "admin_manual_ban_success"
-KEY_ADMIN_MANUAL_BAN_INVALID_ID = "admin_manual_ban_invalid_id"
-KEY_ADMIN_MANUAL_BAN_FAIL = "admin_manual_ban_fail"
-
-# New Localization Keys for TT Account Listing
-KEY_ADMIN_TT_LIST_TITLE = "admin_tt_list_title"
-KEY_ADMIN_TT_LIST_NO_ACCOUNTS = "admin_tt_list_no_accounts"
-KEY_ADMIN_TT_LIST_CONNECTION_ERROR = "admin_tt_list_connection_error"
-KEY_BUTTON_DELETE_FROM_TT = "admin_button_delete_from_tt"
-
-# Localization Keys for TT Account Deletion Prompt
-KEY_ADMIN_TT_DELETE_PROMPT_TEXT = "admin_tt_delete_prompt_text"
-KEY_BUTTON_CONFIRM_DELETE_FROM_TT = "admin_button_confirm_delete_from_tt"
-KEY_BUTTON_CANCEL_TT_DELETE = "admin_button_cancel_tt_delete"
-
-# Localization Keys for TT Account Deletion Confirmation
-KEY_ADMIN_TT_DELETE_SUCCESS = "admin_tt_delete_success"
-KEY_ADMIN_TT_DELETE_FAIL = "admin_tt_delete_fail"
-KEY_ADMIN_TT_DELETE_CONNECTION_ERROR = "admin_tt_delete_connection_error"
-
-
 @router.message(Command("adminpanel"))
 async def admin_panel_handler(message: types.Message):
     # Admin check
@@ -100,7 +57,7 @@ async def admin_panel_handler(message: types.Message):
     # For now, using a simple string. Localization can be added later.
     admin_lang = get_admin_lang_code() # This would be needed for localization
     _ = get_translator(admin_lang)
-    reply_text = _(KEY_ADMIN_PANEL_TITLE) # Using simple string for now
+    reply_text = _("admin_panel_title") # Using simple string for now
 
     keyboard = get_admin_panel_keyboard()
     await message.reply(reply_text, reply_markup=keyboard)
@@ -135,10 +92,10 @@ async def delete_user_start_handler(callback_query: types.CallbackQuery, db_sess
 
     if not users:
         try:
-            await callback_query.message.edit_text(_(KEY_ADMIN_DELETE_NO_USERS_FOUND))
+            await callback_query.message.edit_text(_("admin_delete_no_users_found"))
         except Exception as e: # Handle cases where message cannot be edited (e.g. too old)
             logger.warning(f"Could not edit message for no users found: {e}")
-            await callback_query.message.answer(_(KEY_ADMIN_DELETE_NO_USERS_FOUND))
+            await callback_query.message.answer(_("admin_delete_no_users_found"))
         return
 
     builder = InlineKeyboardBuilder()
@@ -150,7 +107,7 @@ async def delete_user_start_handler(callback_query: types.CallbackQuery, db_sess
 
     builder.adjust(1) # One button per row
 
-    reply_text = _(KEY_ADMIN_DELETE_SELECT_USER)
+    reply_text = _("admin_delete_select_user")
     try:
         await callback_query.message.edit_text(reply_text, reply_markup=builder.as_markup())
     except Exception as e: # Handle potential errors editing the message
@@ -209,9 +166,9 @@ async def confirm_delete_user_handler(callback_query: types.CallbackQuery, db_se
             reason="Deleted via bot admin panel"
         )
         logger.info(f"User {telegram_id_to_delete} (TT: {tt_username_for_ban}) also added to ban list by admin {callback_query.from_user.id}.")
-        reply_text = _(KEY_ADMIN_DELETE_CONFIRMED_SUCCESS).format(telegram_id=telegram_id_to_delete)
+        reply_text = _("admin_delete_confirmed_success").format(telegram_id=telegram_id_to_delete)
     else:
-        reply_text = _(KEY_ADMIN_DELETE_CONFIRMED_FAIL).format(telegram_id=telegram_id_to_delete)
+        reply_text = _("admin_delete_confirmed_fail").format(telegram_id=telegram_id_to_delete)
         logger.warning(f"Admin {callback_query.from_user.id} failed to delete TelegramRegistration for ID: {telegram_id_to_delete} (possibly already deleted or DB error). Ban not applied.")
 
     await callback_query.answer(reply_text, show_alert=True)
@@ -231,9 +188,9 @@ async def _build_ban_list_message_and_keyboard(db_session: AsyncSession, _transl
     banned_users = await get_banned_users(db_session)
     builder = InlineKeyboardBuilder()
 
-    message_lines = [_translator(KEY_ADMIN_BANLIST_TITLE)]
+    message_lines = [_translator("admin_banlist_title")]
     if not banned_users:
-        message_lines.append(_translator(KEY_ADMIN_BANLIST_EMPTY))
+        message_lines.append(_translator("admin_banlist_empty"))
     else:
         for buser in banned_users:
             reason_text = buser.reason if buser.reason else "N/A"
@@ -242,12 +199,12 @@ async def _build_ban_list_message_and_keyboard(db_session: AsyncSession, _transl
             tg_id_str = str(buser.telegram_id)
             message_lines.append(f"TG ID: {tg_id_str} - TT User: {tt_user_text} (Reason: {reason_text})")
             builder.button(
-                text=f"{_translator(KEY_BUTTON_UNBAN)} ({tg_id_str})",
+                text=f"{_translator('admin_button_unban')} ({tg_id_str})",
                 callback_data=AdminBanListActionCallback(action="unban", target_telegram_id=buser.telegram_id).pack()
             )
 
     builder.button(
-        text=_translator(KEY_BUTTON_ADD_TO_BANLIST_MANUAL),
+        text=_translator("admin_button_add_to_banlist_manual"),
         callback_data=AdminBanListActionCallback(action="add_prompt", target_telegram_id=None).pack()
     )
     builder.adjust(1) # One button per row for unban, then add_manual button
@@ -283,10 +240,10 @@ async def unban_user_handler(callback_query: types.CallbackQuery, callback_data:
     success = await remove_banned_user(db_session, target_id)
     alert_text = ""
     if success:
-        alert_text = _(KEY_ADMIN_UNBAN_SUCCESS).format(target_telegram_id=target_id)
+        alert_text = _("admin_unban_success").format(target_telegram_id=target_id)
         logger.info(f"Admin {callback_query.from_user.id} unbanned user {target_id}.")
     else:
-        alert_text = _(KEY_ADMIN_UNBAN_FAIL).format(target_telegram_id=target_id)
+        alert_text = _("admin_unban_fail").format(target_telegram_id=target_id)
         logger.warning(f"Admin {callback_query.from_user.id} failed to unban user {target_id}.")
     await callback_query.answer(alert_text, show_alert=True)
 
@@ -305,10 +262,10 @@ async def manual_ban_prompt_handler(callback_query: types.CallbackQuery, state: 
     admin_lang = get_admin_lang_code()
     _ = get_translator(admin_lang)
     try:
-        await callback_query.message.edit_text(_(KEY_ADMIN_MANUAL_BAN_PROMPT))
+        await callback_query.message.edit_text(_("admin_manual_ban_prompt"))
     except Exception as e:
         logger.debug(f"Could not edit message for manual ban prompt (maybe no change): {e}")
-        await callback_query.message.answer(_(KEY_ADMIN_MANUAL_BAN_PROMPT)) # Send as new if edit fails
+        await callback_query.message.answer(_("admin_manual_ban_prompt")) # Send as new if edit fails
     await state.set_state(AdminActions.awaiting_manual_ban_id_reason)
 
 @router.message(AdminActions.awaiting_manual_ban_id_reason, F.text)
@@ -319,7 +276,7 @@ async def process_manual_ban_handler(message: types.Message, state: FSMContext, 
 
     parts = message.text.splitlines()
     if not parts: # Should not happen with F.text but good practice
-        await message.reply(_(KEY_ADMIN_MANUAL_BAN_INVALID_ID)) # Or a more generic error
+        await message.reply(_("admin_manual_ban_invalid_id")) # Or a more generic error
         return
 
     telegram_id_str = parts[0].strip()
@@ -345,15 +302,15 @@ async def process_manual_ban_handler(message: types.Message, state: FSMContext, 
         )
         # add_banned_user now typically returns the BannedUser object.
         # Success is implied if no exception was raised and banned_user is not None.
-        await message.reply(_(KEY_ADMIN_MANUAL_BAN_SUCCESS).format(telegram_id=target_telegram_id))
+        await message.reply(_("admin_manual_ban_success").format(telegram_id=target_telegram_id))
         logger.info(f"Admin {message.from_user.id} manually banned user {target_telegram_id} with reason: '{reason}'. TT username: {tt_username}")
 
     except ValueError:
         logger.warning(f"Admin {message.from_user.id} provided invalid Telegram ID for manual ban: {telegram_id_str}")
-        await message.reply(_(KEY_ADMIN_MANUAL_BAN_INVALID_ID))
+        await message.reply(_("admin_manual_ban_invalid_id"))
     except Exception as e:
         logger.error(f"Failed to manually ban user {telegram_id_str} by admin {message.from_user.id}: {e}", exc_info=True)
-        await message.reply(_(KEY_ADMIN_MANUAL_BAN_FAIL).format(telegram_id=telegram_id_str))
+        await message.reply(_("admin_manual_ban_fail").format(telegram_id=telegram_id_str))
 
 # --- TeamTalk Account Listing Handler ---
 
@@ -370,10 +327,10 @@ async def list_all_tt_accounts_handler(callback_query: types.CallbackQuery): # R
     if not tt_instance or not tt_instance.connected or not hasattr(tt_instance, 'server'): # Changed is_connected() to connected
         logger.warning("list_all_tt_accounts_handler: TeamTalk instance not available or not connected.")
         try:
-            await callback_query.message.edit_text(_(KEY_ADMIN_TT_LIST_CONNECTION_ERROR), reply_markup=None)
+            await callback_query.message.edit_text(_("admin_tt_list_connection_error"), reply_markup=None)
         except Exception as e_edit:
             logger.debug(f"Failed to edit message for TT connection error: {e_edit}")
-            await callback_query.message.answer(_(KEY_ADMIN_TT_LIST_CONNECTION_ERROR), reply_markup=None)
+            await callback_query.message.answer(_("admin_tt_list_connection_error"), reply_markup=None)
         return
 
     user_accounts_display = []
@@ -399,22 +356,22 @@ async def list_all_tt_accounts_handler(callback_query: types.CallbackQuery): # R
     except Exception as e:
         logger.error(f"Error fetching TeamTalk accounts using list_user_accounts: {e}", exc_info=True)
         try:
-            await callback_query.message.edit_text(_(KEY_ADMIN_TT_LIST_CONNECTION_ERROR), reply_markup=None)
+            await callback_query.message.edit_text(_("admin_tt_list_connection_error"), reply_markup=None)
         except Exception as e_edit:
             logger.debug(f"Failed to edit message for TT account fetching error: {e_edit}")
-            await callback_query.message.answer(_(KEY_ADMIN_TT_LIST_CONNECTION_ERROR), reply_markup=None)
+            await callback_query.message.answer(_("admin_tt_list_connection_error"), reply_markup=None)
         return
 
     builder = InlineKeyboardBuilder()
     if not user_accounts_display: # Check the processed list
-        message_text = _(KEY_ADMIN_TT_LIST_NO_ACCOUNTS)
+        message_text = _("admin_tt_list_no_accounts")
     else:
-        lines = [_(KEY_ADMIN_TT_LIST_TITLE)]
+        lines = [_("admin_tt_list_title")]
         for acc_data in user_accounts_display: # Iterate over the processed list
             tt_username = acc_data["username"]
             lines.append(f"- {tt_username}")
             builder.button(
-                text=f"{_(KEY_BUTTON_DELETE_FROM_TT)} ({tt_username})",
+                text=f"{_('admin_button_delete_from_tt')} ({tt_username})",
                 callback_data=AdminTTAccountsCallback(action="delete_prompt", tt_username=tt_username).pack()
             )
         message_text = "\n".join(lines)
@@ -447,15 +404,15 @@ async def prompt_delete_tt_account_handler(callback_query: types.CallbackQuery, 
             await callback_query.message.answer(error_text, reply_markup=None)
         return
 
-    prompt_text = _(KEY_ADMIN_TT_DELETE_PROMPT_TEXT).format(tt_username=tt_username)
+    prompt_text = _("admin_tt_delete_prompt_text").format(tt_username=tt_username)
 
     builder = InlineKeyboardBuilder()
     builder.button(
-        text=_(KEY_BUTTON_CONFIRM_DELETE_FROM_TT),
+        text=_("admin_button_confirm_delete_from_tt"),
         callback_data=AdminTTAccountsCallback(action="delete_confirm", tt_username=tt_username).pack()
     )
     builder.button(
-        text=_(KEY_BUTTON_CANCEL_TT_DELETE),
+        text=_("admin_button_cancel_tt_delete"),
         callback_data=AdminTTAccountsCallback(action="list_all", tt_username=None).pack() # Go back to the list
     )
     builder.adjust(2) # Confirm and Cancel side-by-side or stacked (adjust(1) for stacked)
@@ -490,7 +447,7 @@ async def confirm_delete_tt_account_handler(callback_query: types.CallbackQuery,
 
     if not tt_instance or not tt_instance.connected or not hasattr(tt_instance, 'server'): # Changed is_connected() to connected
         logger.warning(f"confirm_delete_tt_account_handler: TeamTalk instance not available or not connected for deleting {tt_username}.")
-        connection_error_text = _(KEY_ADMIN_TT_DELETE_CONNECTION_ERROR)
+        connection_error_text = _("admin_tt_delete_connection_error")
         await callback_query.answer(connection_error_text, show_alert=True)
         try:
             await callback_query.message.edit_text(connection_error_text, reply_markup=None)
@@ -508,7 +465,7 @@ async def confirm_delete_tt_account_handler(callback_query: types.CallbackQuery,
         deletion_command_sent = tt_instance.delete_user_account(username=tt_username)
 
         if deletion_command_sent: # Returns True on success as per pytalk docs
-            final_message = _(KEY_ADMIN_TT_DELETE_SUCCESS).format(tt_username=tt_username)
+            final_message = _("admin_tt_delete_success").format(tt_username=tt_username)
             # Changed show_alert to True as this is the final user feedback on this action.
             await callback_query.answer(final_message, show_alert=True)
             logger.info(f"TeamTalk user '{tt_username}' deletion command successfully processed by bot for admin {callback_query.from_user.id}. Waiting for server event for actual ban.")
@@ -516,20 +473,20 @@ async def confirm_delete_tt_account_handler(callback_query: types.CallbackQuery,
             # This case implies the method returned False without raising an exception,
             # which might be unexpected if the library usually raises for errors.
             logger.warning(f"TeamTalk user '{tt_username}' deletion command returned False for admin {callback_query.from_user.id} without raising an exception.")
-            final_message = _(KEY_ADMIN_TT_DELETE_FAIL).format(tt_username=tt_username, error="TeamTalk command indicated failure but no specific error.")
+            final_message = _("admin_tt_delete_fail").format(tt_username=tt_username, error="TeamTalk command indicated failure but no specific error.")
             await callback_query.answer(final_message, show_alert=True)
 
     except PermissionError as e: # Specific exception from pytalk for permission issues
         logger.error(f"Permission error deleting TeamTalk user '{tt_username}' by admin {callback_query.from_user.id}: {e}", exc_info=True)
-        final_message = _(KEY_ADMIN_TT_DELETE_FAIL).format(tt_username=tt_username, error=f"Permission denied: {e}")
+        final_message = _("admin_tt_delete_fail").format(tt_username=tt_username, error=f"Permission denied: {e}")
         await callback_query.answer(final_message, show_alert=True)
     except ValueError as e: # Specific exception from pytalk (e.g., user not found, invalid username)
         logger.error(f"Value error (e.g., user not found) deleting TeamTalk user '{tt_username}' by admin {callback_query.from_user.id}: {e}", exc_info=True)
-        final_message = _(KEY_ADMIN_TT_DELETE_FAIL).format(tt_username=tt_username, error=f"Invalid request/user not found: {e}")
+        final_message = _("admin_tt_delete_fail").format(tt_username=tt_username, error=f"Invalid request/user not found: {e}")
         await callback_query.answer(final_message, show_alert=True)
     except Exception as e: # Catch-all for other unexpected errors from the TeamTalk library or other issues
         logger.error(f"Generic error deleting TeamTalk user '{tt_username}' by admin {callback_query.from_user.id}: {e}", exc_info=True)
-        final_message = _(KEY_ADMIN_TT_DELETE_FAIL).format(tt_username=tt_username, error=f"Unexpected error: {e}")
+        final_message = _("admin_tt_delete_fail").format(tt_username=tt_username, error=f"Unexpected error: {e}")
         await callback_query.answer(final_message, show_alert=True)
 
     try:

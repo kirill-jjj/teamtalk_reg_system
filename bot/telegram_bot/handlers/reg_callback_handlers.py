@@ -128,7 +128,7 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
         return
 
     if decision_action == "verify":
-        await callback_query.answer(_("User {} registration approved.").format(username_val), show_alert=True)
+        await callback_query.answer(_("User {username} registration approved.").format(username=username_val), show_alert=True)
         source_info_from_request["approved_by_admin_id"] = callback_query.from_user.id
 
         # Perform the actual registration
@@ -176,13 +176,13 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
             logger.error(f"Registration for TT user {username_val} (TG ID: {registrant_user_tg_id}) was approved by admin {callback_query.from_user.id}, but _process_actual_registration failed.")
             # Optionally, notify admin who approved about this internal failure.
             try:
-                await bot.send_message(callback_query.from_user.id, _("CRITICAL: Registration for {} was approved, but the final registration step failed. Please check logs.").format(username_val))
+                await bot.send_message(callback_query.from_user.id, _("CRITICAL: Registration for {username} was approved, but the final registration step failed. Please check logs.").format(username=username_val))
             except Exception as e_admin_crit:
                 logger.error(f"Failed to send critical failure notice to approving admin {callback_query.from_user.id}: {e_admin_crit}")
 
 
     elif decision_action == "reject":
-        await callback_query.answer(_("User {} registration declined.").format(username_val), show_alert=True)
+        await callback_query.answer(_("User {username} registration declined.").format(username=username_val), show_alert=True)
         try:
             await bot.send_message(registrant_user_tg_id, _user_specific_translator("Your registration has been declined by the administrator."))
         except Exception as e: logger.warning(f"Could not send decline notification to user {registrant_user_tg_id}: {e}")

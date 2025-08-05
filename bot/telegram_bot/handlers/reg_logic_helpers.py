@@ -122,7 +122,7 @@ async def _process_actual_registration(
     broadcast_text_for_tt = None
     if config.REGISTRATION_BROADCAST_ENABLED:
         admin_lang_translator = get_translator(get_admin_lang_code())
-        broadcast_text_for_tt = admin_lang_translator("User {} was registered.").format(username_val)
+        broadcast_text_for_tt = admin_lang_translator("User {username} was registered.").format(username=username_val)
 
     success, reg_msg_key_or_detail, artefact_data_val = await tt_users_service.perform_teamtalk_registration(
         username_str=username_val,
@@ -142,7 +142,7 @@ async def _process_actual_registration(
     )
 
     if success:
-        await bot.send_message(registrant_user_id, _("User {} successfully registered.").format(username_val))
+        await bot.send_message(registrant_user_id, _("User {username} successfully registered.").format(username=username_val))
 
         initiator_telegram_id = source_info.get("registrar_telegram_id")
         if not is_initiator_admin or (is_initiator_admin and initiator_telegram_id == registrant_user_id):
@@ -165,14 +165,14 @@ async def _process_actual_registration(
 
         if config.ADMIN_IDS:
             admin_notify_lang = get_translator(get_admin_lang_code())
-            admin_notification_message = f"📢 {admin_notify_lang('User {} was registered.').format(username_val)}\n"
+            admin_notification_message = f"📢 {admin_notify_lang('User {username} was registered.').format(username=username_val)}\n"
             lang_code_for_emoji = source_info.get('selected_language', 'en')
             lang_emoji = "🇬🇧" if lang_code_for_emoji == 'en' else ("🇷🇺" if lang_code_for_emoji == 'ru' else "❓")
-            admin_notification_message += admin_notify_lang("👤 Client language: {}").format(lang_emoji) + "\n"
+            admin_notification_message += admin_notify_lang("👤 Client language: {lang_emoji}").format(lang_emoji=lang_emoji) + "\n"
             tg_full_name = source_info.get('telegram_full_name', 'N/A')
-            admin_notification_message += admin_notify_lang("📱 Via Telegram: {} (ID: {})").format(tg_full_name, registrant_user_id) + "\n"
+            admin_notification_message += admin_notify_lang("📱 Via Telegram: {telegram_full_name} (ID: {registrant_telegram_id})").format(telegram_full_name=tg_full_name, registrant_telegram_id=registrant_user_id) + "\n"
             if is_initiator_admin and initiator_telegram_id != registrant_user_id:
-                 admin_notification_message += admin_notify_lang("🔑 Registered by Admin ID: {}").format(initiator_telegram_id) + "\n"
+                 admin_notification_message += admin_notify_lang("🔑 Registered by Admin ID: {initiator_telegram_id}").format(initiator_telegram_id=initiator_telegram_id) + "\n"
 
             for admin_id_val_notify in config.ADMIN_IDS:
                 try: await bot.send_message(admin_id_val_notify, admin_notification_message.strip())

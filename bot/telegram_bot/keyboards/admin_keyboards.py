@@ -6,9 +6,6 @@ from ..callbacks.admin_callbacks import AdminBanListActionCallback, AdminTTAccou
 
 # Define the callback data for the button
 CALLBACK_DATA_DELETE_USER = "admin_delete_user_start" # String callback for deleting TG user by TG ID
-KEY_BUTTON_DELETE_USER = "admin_keyboard_delete_user"
-KEY_BUTTON_MANAGE_BAN_LIST = "admin_button_manage_ban_list"
-KEY_BUTTON_LIST_TT_ACCOUNTS = "admin_button_list_tt_accounts" # New localization key
 
 def get_admin_panel_keyboard() -> InlineKeyboardMarkup:
     """
@@ -19,19 +16,19 @@ def get_admin_panel_keyboard() -> InlineKeyboardMarkup:
 
     # Button for deleting users (existing)
     builder.button(
-        text=_(KEY_BUTTON_DELETE_USER),
+        text=_("admin_keyboard_delete_user"),
         callback_data=CALLBACK_DATA_DELETE_USER
     )
 
     # New button for managing ban list
     builder.button(
-        text=_(KEY_BUTTON_MANAGE_BAN_LIST),
+        text=_("admin_button_manage_ban_list"),
         callback_data=AdminBanListActionCallback(action="view", target_telegram_id=None).pack()
     )
 
     # New button for listing all TeamTalk accounts
     builder.button(
-        text=_(KEY_BUTTON_LIST_TT_ACCOUNTS),
+        text=_("admin_button_list_tt_accounts"),
         callback_data=AdminTTAccountsCallback(action="list_all", tt_username=None).pack()
     )
 
