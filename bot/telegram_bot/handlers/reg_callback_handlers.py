@@ -115,13 +115,13 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
     source_info_from_request = pending_reg_data_model.source_info # This is already a dict
 
     user_specific_lang_code = source_info_from_request.get("selected_language", config.CFG_ADMIN_LANG)
-    _user_specific_translator = get_translator(user_specific_lang_code)
+    _ = get_translator(user_specific_lang_code)
 
     # Check if already registered *before* processing, especially for "verify"
     if decision_action == "verify" and await is_telegram_id_registered(db_session, registrant_user_tg_id):
         await callback_query.answer(_("This Telegram account has already a TeamTalk account linked."), show_alert=True)
         try:
-            await bot.send_message(registrant_user_tg_id, _user_specific_translator("Your registration request was processed, but this Telegram account already has a TeamTalk account linked. Only one registration is allowed."))
+            await bot.send_message(registrant_user_tg_id, _("Your registration request was processed, but this Telegram account already has a TeamTalk account linked. Only one registration is allowed."))
         except Exception as e: logger.warning(f"Could not notify user {registrant_user_tg_id} about being already registered: {e}")
         try: await callback_query.message.delete()
         except: pass
@@ -141,7 +141,7 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
         # Notify the registrant
         if reg_success:
             try:
-                await bot.send_message(registrant_user_tg_id, _user_specific_translator("Your registration has been approved by the administrator. You can now use TeamTalk."))
+                await bot.send_message(registrant_user_tg_id, _("Your registration has been approved by the administrator. You can now use TeamTalk."))
             except Exception as e:
                 logger.warning(f"Could not send approval notification to user {registrant_user_tg_id}: {e}")
 
@@ -184,7 +184,7 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
     elif decision_action == "reject":
         await callback_query.answer(_("User {username} registration declined.").format(username=username_val), show_alert=True)
         try:
-            await bot.send_message(registrant_user_tg_id, _user_specific_translator("Your registration has been declined by the administrator."))
+            await bot.send_message(registrant_user_tg_id, _("Your registration has been declined by the administrator."))
         except Exception as e: logger.warning(f"Could not send decline notification to user {registrant_user_tg_id}: {e}")
 
         # Notify other admins about the rejection

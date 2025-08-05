@@ -164,15 +164,15 @@ async def _process_actual_registration(
                        await bot.send_message(admin_tg_id_notify, f"DB SYNC ERROR (Exception): User {username_val} (TG ID: {registrant_user_id}) created in TeamTalk but FAILED local TelegramRegistration DB save. Exception: {e_db_add}")
 
         if config.ADMIN_IDS:
-            admin_notify_lang = get_translator(get_admin_lang_code())
-            admin_notification_message = f"📢 {admin_notify_lang('User {username} was registered.').format(username=username_val)}\n"
+            _ = get_translator(get_admin_lang_code())
+            admin_notification_message = f"📢 {_('User {username} was registered.').format(username=username_val)}\n"
             lang_code_for_emoji = source_info.get('selected_language', 'en')
             lang_emoji = "🇬🇧" if lang_code_for_emoji == 'en' else ("🇷🇺" if lang_code_for_emoji == 'ru' else "❓")
-            admin_notification_message += admin_notify_lang("👤 Client language: {lang_emoji}").format(lang_emoji=lang_emoji) + "\n"
+            admin_notification_message += _("👤 Client language: {lang_emoji}").format(lang_emoji=lang_emoji) + "\n"
             tg_full_name = source_info.get('telegram_full_name', 'N/A')
-            admin_notification_message += admin_notify_lang("📱 Via Telegram: {telegram_full_name} (ID: {registrant_telegram_id})").format(telegram_full_name=tg_full_name, registrant_telegram_id=registrant_user_id) + "\n"
+            admin_notification_message += _("📱 Via Telegram: {telegram_full_name} (ID: {registrant_telegram_id})").format(telegram_full_name=tg_full_name, registrant_telegram_id=registrant_user_id) + "\n"
             if is_initiator_admin and initiator_telegram_id != registrant_user_id:
-                 admin_notification_message += admin_notify_lang("🔑 Registered by Admin ID: {initiator_telegram_id}").format(initiator_telegram_id=initiator_telegram_id) + "\n"
+                 admin_notification_message += _("🔑 Registered by Admin ID: {initiator_telegram_id}").format(initiator_telegram_id=initiator_telegram_id) + "\n"
 
             for admin_id_val_notify in config.ADMIN_IDS:
                 try: await bot.send_message(admin_id_val_notify, admin_notification_message.strip())
@@ -199,7 +199,7 @@ async def _handle_registration_continuation(
     initiator_user_id = message_or_callback_query.from_user.id
 
     user_lang_code = current_fsm_data.get("selected_language", config.CFG_ADMIN_LANG)
-    _user_translator = get_translator(user_lang_code)
+    _ = get_translator(user_lang_code)
 
     username_value = current_fsm_data["name"]
     password_value = current_fsm_data["password"]
@@ -239,28 +239,28 @@ async def _handle_registration_continuation(
             logger.info(f"Reg request {current_request_key} for TG user {registrant_user_id} ({username_value}) stored in DB for admin verification.")
         except Exception as e_db_add_pending:
             logger.error(f"Failed to add pending registration to DB for user {registrant_user_id}, username {username_value}: {e_db_add_pending}", exc_info=True)
-            await bot.send_message(registrant_user_id, _user_translator("An error occurred while submitting your registration for approval. Please try again later or contact an administrator."))
+            await bot.send_message(registrant_user_id, _("An error occurred while submitting your registration for approval. Please try again later or contact an administrator."))
             if state: await state.clear() # Clear state to prevent resubmission issues
             return # Stop further processing if DB write fails
 
-        admin_notify_lang = get_translator(get_admin_lang_code())
-        admin_msg_text = admin_notify_lang('Registration request:') + "\n" + \
-                         admin_notify_lang('Username:') + f" {username_value}\n"
-        if nickname_value != username_value: admin_msg_text += admin_notify_lang('Nickname:') + f" {nickname_value}\n"
-        admin_msg_text += admin_notify_lang('Telegram User:') + f" {user_full_name} (ID: {registrant_user_id})\n" + \
-                          admin_notify_lang('Approve registration?')
+        _ = get_translator(get_admin_lang_code())
+        admin_msg_text = _('Registration request:') + "\n" + \
+                         _('Username:') + f" {username_value}\n"
+        if nickname_value != username_value: admin_msg_text += _('Nickname:') + f" {nickname_value}\n"
+        admin_msg_text += _('Telegram User:') + f" {user_full_name} (ID: {registrant_user_id})\n" + \
+                          _('Approve registration?')
 
         builder = InlineKeyboardBuilder()
         # Use the new string request_key in AdminVerificationCallback
-        builder.button(text=admin_notify_lang("Yes"), callback_data=AdminVerificationCallback(action="verify", request_key=current_request_key))
-        builder.button(text=admin_notify_lang("No"), callback_data=AdminVerificationCallback(action="reject", request_key=current_request_key))
+        builder.button(text=_("Yes"), callback_data=AdminVerificationCallback(action="verify", request_key=current_request_key))
+        builder.button(text=_("No"), callback_data=AdminVerificationCallback(action="reject", request_key=current_request_key))
         builder.adjust(2)
 
         for admin_id in config.ADMIN_IDS:
             try: await bot.send_message(admin_id, admin_msg_text, reply_markup=builder.as_markup())
             except Exception as e: logger.error(f"Error sending verification to admin {admin_id}: {e}", exc_info=True)
 
-        reply_text = _user_translator("Registration request sent to administrators. Please wait for approval.")
+        reply_text = _("Registration request sent to administrators. Please wait for approval.")
         if isinstance(message_or_callback_query, types.Message): await message_or_callback_query.answer(reply_text)
         elif isinstance(message_or_callback_query, types.CallbackQuery): await message_or_callback_query.message.answer(reply_text)
 
