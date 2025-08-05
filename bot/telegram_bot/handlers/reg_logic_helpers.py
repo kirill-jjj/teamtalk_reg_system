@@ -205,7 +205,9 @@ async def _handle_registration_continuation(
     password_value = current_fsm_data["password"]
     nickname_value = current_fsm_data.get("nickname", username_value)
 
-    user_full_name = message_or_callback_query.from_user.full_name
+    user_object = message_or_callback_query.from_user
+    user_full_name = user_object.full_name
+    telegram_username = user_object.username
 
     is_initiator_of_start_admin = current_fsm_data.get("is_admin_registrar", False)
     tt_account_type_chosen_by_admin = current_fsm_data.get("tt_account_type")
@@ -214,6 +216,7 @@ async def _handle_registration_continuation(
         "type": "telegram",
         "telegram_id": registrant_user_id,
         "telegram_full_name": user_full_name,
+        "telegram_username": telegram_username,
         "selected_language": user_lang_code,
         "nickname": nickname_value,
         "is_admin_registrar": is_initiator_of_start_admin,
@@ -247,7 +250,13 @@ async def _handle_registration_continuation(
         admin_msg_text = _('Registration request:') + "\n" + \
                          _('Username:') + f" {username_value}\n"
         if nickname_value != username_value: admin_msg_text += _('Nickname:') + f" {nickname_value}\n"
-        admin_msg_text += _('Telegram User:') + f" {user_full_name} (ID: {registrant_user_id})\n" + \
+
+        telegram_user_info_line = f" {user_full_name}"
+        if telegram_username: # Проверяем, есть ли у пользователя юзернейм
+            telegram_user_info_line += f" (@{telegram_username})"
+        telegram_user_info_line += f" (ID: {registrant_user_id})"
+
+        admin_msg_text += _('Telegram User:') + telegram_user_info_line + "\n" + \
                           _('Approve registration?')
 
         builder = InlineKeyboardBuilder()

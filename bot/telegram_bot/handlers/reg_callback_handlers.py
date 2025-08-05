@@ -113,6 +113,7 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
     password_val_cb = pending_reg_data_model.password_cleartext
     nickname_val = pending_reg_data_model.nickname
     source_info_from_request = pending_reg_data_model.source_info # This is already a dict
+    registrant_tg_username = source_info_from_request.get("telegram_username")
 
     user_specific_lang_code = source_info_from_request.get("selected_language", config.CFG_ADMIN_LANG)
     _ = get_translator(user_specific_lang_code)
@@ -148,13 +149,15 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
             # Notify other admins
             acting_admin_id = callback_query.from_user.id
             acting_admin_name = callback_query.from_user.full_name
-            approved_tt_username = username_val
-            approved_registrant_tg_id = registrant_user_tg_id
+
+            registrant_telegram_info = f"Registrant Telegram ID: {pending_reg_data_model.registrant_telegram_id}"
+            if registrant_tg_username:
+                registrant_telegram_info += f"\\nRegistrant Telegram Username: @{registrant_tg_username}"
 
             notification_message = (
                 f"ℹ️ Registration APPROVED by admin {acting_admin_name} (ID: {acting_admin_id}).\n\n"
-                f"TeamTalk User: {approved_tt_username}\n"
-                f"Registrant Telegram ID: {approved_registrant_tg_id}"
+                f"TeamTalk User: {username_val}\n"
+                f"{registrant_telegram_info}"
             )
 
             if config.ADMIN_IDS:
@@ -190,13 +193,15 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
         # Notify other admins about the rejection
         acting_admin_id = callback_query.from_user.id
         acting_admin_name = callback_query.from_user.full_name
-        rejected_tt_username = username_val
-        rejected_registrant_tg_id = registrant_user_tg_id
+
+        registrant_telegram_info = f"Registrant Telegram ID: {pending_reg_data_model.registrant_telegram_id}"
+        if registrant_tg_username:
+            registrant_telegram_info += f"\\nRegistrant Telegram Username: @{registrant_tg_username}"
 
         notification_message = (
             f"ℹ️ Registration REJECTED by admin {acting_admin_name} (ID: {acting_admin_id}).\n\n"
-            f"TeamTalk User: {rejected_tt_username}\n"
-            f"Registrant Telegram ID: {rejected_registrant_tg_id}"
+            f"TeamTalk User: {username_val}\n"
+            f"{registrant_telegram_info}"
         )
 
         if config.ADMIN_IDS:
