@@ -245,7 +245,7 @@ async def on_user_account_remove(account: UserAccount):
     asyncio.create_task(_handle_banning_on_tt_account_removal(account_username_str, server_host_info))
 
     if account_username_str in recently_deleted_users:
-        _, old_task = recently_deleted_users[account_username_str]
+        __, old_task = recently_deleted_users[account_username_str]
         old_task.cancel()
         logger.warning(f"Found and cancelled a pre-existing removal task for '{account_username_str}'.")
 

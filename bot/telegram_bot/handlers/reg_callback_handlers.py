@@ -132,7 +132,7 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
         source_info_from_request["approved_by_admin_id"] = callback_query.from_user.id
 
         # Perform the actual registration
-        reg_success, _, _ = await _process_actual_registration( # We only need success status here
+        reg_success, __, __ = await _process_actual_registration( # We only need success status here
             db_session=db_session, registrant_user_id=registrant_user_tg_id,
             username_val=username_val, password_val_reg=password_val_cb, nickname_val=nickname_val,
             source_info=source_info_from_request, state=None, bot=bot # Pass bot here

@@ -208,7 +208,7 @@ def create_and_save_base_client_zip(app: FastAPI, template_dir_str: str) -> Path
 
     try:
         with ZipFile(target_zip_path, 'w', ZIP_DEFLATED) as zipf:
-            for root, _, files in os.walk(template_dir_base):
+            for root, __, files in os.walk(template_dir_base):
                 for file_item in files:
                     file_path_item = Path(root) / file_item
                     archive_path = file_path_item.relative_to(template_dir_base)
