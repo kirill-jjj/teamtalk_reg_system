@@ -2,7 +2,9 @@ import logging
 import os
 from typing import Any, Callable, List, Optional
 
-from dotenv import find_dotenv, load_dotenv
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
