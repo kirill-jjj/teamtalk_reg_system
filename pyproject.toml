@@ -30,6 +30,12 @@ Homepage = "https://github.com/kirill-jjj/teamtalk_reg_system"
 Repository = "https://github.com/kirill-jjj/teamtalk_reg_system"
 "Bug Tracker" = "https://github.com/kirill-jjj/teamtalk_reg_system/issues"
 
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "mypy",
+]
+
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
@@ -38,3 +44,86 @@ backend-path = "."
 where = ["."]
 include = ["bot*"]
 exclude = ["locales*"]
+
+[tool.ruff]
+src = ["bot", "run.py", "manage-locales.py"]
+target-version = "py311"
+exclude = [
+    ".git",
+    ".idea",
+    ".venv",
+    "pycache",
+    "locales",
+    "babel.cfg",
+    "test.db",
+    "uv.lock",
+    "*.md",
+]
+respect-gitignore = true
+line-length = 88
+indent-width = 4
+
+[tool.ruff.lint]
+select = [
+    "A",
+    "ANN",
+    "ARG",
+    "ASYNC",
+    "B",
+    "C4",
+    "D",
+    "DTZ",
+    "E", "W",
+    "ERA",
+    "F",
+    "FBT",
+    "G",
+    "I",
+    "ISC",
+    "N",
+    "PIE",
+    "PL",
+    "PT",
+    "PTH",
+    "RET",
+    "RUF",
+    "S",
+    "SIM",
+    "T20",
+    "TRY",
+    "UP",
+]
+ignore = [
+    "D203",
+    "D213",
+    "PLR0913",
+    "RUF001",
+    "ANN101",
+]
+fixable = ["ALL"]
+unfixable = []
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.per-file-ignores]
+"init.py" = ["D104"]
+"run.py" = ["T201"]
+"manage-locales.py" = ["T201"]
+"bot/core/config.py" = ["E501"]
+"bot/telegram_bot/handlers/*" = ["ARG001"]
+"bot/telegram_bot/handlers/reg_logic_helpers.py" = ["ARG001"]
+"bot/telegram_bot/middlewares/*" = ["ARG001"]
+"bot/telegram_bot/callbacks/*" = ["D101"]
+"bot/telegram_bot/states.py" = ["D101"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["bot"]
+force-sort-within-sections = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
