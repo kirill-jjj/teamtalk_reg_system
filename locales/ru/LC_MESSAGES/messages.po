@@ -1,9 +1,3 @@
-# Russian translations for teamtalk_reg_system.
-# Copyright (C) 2025 kirill-jjj
-# This file is distributed under the same license as the teamtalk_reg_system
-# project.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
-#
 msgid ""
 msgstr ""
 "Project-Id-Version: teamtalk_reg_system VERSION\n"
@@ -20,63 +14,47 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.17.0\n"
 
-#: bot/core/localization.py:42
 msgid "native_language_name"
 msgstr "Русский"
 
-#: bot/fastapi_app/templates/register.html:6
-#: bot/fastapi_app/templates/register.html:29
 msgid "TeamTalk Registration"
 msgstr "Регистрация в TeamTalk"
 
-#: bot/fastapi_app/templates/register.html:34
 msgid "Select Language:"
 msgstr "Выберите язык:"
 
-#: bot/fastapi_app/templates/register.html:37
 msgid "Language:"
 msgstr "Язык:"
 
-#: bot/fastapi_app/templates/register.html:46
 msgid "Set Language"
 msgstr "Установить язык"
 
-#: bot/fastapi_app/templates/register.html:53
 msgid "If you want to register on the server"
 msgstr "Если вы хотите зарегистрироваться на сервере"
 
-#: bot/fastapi_app/templates/register.html:53
 msgid "please fill out the form below."
 msgstr "пожалуйста, заполните форму ниже."
 
-#: bot/fastapi_app/templates/register.html:68
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:248
 msgid "Username:"
 msgstr "Имя пользователя:"
 
-#: bot/fastapi_app/templates/register.html:72
 msgid "Nickname (optional):"
 msgstr "Никнейм (необязательно):"
 
-#: bot/fastapi_app/templates/register.html:73
 msgid "Defaults to username if blank"
 msgstr ""
 "По умолчанию будет использовано имя пользователя, если оставить поле "
 "пустым"
 
-#: bot/fastapi_app/templates/register.html:76
 msgid "Password:"
 msgstr "Пароль:"
 
-#: bot/fastapi_app/templates/register.html:81
 msgid "Show Password"
 msgstr "Показать пароль"
 
-#: bot/fastapi_app/templates/register.html:83
 msgid "Register"
 msgstr "Зарегистрироваться"
 
-#: bot/fastapi_app/templates/register.html:96
 msgid ""
 "You have <span id='countdown-timer'>10:00</span> to download your .tt "
 "file, client or use the quick connect link."
@@ -84,159 +62,102 @@ msgstr ""
 "У вас есть <span id=\"countdown-timer\">10:00</span>, чтобы скачать ваш "
 ".tt файл, клиент или использовать ссылку для быстрого подключения."
 
-#: bot/fastapi_app/templates/register.html:98
 msgid "Quick Connect Link:"
 msgstr "Ссылка для быстрого подключения:"
 
-#: bot/fastapi_app/templates/register.html:101
 msgid "Download .tt file"
 msgstr "Скачать .tt файл"
 
-#: bot/fastapi_app/templates/register.html:104
 msgid "Download pre-configured TeamTalk Client (ZIP)"
 msgstr "Скачать преднастроенный клиент TeamTalk (ZIP)"
 
-#: bot/fastapi_app/templates/register.html:123
 msgid "expired"
 msgstr "истекло"
 
-#: bot/fastapi_app/templates/register.html:124
 msgid "second"
 msgstr "секунда"
 
-#: bot/fastapi_app/templates/register.html:125
 msgid "seconds_few"
 msgstr "секунды"
 
-#: bot/fastapi_app/templates/register.html:126
 msgid "seconds"
 msgstr "секунд"
 
-# | msgid "admin_panel_title"
-#: bot/telegram_bot/handlers/admin.py:60
-#, fuzzy
 msgid "Admin Panel"
 msgstr "Панель администратора"
 
-#: bot/telegram_bot/handlers/admin.py:95 bot/telegram_bot/handlers/admin.py:98
 msgid "No registered users found to delete."
-msgstr ""
+msgstr "Зарегистрированные пользователи для удаления не найдены."
 
-#: bot/telegram_bot/handlers/admin.py:110
 msgid "Select a user to delete:"
-msgstr ""
+msgstr "Выберите пользователя для удаления:"
 
-#: bot/telegram_bot/handlers/admin.py:169
-#, python-brace-format
 msgid "User with Telegram ID {telegram_id} has been deleted and banned."
-msgstr ""
+msgstr "Пользователь с Telegram ID {telegram_id} был удален и забанен."
 
-#: bot/telegram_bot/handlers/admin.py:171
-#, python-brace-format
 msgid "Failed to delete user with Telegram ID {telegram_id}."
-msgstr ""
+msgstr "Не удалось удалить пользователя с Telegram ID {telegram_id}."
 
-#: bot/telegram_bot/handlers/admin.py:243
-#, python-brace-format
 msgid "User {target_telegram_id} has been unbanned."
-msgstr ""
+msgstr "Пользователь {target_telegram_id} был разбанен."
 
-#: bot/telegram_bot/handlers/admin.py:246
-#, python-brace-format
 msgid "Failed to unban user {target_telegram_id}."
-msgstr ""
+msgstr "Не удалось разбанить пользователя {target_telegram_id}."
 
-#: bot/telegram_bot/handlers/admin.py:257
 msgid "Action processed. Could not refresh list immediately."
-msgstr ""
+msgstr "Действие обработано. Не удалось немедленно обновить список."
 
-#: bot/telegram_bot/handlers/admin.py:265
-#: bot/telegram_bot/handlers/admin.py:268
 msgid "Please enter the Telegram ID and reason for the ban on separate lines."
-msgstr ""
+msgstr "Пожалуйста, введите Telegram ID и причину бана на отдельных строках."
 
-#: bot/telegram_bot/handlers/admin.py:279
-#: bot/telegram_bot/handlers/admin.py:310
 msgid "Invalid Telegram ID provided."
-msgstr ""
+msgstr "Предоставлен неверный Telegram ID."
 
-#: bot/telegram_bot/handlers/admin.py:305
-#, python-brace-format
 msgid "User {telegram_id} has been manually banned."
-msgstr ""
+msgstr "Пользователь {telegram_id} был забанен вручную."
 
-#: bot/telegram_bot/handlers/admin.py:313
-#, python-brace-format
 msgid "Failed to manually ban user {telegram_id}."
-msgstr ""
+msgstr "Не удалось забанить пользователя {telegram_id} вручную."
 
-#: bot/telegram_bot/handlers/admin.py:330
-#: bot/telegram_bot/handlers/admin.py:333
-#: bot/telegram_bot/handlers/admin.py:359
-#: bot/telegram_bot/handlers/admin.py:362
 msgid "Could not connect to the TeamTalk server to get the list of accounts."
-msgstr ""
+msgstr "Не удалось подключиться к серверу TeamTalk для получения списка учетных записей."
 
-#: bot/telegram_bot/handlers/admin.py:367
 msgid "No TeamTalk accounts found on the server."
-msgstr ""
+msgstr "На сервере не найдено учетных записей TeamTalk."
 
-# | msgid "TeamTalk User"
-#: bot/telegram_bot/handlers/admin.py:369
-#, fuzzy
 msgid "TeamTalk Accounts:"
 msgstr "Пользователь TeamTalk"
 
-#: bot/telegram_bot/handlers/admin.py:374
 msgid "Delete from TeamTalk"
-msgstr ""
+msgstr "Удалить из TeamTalk"
 
-#: bot/telegram_bot/handlers/admin.py:407
-#, python-brace-format
 msgid "Are you sure you want to delete the TeamTalk user '{tt_username}'?"
-msgstr ""
+msgstr "Вы уверены, что хотите удалить пользователя TeamTalk '{tt_username}'?"
 
-#: bot/telegram_bot/handlers/admin.py:411
 msgid "Confirm Delete"
-msgstr ""
+msgstr "Подтвердить удаление"
 
-#: bot/telegram_bot/handlers/admin.py:415
 msgid "Cancel"
-msgstr ""
+msgstr "Отмена"
 
-#: bot/telegram_bot/handlers/admin.py:450
 msgid "Could not connect to the TeamTalk server to delete the account."
-msgstr ""
+msgstr "Не удалось подключиться к серверу TeamTalk для удаления учетной записи."
 
-# | msgid "User {} successfully registered."
-# | msgid "User {username} successfully registered."
-#: bot/telegram_bot/handlers/admin.py:468
-#, fuzzy, python-brace-format
 msgid "TeamTalk user '{tt_username}' was successfully deleted."
 msgstr "Пользователь {} успешно зарегистрирован."
 
-#: bot/telegram_bot/handlers/admin.py:476
-#: bot/telegram_bot/handlers/admin.py:481
-#: bot/telegram_bot/handlers/admin.py:485
-#: bot/telegram_bot/handlers/admin.py:489
-#, python-brace-format
 msgid "Failed to delete TeamTalk user '{tt_username}'. Reason: {error}"
-msgstr ""
+msgstr "Не удалось удалить пользователя TeamTalk '{tt_username}'. Причина: {error}"
 
-#: bot/telegram_bot/handlers/admin.py:524
 msgid "Deeplink registration is currently disabled in the configuration."
-msgstr ""
+msgstr "Регистрация по deeplink в данный момент отключена в конфигурации."
 
-#: bot/telegram_bot/handlers/admin.py:570
 msgid "An error occurred while generating the deeplink."
-msgstr ""
+msgstr "Произошла ошибка при генерации deeplink."
 
-#: bot/telegram_bot/handlers/reg_callback_handlers.py:53
 msgid "Language set successfully."
 msgstr "Язык успешно установлен."
 
-#: bot/telegram_bot/handlers/reg_callback_handlers.py:65
-#: bot/telegram_bot/handlers/reg_command_handlers.py:127
 msgid ""
 "You have already registered one TeamTalk account from this Telegram "
 "account. Only one registration is allowed."
@@ -244,29 +165,18 @@ msgstr ""
 "Вы уже зарегистрировали одну учетную запись TeamTalk с этого Telegram "
 "аккаунта. Разрешена только одна регистрация."
 
-#: bot/telegram_bot/handlers/reg_callback_handlers.py:69
-#: bot/telegram_bot/handlers/reg_fsm_message_handlers.py:32
 msgid "Hello! Please enter a username for registration."
 msgstr "Здравствуйте! Пожалуйста, введите имя пользователя для регистрации."
 
-#: bot/telegram_bot/handlers/reg_callback_handlers.py:84
 msgid "this account"
 msgstr "этот аккаунт"
 
-# | msgid "Registration request not found or outdated."
-#: bot/telegram_bot/handlers/reg_callback_handlers.py:105
-#, fuzzy
 msgid "Registration request not found, outdated, or already processed."
 msgstr "Запрос на регистрацию не найден или устарел."
 
-#: bot/telegram_bot/handlers/reg_callback_handlers.py:122
 msgid "This Telegram account has already a TeamTalk account linked."
 msgstr "К этому Telegram-аккаунту уже привязана учетная запись TeamTalk."
 
-#: bot/telegram_bot/handlers/reg_callback_handlers.py:124
-#, fuzzy
-#| msgid "" "This Telegram account has already registered a TeamTalk account.
-#| Only one" " registration is allowed."
 msgid ""
 "Your registration request was processed, but this Telegram account "
 "already has a TeamTalk account linked. Only one registration is allowed."
@@ -274,81 +184,57 @@ msgstr ""
 "С этого Telegram-аккаунта уже зарегистрирована учетная запись TeamTalk. "
 "Разрешена только одна регистрация."
 
-# | msgid "User {} registration approved."
-#: bot/telegram_bot/handlers/reg_callback_handlers.py:131
-#, fuzzy, python-brace-format
 msgid "User {username} registration approved."
 msgstr "Регистрация пользователя {} одобрена."
 
-#: bot/telegram_bot/handlers/reg_callback_handlers.py:144
 msgid ""
 "Your registration has been approved by the administrator. You can now use"
 " TeamTalk."
-msgstr ""
+msgstr "Ваша регистрация была одобрена администратором. Теперь вы можете использовать TeamTalk."
 
-#: bot/telegram_bot/handlers/reg_callback_handlers.py:179
-#, python-brace-format
 msgid ""
 "CRITICAL: Registration for {username} was approved, but the final "
 "registration step failed. Please check logs."
-msgstr ""
+msgstr "КРИТИЧЕСКАЯ ОШИБКА: Регистрация для {username} была одобрена, но последний шаг регистрации не удался. Пожалуйста, проверьте логи."
 
-# | msgid "User {} registration declined."
-#: bot/telegram_bot/handlers/reg_callback_handlers.py:185
-#, fuzzy, python-brace-format
 msgid "User {username} registration declined."
 msgstr "Регистрация пользователя {} отклонена."
 
-#: bot/telegram_bot/handlers/reg_callback_handlers.py:187
 msgid "Your registration has been declined by the administrator."
-msgstr ""
+msgstr "Ваша регистрация была отклонена администратором."
 
-#: bot/telegram_bot/handlers/reg_callback_handlers.py:235
 msgid "Please enter your desired nickname."
 msgstr "Пожалуйста, введите желаемый никнейм."
 
-#: bot/telegram_bot/handlers/reg_callback_handlers.py:241
 msgid "Error: Username not found. Please start over."
 msgstr "Ошибка: имя пользователя не найдено. Пожалуйста, начните сначала."
 
-#: bot/telegram_bot/handlers/reg_callback_handlers.py:250
 msgid "Invalid choice. Please try again."
 msgstr "Неверный выбор. Пожалуйста, попробуйте снова."
 
-#: bot/telegram_bot/handlers/reg_command_handlers.py:82
 msgid "You have already registered. This link cannot be used to register again."
-msgstr ""
+msgstr "Вы уже зарегистрированы. Эту ссылку нельзя использовать для повторной регистрации."
 
-# | msgid "Please choose your language:"
-#: bot/telegram_bot/handlers/reg_command_handlers.py:99
-#, fuzzy
 msgid "Welcome! Please choose your language to continue registration."
 msgstr "Пожалуйста, выберите ваш язык:"
 
-#: bot/telegram_bot/handlers/reg_command_handlers.py:104
 msgid "This registration link is invalid, expired, or has already been used."
-msgstr ""
+msgstr "Эта ссылка для регистрации недействительна, истекла или уже была использована."
 
-#: bot/telegram_bot/handlers/reg_command_handlers.py:155
 msgid "Please choose your language:"
 msgstr "Пожалуйста, выберите ваш язык:"
 
-#: bot/telegram_bot/handlers/reg_fsm_message_handlers.py:39
 msgid "Sorry, this username is already taken. Please choose another username."
 msgstr "Извините, это имя пользователя уже занято. Пожалуйста, выберите другое."
 
-#: bot/telegram_bot/handlers/reg_fsm_message_handlers.py:42
 msgid "Now enter a password."
 msgstr "Теперь введите пароль."
 
-#: bot/telegram_bot/handlers/reg_fsm_message_handlers.py:46
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:185
 msgid "Registration error. Please try again later or contact an administrator."
 msgstr ""
 "Ошибка регистрации. Пожалуйста, попробуйте позже или свяжитесь с "
 "администратором."
 
-#: bot/telegram_bot/handlers/reg_fsm_message_handlers.py:59
 msgid ""
 "This Telegram account has already registered a TeamTalk account. Only one"
 " registration is allowed."
@@ -356,16 +242,12 @@ msgstr ""
 "С этого Telegram-аккаунта уже зарегистрирована учетная запись TeamTalk. "
 "Разрешена только одна регистрация."
 
-#: bot/telegram_bot/handlers/reg_fsm_message_handlers.py:69
 msgid "TeamTalk Admin"
 msgstr "Администратор TeamTalk"
 
-#: bot/telegram_bot/handlers/reg_fsm_message_handlers.py:70
 msgid "TeamTalk User"
 msgstr "Пользователь TeamTalk"
 
-#: bot/telegram_bot/handlers/reg_fsm_message_handlers.py:75
-#, python-brace-format
 msgid ""
 "This TeamTalk account will be for username '{username}'.\n"
 "Do you want to register it as a TeamTalk 'Admin' or a regular 'User' on "
@@ -375,21 +257,15 @@ msgstr ""
 "Вы хотите зарегистрировать её как 'Администратора' TeamTalk или как "
 "обычного 'Пользователя' на сервере?"
 
-#: bot/telegram_bot/handlers/reg_fsm_message_handlers.py:90
 msgid "Nickname cannot be empty. Please enter a valid nickname."
 msgstr "Никнейм не может быть пустым. Пожалуйста, введите корректный никнейм."
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:30
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:255
 msgid "Yes"
 msgstr "Да"
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:31
 msgid "No (use username)"
 msgstr "Нет (использовать имя пользователя)"
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:39
-#, python-brace-format
 msgid ""
 "Your username will be '{username}'. Would you like to set a different "
 "nickname? If not, your nickname will be the same as your username."
@@ -397,59 +273,38 @@ msgstr ""
 "Ваше имя пользователя будет '{username}'. Хотите установить другой "
 "никнейм? Если нет, ваш никнейм будет таким же, как имя пользователя."
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:92
 msgid "Your .tt file for quick connection"
 msgstr "Ваш .tt файл для быстрого подключения"
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:93
 msgid "Or use this TT link:\n"
 msgstr "Или используйте эту TT ссылку:\n"
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:98
 msgid "Could not send the .tt file or link. Please contact an admin."
 msgstr ""
 "Не удалось отправить .tt файл или ссылку. Пожалуйста, свяжитесь с "
 "администратором."
 
-# | msgid "User {} successfully registered."
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:145
-#, fuzzy, python-brace-format
 msgid "User {username} successfully registered."
 msgstr "Пользователь {} успешно зарегистрирован."
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:160
 msgid ""
 "Your TeamTalk account is ready, but there was an issue syncing your "
 "registration locally. Please contact an administrator if you experience "
 "issues."
-msgstr ""
+msgstr "Ваша учетная запись TeamTalk готова, но возникла проблема с локальной синхронизацией вашей регистрации. Пожалуйста, свяжитесь с администратором, если у вас возникнут проблемы."
 
-# | msgid "User {} successfully registered."
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:168
-#, fuzzy, python-brace-format
-#| msgid "User {username} successfully registered."
 msgid "User {username} was registered."
 msgstr "Пользователь {} успешно зарегистрирован."
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:171
-#, python-brace-format
 msgid "👤 Client language: {lang_emoji}"
-msgstr ""
+msgstr "👤 Язык клиента: {lang_emoji}"
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:173
-#, python-brace-format
 msgid "📱 Via Telegram: {telegram_full_name} (ID: {registrant_telegram_id})"
-msgstr ""
+msgstr "📱 Через Telegram: {telegram_full_name} (ID: {registrant_telegram_id})"
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:175
-#, python-brace-format
 msgid "🔑 Registered by Admin ID: {initiator_telegram_id}"
-msgstr ""
+msgstr "🔑 Зарегистрировано администратором с ID: {initiator_telegram_id}"
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:242
-#, fuzzy
-#| msgid "Registration error. Please try again later or contact an
-#| administrator."
 msgid ""
 "An error occurred while submitting your registration for approval. Please"
 " try again later or contact an administrator."
@@ -457,225 +312,29 @@ msgstr ""
 "Ошибка регистрации. Пожалуйста, попробуйте позже или свяжитесь с "
 "администратором."
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:247
 msgid "Registration request:"
-msgstr ""
+msgstr "Запрос на регистрацию:"
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:249
-#, fuzzy
-#| msgid "Nickname (optional):"
 msgid "Nickname:"
 msgstr "Никнейм (необязательно):"
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:250
-#, fuzzy
-#| msgid "TeamTalk User"
 msgid "Telegram User:"
 msgstr "Пользователь TeamTalk"
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:251
-#, fuzzy
-#| msgid "TeamTalk Registration"
 msgid "Approve registration?"
 msgstr "Регистрация в TeamTalk"
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:256
 msgid "No"
-msgstr ""
+msgstr "Нет"
 
-#: bot/telegram_bot/handlers/reg_logic_helpers.py:263
 msgid "Registration request sent to administrators. Please wait for approval."
-msgstr ""
+msgstr "Запрос на регистрацию отправлен администраторам. Пожалуйста, ожидайте одобрения."
 
-#: bot/telegram_bot/keyboards/admin_keyboards.py:19
 msgid "Delete User"
-msgstr ""
+msgstr "Удалить пользователя"
 
-# | msgid "admin_button_manage_ban_list"
-#: bot/telegram_bot/keyboards/admin_keyboards.py:25
-#, fuzzy
 msgid "Manage Ban List"
 msgstr "Управление бан-листом"
 
-# | msgid "TeamTalk User"
-#: bot/telegram_bot/keyboards/admin_keyboards.py:31
-#, fuzzy
 msgid "List TeamTalk Accounts"
 msgstr "Пользователь TeamTalk"
-
-#~ msgid ""
-#~ "Your registration has been approved by"
-#~ " the administrator. You can now use"
-#~ " TeamTalk."
-#~ msgstr ""
-#~ "Ваша регистрация была одобрена "
-#~ "администратором. Теперь вы можете использовать"
-#~ " TeamTalk."
-
-#~ msgid "Your registration has been declined by the administrator."
-#~ msgstr "Ваша регистрация была отклонена администратором."
-
-#~ msgid "Language updated successfully!"
-#~ msgstr "Язык успешно обновлен!"
-
-#~ msgid "Sorry, language selection is currently unavailable."
-#~ msgstr "Извините, выбор языка в данный момент недоступен."
-
-#~ msgid ""
-#~ "Registration completed, but a sync error"
-#~ " occurred. Please contact admin."
-#~ msgstr ""
-#~ "Регистрация завершена, но произошла ошибка "
-#~ "синхронизации. Пожалуйста, свяжитесь с "
-#~ "администратором."
-
-#~ msgid "👤 Client language: {}"
-#~ msgstr "👤 Язык клиента: {}"
-
-#~ msgid "📱 Via Telegram: {} (ID: {})"
-#~ msgstr "📱 Через Telegram: {} (ID: {})"
-
-#~ msgid "🔑 Registered by Admin ID: {}"
-#~ msgstr "🔑 Зарегистрировано администратором с ID: {}"
-
-#~ msgid "Registration request:"
-#~ msgstr "Запрос на регистрацию:"
-
-#~ msgid "Nickname:"
-#~ msgstr "Никнейм:"
-
-#~ msgid "Telegram User:"
-#~ msgstr "Пользователь Telegram:"
-
-#~ msgid "Approve registration?"
-#~ msgstr "Одобрить регистрацию?"
-
-#~ msgid "No"
-#~ msgstr "Нет"
-
-#~ msgid "Registration request sent to administrators. Please wait for approval."
-#~ msgstr ""
-#~ "Запрос на регистрацию отправлен "
-#~ "администраторам. Пожалуйста, ожидайте одобрения."
-
-#~ msgid "admin_delete_processing"
-#~ msgstr "Обработка запроса на удаление..."
-
-#~ msgid "admin_delete_prompt_identifier"
-#~ msgstr ""
-#~ "Пожалуйста, отправьте Telegram ID или "
-#~ "TeamTalk имя пользователя для удаления."
-
-#~ msgid "admin_delete_success"
-#~ msgstr "Пользователь {identifier} успешно удален."
-
-#~ msgid "admin_delete_fail_db"
-#~ msgstr "Не удалось удалить пользователя {identifier} из базы данных."
-
-#~ msgid "admin_delete_user_not_found"
-#~ msgstr "Пользователь {identifier} не найден."
-
-#~ msgid "admin_delete_invalid_input"
-#~ msgstr ""
-#~ "Неверный ввод. Пожалуйста, отправьте "
-#~ "действительный Telegram ID или TeamTalk "
-#~ "имя пользователя."
-
-#~ msgid "admin_delete_invalid_id_format"
-#~ msgstr "Ошибка: Неверный формат ID пользователя для удаления."
-
-#~ msgid "admin_banlist_title"
-#~ msgstr "Список забаненных пользователей:"
-
-#~ msgid "admin_banlist_empty"
-#~ msgstr "Бан-лист пуст."
-
-#~ msgid "admin_button_unban"
-#~ msgstr "Разбанить"
-
-#~ msgid "admin_button_add_to_banlist_manual"
-#~ msgstr "Добавить в бан-лист"
-
-#~ msgid "admin_delete_no_users_found"
-#~ msgstr "Зарегистрированные пользователи не найдены."
-
-#~ msgid "admin_delete_select_user"
-#~ msgstr "Выберите пользователя для удаления:"
-
-#~ msgid "admin_delete_confirmed_success"
-#~ msgstr "Пользователь с Telegram ID {telegram_id} успешно удален."
-
-#~ msgid "admin_delete_confirmed_fail"
-#~ msgstr ""
-#~ "Не удалось удалить пользователя с "
-#~ "Telegram ID {telegram_id} (возможно, уже "
-#~ "удален или ошибка базы данных)."
-
-#~ msgid "admin_unban_success"
-#~ msgstr "Пользователь {target_telegram_id} разбанен."
-
-#~ msgid "admin_unban_fail"
-#~ msgstr "Не удалось разбанить пользователя {target_telegram_id}."
-
-#~ msgid "admin_manual_ban_prompt"
-#~ msgstr ""
-#~ "Отправьте Telegram ID пользователя для "
-#~ "бана. На следующей строке можно указать"
-#~ " причину (необязательно)."
-
-#~ msgid "admin_manual_ban_invalid_id"
-#~ msgstr "Неверный формат Telegram ID. Пожалуйста, введите только цифры."
-
-#~ msgid "admin_manual_ban_success"
-#~ msgstr "Пользователь {telegram_id} забанен вручную."
-
-#~ msgid "admin_manual_ban_fail"
-#~ msgstr "Не удалось забанить пользователя {telegram_id} вручную."
-
-#~ msgid "admin_tt_list_connection_error"
-#~ msgstr "Ошибка подключения к TeamTalk серверу или получения списка аккаунтов."
-
-#~ msgid "admin_tt_list_no_accounts"
-#~ msgstr "На TeamTalk сервере не найдено ни одного аккаунта."
-
-#~ msgid "admin_tt_list_title"
-#~ msgstr "Список всех аккаунтов на TeamTalk сервере:"
-
-#~ msgid "admin_button_delete_from_tt"
-#~ msgstr "Удалить с TT"
-
-#~ msgid "admin_tt_delete_prompt_text"
-#~ msgstr ""
-#~ "Вы уверены, что хотите удалить "
-#~ "пользователя TeamTalk '{tt_username}' с "
-#~ "сервера? Этот пользователь также будет "
-#~ "забанен в боте (если он "
-#~ "зарегистрирован)."
-
-#~ msgid "admin_button_confirm_delete_from_tt"
-#~ msgstr "Да, удалить с TT"
-
-#~ msgid "admin_button_cancel_tt_delete"
-#~ msgstr "Отмена"
-
-#~ msgid "admin_tt_delete_connection_error"
-#~ msgstr "Ошибка подключения к TeamTalk серверу. Не удалось выполнить удаление."
-
-#~ msgid "admin_tt_delete_success"
-#~ msgstr ""
-#~ "Запрос на удаление пользователя TeamTalk "
-#~ "'{tt_username}' отправлен на сервер. Если "
-#~ "пользователь существует, он будет удален "
-#~ "и забанен в боте."
-
-#~ msgid "admin_tt_delete_fail"
-#~ msgstr ""
-#~ "Не удалось отправить запрос на удаление"
-#~ " пользователя TeamTalk '{tt_username}'. Ошибка:"
-#~ " {error}"
-
-#~ msgid "admin_keyboard_delete_user"
-#~ msgstr "Удалить пользователя"
-
-#~ msgid "admin_button_list_tt_accounts"
-#~ msgstr "Список всех TT аккаунтов"
