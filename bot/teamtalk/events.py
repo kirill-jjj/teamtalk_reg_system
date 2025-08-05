@@ -13,7 +13,7 @@ from bot.core import config
 from bot.core.db.crud import add_banned_user, get_telegram_id_by_teamtalk_username
 from bot.core.db.session import AsyncSessionLocal
 from .connection import force_restart_instance_on_event, pytalk_bot
-from ...core.localization import get_translator, get_admin_lang_code
+from ..core.localization import get_translator, get_admin_lang_code
 
 logger = logging.getLogger(__name__)
 
