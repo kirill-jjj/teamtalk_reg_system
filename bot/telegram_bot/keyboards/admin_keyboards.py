@@ -16,19 +16,19 @@ def get_admin_panel_keyboard() -> InlineKeyboardMarkup:
 
     # Button for deleting users (existing)
     builder.button(
-        text=_("admin_keyboard_delete_user"),
+        text=_("Delete User"),
         callback_data=CALLBACK_DATA_DELETE_USER
     )
 
     # New button for managing ban list
     builder.button(
-        text=_("admin_button_manage_ban_list"),
+        text=_("Manage Ban List"),
         callback_data=AdminBanListActionCallback(action="view", target_telegram_id=None).pack()
     )
 
     # New button for listing all TeamTalk accounts
     builder.button(
-        text=_("admin_button_list_tt_accounts"),
+        text=_("List TeamTalk Accounts"),
         callback_data=AdminTTAccountsCallback(action="list_all", tt_username=None).pack()
     )
 
