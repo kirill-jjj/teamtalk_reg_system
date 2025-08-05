@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: teamtalk_reg_system VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2025-08-05 22:28+0000\n"
+"POT-Creation-Date: 2025-08-05 22:33+0000\n"
 "PO-Revision-Date: 2025-06-12 04:00+0500\n"
 "Last-Translator: Kirill <kirillkolovi@gmail.com>\n"
 "Language: ru\n"
@@ -87,13 +87,20 @@ msgid "TeamTalk: User account '{username}' has been REMOVED."
 msgstr "TeamTalk: Учетная запись пользователя '{username}' была УДАЛЕНА."
 
 msgid "TeamTalk: User account '{account_username_str}' has been CREATED."
-msgstr "TeamTalk: Учетная запись пользователя '{account_username_str}' была СОЗДАНА."
+msgstr ""
+"TeamTalk: Учетная запись пользователя '{account_username_str}' была "
+"СОЗДАНА."
 
 msgid "TeamTalk: User account '{account_username_str}' has been CHANGED."
-msgstr "TeamTalk: Учетная запись пользователя '{account_username_str}' была ИЗМЕНЕНА."
+msgstr ""
+"TeamTalk: Учетная запись пользователя '{account_username_str}' была "
+"ИЗМЕНЕНА."
 
 msgid "Admin Panel"
 msgstr "Панель администратора"
+
+msgid "Permission denied."
+msgstr "В доступе отказано."
 
 msgid "No registered users found to delete."
 msgstr "Зарегистрированные пользователи для удаления не найдены."
@@ -106,6 +113,9 @@ msgstr "Пользователь с Telegram ID {telegram_id} был удале�
 
 msgid "Failed to delete user with Telegram ID {telegram_id}."
 msgstr "Не удалось удалить пользователя с Telegram ID {telegram_id}."
+
+msgid "Error: No target user ID specified for unban."
+msgstr "Ошибка: не указан ID пользователя для разбана."
 
 msgid "User {target_telegram_id} has been unbanned."
 msgstr "Пользователь {target_telegram_id} был разбанен."
@@ -142,6 +152,9 @@ msgstr "Пользователь TeamTalk"
 msgid "Delete from TeamTalk"
 msgstr "Удалить из TeamTalk"
 
+msgid "Error: Username not provided for deletion. Please try again."
+msgstr "Ошибка: имя пользователя для удаления не предоставлено. Пожалуйста, попробуйте снова."
+
 msgid "Are you sure you want to delete the TeamTalk user '{tt_username}'?"
 msgstr "Вы уверены, что хотите удалить пользователя TeamTalk '{tt_username}'?"
 
@@ -150,6 +163,12 @@ msgstr "Подтвердить удаление"
 
 msgid "Cancel"
 msgstr "Отмена"
+
+msgid "Error: Username missing. Cannot delete."
+msgstr "Ошибка: имя пользователя отсутствует. Невозможно удалить."
+
+msgid "Internal error: Username was not provided for deletion."
+msgstr "Внутренняя ошибка: имя пользователя для удаления не предоставлено."
 
 msgid "Could not connect to the TeamTalk server to delete the account."
 msgstr "Не удалось подключиться к серверу TeamTalk для удаления учетной записи."
@@ -162,6 +181,9 @@ msgstr "Не удалось удалить пользователя TeamTalk '{t
 
 msgid "Deeplink registration is currently disabled in the configuration."
 msgstr "Регистрация по deeplink в данный момент отключена в конфигурации."
+
+msgid "Internal error: bot username is not available. Please contact support."
+msgstr "Внутренняя ошибка: имя пользователя бота недоступно. Пожалуйста, свяжитесь с поддержкой."
 
 msgid "An error occurred while generating the deeplink."
 msgstr "Произошла ошибка при генерации deeplink."

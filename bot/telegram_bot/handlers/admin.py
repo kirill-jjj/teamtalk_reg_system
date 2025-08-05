@@ -76,7 +76,7 @@ async def delete_user_start_handler(callback_query: types.CallbackQuery, db_sess
 
     if callback_query.from_user.id not in admin_ids_int:
         logger.warning(f"User {callback_query.from_user.id} (not an admin) tried to use delete user callback.")
-        await callback_query.answer("Permission denied.", show_alert=True) # Notify user
+        await callback_query.answer(_("Permission denied."), show_alert=True) # Notify user
         return
 
     await callback_query.answer() # Acknowledge the callback
@@ -132,7 +132,7 @@ async def confirm_delete_user_handler(callback_query: types.CallbackQuery, db_se
 
     if callback_query.from_user.id not in admin_ids_int:
         logger.warning(f"User {callback_query.from_user.id} (not an admin) tried to use confirm delete user callback.")
-        await callback_query.answer("Permission denied.", show_alert=True)
+        await callback_query.answer(_("Permission denied."), show_alert=True)
         return
 
     admin_lang = get_admin_lang_code()
@@ -234,7 +234,7 @@ async def unban_user_handler(callback_query: types.CallbackQuery, callback_data:
 
     target_id = callback_data.target_telegram_id
     if target_id is None: # Should not happen if buttons are generated correctly
-        await callback_query.answer("Error: No target user ID specified for unban.", show_alert=True)
+        await callback_query.answer(_("Error: No target user ID specified for unban."), show_alert=True)
         return
 
     success = await remove_banned_user(db_session, target_id)
@@ -396,7 +396,7 @@ async def prompt_delete_tt_account_handler(callback_query: types.CallbackQuery, 
     if not tt_username:
         logger.warning("prompt_delete_tt_account_handler: tt_username missing in callback_data.")
         # Attempt to edit the message to show an error, or send a new one.
-        error_text = "Error: Username not provided for deletion. Please try again." # This should be localized ideally
+        error_text = _("Error: Username not provided for deletion. Please try again.") # This should be localized ideally
         try:
             await callback_query.message.edit_text(error_text, reply_markup=None)
         except Exception as e_edit:
@@ -434,9 +434,9 @@ async def confirm_delete_tt_account_handler(callback_query: types.CallbackQuery,
     if not tt_username:
         logger.error("confirm_delete_tt_account_handler: tt_username missing in callback_data during delete confirmation.")
         # This message should ideally be localized too if it were user-facing beyond an immediate error.
-        await callback_query.answer("Error: Username missing. Cannot delete.", show_alert=True)
+        await callback_query.answer(_("Error: Username missing. Cannot delete."), show_alert=True)
         try:
-            await callback_query.message.edit_text("Internal error: Username was not provided for deletion.", reply_markup=None)
+            await callback_query.message.edit_text(_("Internal error: Username was not provided for deletion."), reply_markup=None)
         except Exception as e_edit:
             logger.debug(f"Failed to edit message for missing tt_username on confirm: {e_edit}")
         return
@@ -544,7 +544,7 @@ async def generate_deeplink_handler(message: types.Message, bot: AiogramBot, db_
         if not hasattr(bot, 'username') or not bot.username:
             # Это аварийный случай, если на старте не удалось получить имя
             logger.error("Bot username not found in cache. Cannot generate deeplink.")
-            await message.reply("Internal error: bot username is not available. Please contact support.")
+            await message.reply(_("Internal error: bot username is not available. Please contact support."))
             return
 
         bot_username = bot.username
