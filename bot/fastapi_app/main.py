@@ -50,7 +50,6 @@ app.state.templates = Jinja2Templates(
 app.state.cached_server_name = "DefaultServerName (Not yet loaded)"
 app.state.base_client_zip_path_on_disk = Path("dummy_base_client.zip")
 
-# app.mount("/static", StaticFiles(directory="bot/fastapi_app/static"), name="static") # Removed as it seems unused
 
 # --- Startup and Shutdown Event Handlers ---
 import shutil

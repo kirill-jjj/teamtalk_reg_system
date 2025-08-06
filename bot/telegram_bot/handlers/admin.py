@@ -35,8 +35,6 @@ from ...teamtalk.connection import pytalk_bot
 
 logger = logging.getLogger(__name__)
 
-# Removed AdminDeleteCallback and AdminBanListActionCallback class definitions from here
-
 router = Router()
 
 @router.message(Command("adminpanel"))
@@ -117,7 +115,6 @@ async def delete_user_start_handler(callback_query: types.CallbackQuery, db_sess
 
     logger.info(f"Admin {callback_query.from_user.id} requested user list for deletion.")
 
-# Removed receive_user_identifier_for_deletion_handler as it's no longer used.
 
 @router.callback_query(AdminDeleteCallback.filter()) # Changed to use AdminDeleteCallback.filter()
 async def confirm_delete_user_handler(callback_query: types.CallbackQuery, db_session: AsyncSession, callback_data: AdminDeleteCallback): # Added callback_data parameter
@@ -539,17 +536,13 @@ async def generate_deeplink_handler(message: types.Message, bot: AiogramBot, db_
             generated_by_admin_id=acting_admin_id
         )
 
-        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
-        # Используем закешированное имя пользователя бота
         if not hasattr(bot, 'username') or not bot.username:
-            # Это аварийный случай, если на старте не удалось получить имя
             logger.error("Bot username not found in cache. Cannot generate deeplink.")
             await message.reply(_("Internal error: bot username is not available. Please contact support."))
             return
 
         bot_username = bot.username
         deeplink_url = f"https://t.me/{bot_username}?start={token}"
-        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
         admin_lang = get_admin_lang_code()
         _ = get_translator(admin_lang)

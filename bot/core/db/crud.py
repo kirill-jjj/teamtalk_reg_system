@@ -242,9 +242,6 @@ async def get_fastapi_download_token(db: AsyncSession, token: str) -> Optional[F
     if token_entry:
         if token_entry.expires_at < datetime.utcnow():
             logger.info(f"Download token {token} found but has expired.")
-            # Optionally delete it here or let cleanup handle it
-            # await db.delete(token_entry)
-            # await db.flush()
             return None
         if token_entry.is_used:
             logger.info(f"Download token {token} found but has already been used.")

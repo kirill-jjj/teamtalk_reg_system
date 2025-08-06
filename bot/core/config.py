@@ -107,8 +107,6 @@ DEFAULT_REGISTRATION_BROADCAST_ENABLED_VALUE: str = "1" # String "1" as it repre
 DEFAULT_TELEGRAM_DEEPLINK_REGISTRATION_ENABLED_VALUE: bool = False
 DEFAULT_TELEGRAM_PUBLIC_REGISTRATION_ENABLED_VALUE: bool = True
 
-# NOTE: The .env file loading is now handled externally (e.g., in run.py)
-# before this module's variables are accessed.
 
 # --- Configuration Variable Initialization using Helpers ---
 # Telegram Bot Configuration
@@ -117,7 +115,7 @@ ADMIN_IDS: List[int] = _get_env_var_list("ADMIN_IDS", default_list_str="", item_
 
 # TeamTalk Server Configuration
 HOST_NAME: Optional[str] = _get_env_var("HOST_NAME")
-TCP_PORT_STR: Optional[str] = _get_env_var("PORT") # Kept for required_values_from_env check
+TCP_PORT_STR: Optional[str] = _get_env_var("PORT")
 TCP_PORT: int = _get_env_var_int("PORT", 0)
 UDP_PORT: int = _get_env_var_int("UDP_PORT", 0)
 if UDP_PORT == 0 and TCP_PORT != 0:

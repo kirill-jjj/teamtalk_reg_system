@@ -252,7 +252,7 @@ async def _handle_registration_continuation(
         if nickname_value != username_value: admin_msg_text += _('Nickname:') + f" {nickname_value}\n"
 
         telegram_user_info_line = f" {user_full_name}"
-        if telegram_username: # Проверяем, есть ли у пользователя юзернейм
+        if telegram_username:
             telegram_user_info_line += f" (@{telegram_username})"
         telegram_user_info_line += f" (ID: {registrant_user_id})"
 

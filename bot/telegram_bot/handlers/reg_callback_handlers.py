@@ -35,8 +35,6 @@ logger = logging.getLogger(__name__)
 
 callback_router = Router()
 
-# CallbackData class definitions were moved to reg_callback_data.py
-
 # Handler functions - ensure their filters match the new prefixes in reg_callback_data.py
 # LanguageCallback prefix is now "reg_lang"
 # NicknameChoiceCallback prefix is now "reg_nick_choice"
