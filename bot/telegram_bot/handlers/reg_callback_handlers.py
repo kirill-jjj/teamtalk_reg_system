@@ -163,12 +163,12 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
                     try:
                         other_admin_id = int(other_admin_id_str)
                         if other_admin_id != acting_admin_id:
-                            logger.info(f"Notifying admin {other_admin_id} about registration approval by {acting_admin_id} for TT user {approved_tt_username}")
+                            logger.info(f"Notifying admin {other_admin_id} about registration approval by {acting_admin_id} for TT user {username_val}")
                             await bot.send_message(chat_id=other_admin_id, text=notification_message)
                     except ValueError:
                         logger.error(f"Invalid Telegram admin ID format in config: '{other_admin_id_str}'. Must be an integer.")
                     except Exception as e:
-                        logger.error(f"Failed to send approval notification to admin {other_admin_id_str} for TT user {approved_tt_username}. Error: {e}")
+                        logger.error(f"Failed to send approval notification to admin {other_admin_id_str} for TT user {username_val}. Error: {e}")
             else:
                 logger.info("No ADMIN_IDS configured, skipping notification to other admins.")
         else:
@@ -207,12 +207,12 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
                 try:
                     other_admin_id = int(other_admin_id_str)
                     if other_admin_id != acting_admin_id:
-                        logger.info(f"Notifying admin {other_admin_id} about registration rejection by {acting_admin_id} for TT user {rejected_tt_username}")
+                        logger.info(f"Notifying admin {other_admin_id} about registration rejection by {acting_admin_id} for TT user {username_val}")
                         await bot.send_message(chat_id=other_admin_id, text=notification_message)
                 except ValueError:
                     logger.error(f"Invalid Telegram admin ID format in config: '{other_admin_id_str}'. Must be an integer.")
                 except Exception as e:
-                    logger.error(f"Failed to send rejection notification to admin {other_admin_id_str} for TT user {rejected_tt_username}. Error: {e}")
+                    logger.error(f"Failed to send rejection notification to admin {other_admin_id_str} for TT user {username_val}. Error: {e}")
         else:
             logger.info("No ADMIN_IDS configured, skipping notification to other admins about rejection.")
 
