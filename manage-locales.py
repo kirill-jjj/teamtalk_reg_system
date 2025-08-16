@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """
-Утилита для управления файлами локализации проекта с использованием Babel.
+A utility for managing project localization files using Babel.
 
-Скрипт предоставляет интерфейс командной строки для выполнения
-следующих действий:
-- extract: извлечение переводимых строк из исходного кода в .pot-файл.
-- update: обновление .po-файлов для каждого языка на основе .pot-шаблона.
-- compile: компиляция .po-файлов в бинарные .mo-файлы.
+This script provides a command-line interface to perform the following actions:
+- extract: Extract translatable strings from the source code into a .pot file.
+- update: Update .po files for each language based on the .pot template.
+- compile: Compile .po files into binary .mo files.
 
-Для справки используйте команду 'help'. При запуске без аргументов
-выполняются все три действия последовательно.
+For help, use the 'help' command. When run without arguments,
+all three actions are performed sequentially.
 """
 
 import sys
@@ -17,13 +16,13 @@ import subprocess
 from pathlib import Path
 from typing import List
 
-# --- Конфигурация: явное определение констант ---
+# --- Configuration: Explicitly define constants ---
 PROJECT_NAME = "teamtalk_reg_system"
 COPYRIGHT_HOLDER = "kirill-jjj"
 LOCALE_DOMAIN = "messages"
 BABEL_CONFIG = "babel.cfg"
 
-# --- Пути: использование pathlib для надежности ---
+# --- Paths: Use pathlib for reliability ---
 try:
     BASE_DIR = Path(__file__).resolve().parent
     LOCALE_DIR = BASE_DIR / "locales"
@@ -38,40 +37,40 @@ except NameError:
 
 def run_command(command: List[str]) -> None:
     """
-    Выполняет внешнюю команду и обрабатывает ошибки. (Принцип DRY)
+    Executes an external command and handles errors. (DRY principle)
 
     Args:
-        command: Команда и ее аргументы в виде списка.
+        command: The command and its arguments as a list.
     """
-    print(f"▶️  Выполнение: {' '.join(command)}")
+    print(f"▶️  Executing: {' '.join(command)}")
     try:
-        # Явный и безопасный вызов подпроцесса
+        # Explicit and safe subprocess call
         result = subprocess.run(
             command,
-            check=True,  # Вызовет исключение при ошибке
+            check=True,  # Raise an exception on error
             text=True,
             capture_output=True,
             encoding='utf-8',
             cwd=BASE_DIR # Ensure commands run from project root
         )
-        # Выводим stdout, если он есть (полезно для compile --statistics)
+        # Print stdout if it exists (useful for compile --statistics)
         if result.stdout:
             print(result.stdout.strip())
 
     except FileNotFoundError:
-        # Обработка ошибки, если Babel не установлен или не в PATH
+        # Handle error if Babel is not installed or not in PATH
         print(
-            f"❌ Ошибка: Команда '{command[0]}' не найдена.",
-            "Убедитесь, что Babel установлен (`pip install Babel`)",
-            "и что путь к 'pybabel' находится в переменной окружения PATH.",
+            f"❌ Error: Command '{command[0]}' not found.",
+            "Ensure that Babel is installed (`pip install Babel`)",
+            "and that the path to 'pybabel' is in the PATH environment variable.",
             sep="\n", file=sys.stderr
         )
         sys.exit(1)
     except subprocess.CalledProcessError as e:
-        # Детальный вывод ошибки для легкой отладки
+        # Detailed error output for easy debugging
         print(
-            f"❌ Ошибка: Команда завершилась с кодом {e.returncode}.",
-            "--- Вывод stderr: ---",
+            f"❌ Error: Command finished with exit code {e.returncode}.",
+            "--- stderr output: ---",
             e.stderr.strip(),
             "-----------------------",
             sep="\n", file=sys.stderr
@@ -79,7 +78,7 @@ def run_command(command: List[str]) -> None:
         sys.exit(1)
 
 def extract_messages() -> None:
-    """Извлекает переводимые строки в .pot-файл."""
+    """Extracts translatable strings into a .pot file."""
     command = [
         "pybabel", "extract",
         "-F", BABEL_CONFIG,
@@ -90,14 +89,14 @@ def extract_messages() -> None:
         "." # Search current directory and subdirectories
     ]
     run_command(command)
-    print(f"✅ Сообщения успешно извлечены в '{POT_FILE.relative_to(BASE_DIR)}'")
+    print(f"✅ Messages successfully extracted to '{POT_FILE.relative_to(BASE_DIR)}'")
 
 def update_catalogs() -> None:
-    """Обновляет .po-файлы на основе .pot-шаблона."""
+    """Updates .po files based on the .pot template."""
     # Ensure LOCALE_DIR exists before trying to update,
     # though Babel might create it for 'init' but not always for 'update'.
     if not LOCALE_DIR.exists():
-        print(f"ℹ️ Каталог локалей '{LOCALE_DIR.relative_to(BASE_DIR)}' не существует. Пропустите обновление или создайте его и языковые подкаталоги.")
+        print(f"ℹ️ Locale directory '{LOCALE_DIR.relative_to(BASE_DIR)}' does not exist. Skipping update or create it and language subdirectories.")
         return
 
     command = [
@@ -109,12 +108,12 @@ def update_catalogs() -> None:
         "--previous" # Keep previous msgid lines as comments
     ]
     run_command(command)
-    print("✅ Каталоги переводов (.po) успешно обновлены.")
+    print("✅ Translation catalogs (.po) successfully updated.")
 
 def compile_catalogs() -> None:
-    """Компилирует .po-файлы в бинарные .mo-файлы."""
+    """Compiles .po files into binary .mo files."""
     if not LOCALE_DIR.exists():
-        print(f"ℹ️ Каталог локалей '{LOCALE_DIR.relative_to(BASE_DIR)}' не существует. Пропустите компиляцию.")
+        print(f"ℹ️ Locale directory '{LOCALE_DIR.relative_to(BASE_DIR)}' does not exist. Skipping compilation.")
         return
 
     command = [
@@ -124,21 +123,21 @@ def compile_catalogs() -> None:
         "--statistics" # Show statistics about compiled files
     ]
     run_command(command)
-    print("✅ Каталоги переводов (.mo) успешно скомпилированы.")
+    print("✅ Translation catalogs (.mo) successfully compiled.")
 
 def print_help() -> None:
-    """Выводит справочную информацию по использованию скрипта."""
-    # Используем docstring модуля как источник справки (принцип DRY)
+    """Prints help information on how to use the script."""
+    # Use the module's docstring as the source of help (DRY principle)
     print(sys.modules[__name__].__doc__)
-    print("Доступные команды:")
-    print("  extract      - Только извлечение строк в .pot-файл.")
-    print("  update       - Только обновление .po-файлов.")
-    print("  compile      - Только компиляция .mo-файлов.")
-    print("  help         - Показать это справочное сообщение.")
-    print("\nБез аргументов - последовательно выполняются extract, update, compile.")
+    print("Available commands:")
+    print("  extract      - Only extract strings to .pot file.")
+    print("  update       - Only update .po files.")
+    print("  compile      - Only compile .mo files.")
+    print("  help         - Show this help message.")
+    print("\nWithout arguments - extract, update, and compile are run sequentially.")
 
 def main() -> None:
-    """Главная функция, управляющая логикой на основе аргументов."""
+    """Main function that controls logic based on arguments."""
     actions = {
         "extract": extract_messages,
         "update": update_catalogs,
@@ -149,16 +148,16 @@ def main() -> None:
     action_key = sys.argv[1] if len(sys.argv) > 1 else "all"
 
     if action_key == "all":
-        print("--- Запуск полного цикла обновления локализации ---\n")
+        print("--- Starting full localization update cycle ---\n")
         extract_messages()
         update_catalogs()
         compile_catalogs()
-        print("\n🎉 Все шаги локализации успешно завершены.")
+        print("\n🎉 All localization steps completed successfully.")
     elif action_key in actions:
         actions[action_key]()
     else:
-        print(f"❌ Неизвестная команда: '{action_key}'", file=sys.stderr)
-        print("Используйте команду 'help' для справки.", file=sys.stderr)
+        print(f"❌ Unknown command: '{action_key}'", file=sys.stderr)
+        print("Use the 'help' command for assistance.", file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":
