@@ -222,7 +222,7 @@ msgstr ""
 "Разрешена только одна регистрация."
 
 msgid "User {username} registration approved."
-msgstr "Регистрация пользователя {} одобрена."
+msgstr "Регистрация пользователя {username} одобрена."
 
 msgid ""
 "Your registration has been approved by the administrator. You can now use"
@@ -239,7 +239,7 @@ msgstr ""
 "последний шаг регистрации не удался. Пожалуйста, проверьте логи."
 
 msgid "User {username} registration declined."
-msgstr "Регистрация пользователя {} отклонена."
+msgstr "Регистрация пользователя {username} отклонена."
 
 msgid "Your registration has been declined by the administrator."
 msgstr "Ваша регистрация была отклонена администратором."
@@ -330,7 +330,7 @@ msgstr ""
 "администратором."
 
 msgid "User {username} successfully registered."
-msgstr "Пользователь {} успешно зарегистрирован."
+msgstr "Пользователь {username} успешно зарегистрирован."
 
 msgid ""
 "Your TeamTalk account is ready, but there was an issue syncing your "
@@ -342,7 +342,7 @@ msgstr ""
 "администратором, если у вас возникнут проблемы."
 
 msgid "User {username} was registered."
-msgstr "Пользователь {} успешно зарегистрирован."
+msgstr "Пользователь {username} успешно зарегистрирован."
 
 msgid "👤 Client language: {lang_emoji}"
 msgstr "👤 Язык клиента: {lang_emoji}"
