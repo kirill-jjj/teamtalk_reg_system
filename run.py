@@ -1,10 +1,11 @@
 import asyncio
 import logging
+from pathlib import Path
 import sys
 
 import uvicorn
 
-from bot.core import config as core_config
+from bot.core.config import settings
 from bot.core.db import close_db_engine
 from bot.core.db.crud import (
     delete_telegram_registration_by_id,
@@ -12,14 +13,12 @@ from bot.core.db.crud import (
 )
 from bot.core.db.session import AsyncSessionLocal
 from bot.fastapi_app.main import app as fastapi_app
-from bot.teamtalk import events as _  # To register core TT event handlers
 from bot.teamtalk.connection import (
     close_teamtalk_connection,
     launch_teamtalk_service,
     set_aiogram_bot_instance,
 )
 from bot.telegram_bot.main import run_telegram_bot, start_telegram_polling
-from pathlib import Path
 
 # Configure logging AFTER .env load, as .env might contain logging settings in a real app
 logging.basicConfig(
@@ -46,8 +45,7 @@ admin_check_task_ref: asyncio.Task | None = None
 
 
 async def remove_admin_ids_from_registrations(db_ready_event: asyncio.Event):
-    """
-    Checks for any admin IDs in the TelegramRegistration table on startup
+    """Checks for any admin IDs in the TelegramRegistration table on startup
     and removes them.
     """
     await db_ready_event.wait()  # Ensure DB is ready
@@ -55,7 +53,7 @@ async def remove_admin_ids_from_registrations(db_ready_event: asyncio.Event):
         "Performing startup check: Verifying admin IDs are not in TelegramRegistration table..."
     )
 
-    if not core_config.ADMIN_IDS:
+    if not settings.admin_ids:
         logger.info(
             "No ADMIN_IDS configured. Skipping startup check for admin registrations."
         )
@@ -65,8 +63,7 @@ async def remove_admin_ids_from_registrations(db_ready_event: asyncio.Event):
     # Use the session factory as a context manager
     async with AsyncSessionLocal() as session:
         try:
-            for admin_id_str in core_config.ADMIN_IDS:  # ADMIN_IDS are strings from config
-                admin_id = int(admin_id_str)  # Convert to int for DB operations
+            for admin_id in settings.admin_ids:  # ADMIN_IDS are strings from config
                 if await is_telegram_id_registered(session, admin_id):
                     logger.info(
                         f"Admin ID {admin_id} found in TelegramRegistration table. Attempting removal."
@@ -102,8 +99,7 @@ async def remove_admin_ids_from_registrations(db_ready_event: asyncio.Event):
 
 
 async def on_aiogram_shutdown_handler():
-    """
-    Handles graceful shutdown of related asyncio tasks when Aiogram is shutting down.
+    """Handles graceful shutdown of related asyncio tasks when Aiogram is shutting down.
     This function is intended to be registered with Aiogram's dispatcher.
     """
     logger.info("Aiogram shutdown handler called. Cancelling related tasks...")
@@ -132,7 +128,7 @@ async def on_aiogram_shutdown_handler():
         elif task and task.done():
             logger.info(f"Task {task.get_name()} is already done.")
         else:
-            logger.debug(f"Task reference was None, skipping cancellation.")
+            logger.debug("Task reference was None, skipping cancellation.")
     logger.info("Aiogram shutdown handler finished cancelling tasks.")
 
 
@@ -179,11 +175,11 @@ async def main():
         # 2. Pass Bot instance to FastAPI app state
 
         # 3. Configure Uvicorn server (conditionally)
-        if core_config.WEB_REGISTRATION_ENABLED:
+        if settings.web_registration_enabled:
             ssl_config = {}
-            if core_config.WEB_APP_SSL_ENABLED:
-                key_path = Path(core_config.WEB_APP_SSL_KEY_PATH)
-                cert_path = Path(core_config.WEB_APP_SSL_CERT_PATH)
+            if settings.web_app_ssl_enabled:
+                key_path = Path(settings.web_app_ssl_key_path)
+                cert_path = Path(settings.web_app_ssl_cert_path)
                 if key_path.exists() and cert_path.exists():
                     ssl_config["ssl_keyfile"] = str(key_path)
                     ssl_config["ssl_certfile"] = str(cert_path)
@@ -195,12 +191,12 @@ async def main():
 
             uvicorn_config = uvicorn.Config(
                 app=fastapi_app,
-                host=core_config.WEB_APP_HOST,
-                port=core_config.WEB_APP_PORT,
+                host=settings.web_app_host,
+                port=settings.web_app_port,
                 loop="asyncio",
                 log_level="info",
-                forwarded_allow_ips=core_config.WEB_APP_FORWARDED_ALLOW_IPS,
-                proxy_headers=core_config.WEB_APP_PROXY_HEADERS,
+                forwarded_allow_ips=settings.web_app_forwarded_allow_ips,
+                proxy_headers=settings.web_app_proxy_headers,
                 **ssl_config,
             )
             server = uvicorn.Server(config=uvicorn_config)
@@ -210,7 +206,7 @@ async def main():
             )
 
             logger.info(
-                f"FastAPI app starting on http{'s' if ssl_config else ''}://{core_config.WEB_APP_HOST}:{core_config.WEB_APP_PORT}"
+                f"FastAPI app starting on http{'s' if ssl_config else ''}://{settings.web_app_host}:{settings.web_app_port}"
             )
         else:
             logger.info(
@@ -231,17 +227,17 @@ async def main():
 
         pytalk_task_ref = asyncio.create_task(
             launch_teamtalk_service(
-                host_name=core_config.HOST_NAME,
-                tcp_port=core_config.TCP_PORT,
-                udp_port=core_config.UDP_PORT,
-                user_name=core_config.USER_NAME,
-                password=core_config.PASSWORD,
-                nickname=core_config.NICK_NAME,
-                encrypted=core_config.ENCRYPTED,
-                join_channel_path=core_config.TEAMTALK_JOIN_CHANNEL,
-                join_channel_pass=core_config.TEAMTALK_JOIN_CHANNEL_PASSWORD,
-                bot_gender=core_config.TEAMTALK_GENDER,
-                bot_status_text=core_config.TEAMTALK_STATUS_TEXT,
+                host_name=settings.host_name,
+                tcp_port=settings.port,
+                udp_port=settings.udp_port,
+                user_name=settings.user_name,
+                password=settings.password,
+                nickname=settings.nick_name,
+                encrypted=settings.encrypted,
+                join_channel_path=settings.tt_join_channel,
+                join_channel_pass=settings.tt_join_channel_password,
+                bot_gender=settings.tt_gender,
+                bot_status_text=settings.tt_status_text,
             ),
             name="PyTalkBotInternals",
         )
@@ -373,7 +369,7 @@ if __name__ == "__main__":
     # before other imports and logging configuration.
     # The sys.argv parsing for --test-run for exiting early is still in main().
     logger.info(f"Application starting with arguments: {sys.argv}")
-    logger.info(f"NICK_NAME from config: {core_config.NICK_NAME}")
+    logger.info(f"NICK_NAME from config: {settings.nick_name}")
     try:
         # Before asyncio.run(main())
         if sys.platform != "win32":  # Check if not Windows

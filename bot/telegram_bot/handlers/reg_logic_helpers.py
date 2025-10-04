@@ -1,6 +1,6 @@
 import logging
+from typing import Any
 import uuid
-from typing import Any, Dict, Optional
 
 from aiogram import Bot as AiogramBot
 from aiogram import types
@@ -10,7 +10,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from pytalk.enums import UserType as PyTalkUserType
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...core import config
+from ...core.config import settings
 from ...core.db import add_pending_telegram_registration, add_telegram_registration
 from ...core.localization import get_admin_lang_code, get_translator
 from ...teamtalk import users as tt_users_service
@@ -55,7 +55,7 @@ async def _send_tt_credentials_to_user(
     bot: AiogramBot,
     user_id_val: int,
     user_lang_code: str,
-    artefact_data: Dict[str, Any]
+    artefact_data: dict[str, Any]
 ):
     _ = get_translator(user_lang_code)
 
@@ -103,11 +103,11 @@ async def _process_actual_registration(
     username_val: str,
     password_val_reg: str,
     nickname_val: str,
-    source_info: Dict,
-    state: Optional[FSMContext],
+    source_info: dict,
+    state: FSMContext | None,
     bot: AiogramBot,
 ):
-    user_lang_code = source_info.get("selected_language", config.CFG_ADMIN_LANG)
+    user_lang_code = source_info.get("selected_language", settings.bot_admin_lang)
     _ = get_translator(user_lang_code)
 
     if "nickname" not in source_info: source_info["nickname"] = nickname_val
@@ -120,7 +120,7 @@ async def _process_actual_registration(
         tt_usertype_for_sdk = PyTalkUserType.ADMIN
 
     broadcast_text_for_tt = None
-    if config.REGISTRATION_BROADCAST_ENABLED:
+    if settings.teamtalk_registration_broadcast_enabled:
         admin_lang_translator = get_translator(get_admin_lang_code())
         broadcast_text_for_tt = admin_lang_translator("User {username} was registered.").format(username=username_val)
 
@@ -131,14 +131,14 @@ async def _process_actual_registration(
         nickname_str=nickname_val,
         source_info=source_info,
         broadcast_message_text=broadcast_text_for_tt,
-        teamtalk_default_user_rights=config.TEAMTALK_DEFAULT_USER_RIGHTS,
-        registration_broadcast_enabled=config.REGISTRATION_BROADCAST_ENABLED,
-        host_name=config.HOST_NAME,
-        tcp_port=config.TCP_PORT,
-        udp_port=config.UDP_PORT,
-        encrypted=config.ENCRYPTED,
-        server_name=config.SERVER_NAME,
-        teamtalk_public_hostname=config.TEAMTALK_PUBLIC_HOSTNAME
+        teamtalk_default_user_rights=settings.teamtalk_default_user_rights,
+        registration_broadcast_enabled=settings.teamtalk_registration_broadcast_enabled,
+        host_name=settings.host_name,
+        tcp_port=settings.port,
+        udp_port=settings.udp_port,
+        encrypted=settings.encrypted,
+        server_name=settings.server_name,
+        teamtalk_public_hostname=settings.tt_public_hostname
     )
 
     if success:
@@ -159,11 +159,11 @@ async def _process_actual_registration(
                 # The user already received "User registered successfully". This message clarifies a backend sync issue.
                 await bot.send_message(registrant_user_id, _("Your TeamTalk account is ready, but there was an issue syncing your registration locally. Please contact an administrator if you experience issues."))
                 # Notify admins about the sync failure.
-                for admin_tg_id_notify in config.ADMIN_IDS:
+                for admin_tg_id_notify in settings.admin_ids:
                     if admin_tg_id_notify != registrant_user_id: # Don't notify the admin if they are the one causing the error log
                        await bot.send_message(admin_tg_id_notify, f"DB SYNC ERROR (Exception): User {username_val} (TG ID: {registrant_user_id}) created in TeamTalk but FAILED local TelegramRegistration DB save. Exception: {e_db_add}")
 
-        if config.ADMIN_IDS:
+        if settings.admin_ids:
             _ = get_translator(get_admin_lang_code())
             admin_notification_message = f"📢 {_('User {username} was registered.').format(username=username_val)}\n"
             lang_code_for_emoji = source_info.get('selected_language', 'en')
@@ -174,7 +174,7 @@ async def _process_actual_registration(
             if is_initiator_admin and initiator_telegram_id != registrant_user_id:
                  admin_notification_message += _("🔑 Registered by Admin ID: {initiator_telegram_id}").format(initiator_telegram_id=initiator_telegram_id) + "\n"
 
-            for admin_id_val_notify in config.ADMIN_IDS:
+            for admin_id_val_notify in settings.admin_ids:
                 try: await bot.send_message(admin_id_val_notify, admin_notification_message.strip())
                 except Exception as e_notify: logger.error(f"Failed to send admin reg notification to {admin_id_val_notify}: {e_notify}")
 
@@ -198,7 +198,7 @@ async def _handle_registration_continuation(
     registrant_user_id = current_fsm_data.get("registrant_telegram_id")
     initiator_user_id = message_or_callback_query.from_user.id
 
-    user_lang_code = current_fsm_data.get("selected_language", config.CFG_ADMIN_LANG)
+    user_lang_code = current_fsm_data.get("selected_language", settings.bot_admin_lang)
     _ = get_translator(user_lang_code)
 
     username_value = current_fsm_data["name"]
@@ -224,7 +224,7 @@ async def _handle_registration_continuation(
         "registrar_telegram_id": initiator_user_id,
     }
 
-    if config.VERIFY_REGISTRATION and not is_initiator_of_start_admin:
+    if settings.verify_registration and not is_initiator_of_start_admin:
         # Generate a unique request key instead of using a counter
         current_request_key = uuid.uuid4().hex
 
@@ -265,7 +265,7 @@ async def _handle_registration_continuation(
         builder.button(text=_("No"), callback_data=AdminVerificationCallback(action="reject", request_key=current_request_key))
         builder.adjust(2)
 
-        for admin_id in config.ADMIN_IDS:
+        for admin_id in settings.admin_ids:
             try: await bot.send_message(admin_id, admin_msg_text, reply_markup=builder.as_markup())
             except Exception as e: logger.error(f"Error sending verification to admin {admin_id}: {e}", exc_info=True)
 

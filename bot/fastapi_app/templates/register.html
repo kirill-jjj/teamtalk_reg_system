@@ -159,7 +159,7 @@
             window.onload = function () {
                 const currentLang = document.documentElement.lang || "en";
                 {% if registration_complete %} 
-                const initialSeconds = {{ core_config.GENERATED_FILE_TTL_SECONDS if core_config else 600 }}; 
+                const initialSeconds = {{ settings.generated_file_ttl_seconds if settings else 600 }}; 
                 startCountdown(initialSeconds, 'countdown-timer', currentLang);
                 {% endif %}
             };

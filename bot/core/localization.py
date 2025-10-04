@@ -1,10 +1,9 @@
 import logging
-import os
 from pathlib import Path
 
 import babel.support
 
-from .config import CFG_ADMIN_LANG
+from .config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +16,7 @@ AVAILABLE_LANGUAGES_LIST = []
 translations: dict[str, babel.support.Translations] = {}
 
 def discover_available_languages() -> list[dict[str, str]]:
-    """
-    Discovers available languages by checking subdirectories in the LOCALES_DIR.
+    """Discovers available languages by checking subdirectories in the LOCALES_DIR.
     A language is considered available if a messages.mo file exists.
     Tries to load the native name for each language.
     """
@@ -66,8 +64,7 @@ def discover_available_languages() -> list[dict[str, str]]:
     return discovered_languages
 
 def load_translations():
-    """
-    Loads translations for all discovered languages.
+    """Loads translations for all discovered languages.
     Also populates AVAILABLE_LANGUAGES_LIST.
     """
     global translations, AVAILABLE_LANGUAGES_LIST, LOCALES_DIR, DEFAULT_LANG_CODE
@@ -108,8 +105,7 @@ def load_translations():
 load_translations()
 
 def get_translator(lang_code: str = None):
-    """
-    Returns a gettext-like translator function for the given language code.
+    """Returns a gettext-like translator function for the given language code.
     Falls back to DEFAULT_LANG_CODE if the requested language is not available.
     """
     global translations, DEFAULT_LANG_CODE
@@ -118,7 +114,7 @@ def get_translator(lang_code: str = None):
     if selected_lang_code not in translations:
         logger.debug(f"Language '{selected_lang_code}' not available, falling back to default '{DEFAULT_LANG_CODE}'.")
         selected_lang_code = DEFAULT_LANG_CODE
-    
+
     translator_instance = translations.get(selected_lang_code)
 
     if not translator_instance:
@@ -128,14 +124,13 @@ def get_translator(lang_code: str = None):
     return translator_instance.gettext
 
 def get_admin_lang_code() -> str:
-    """
-    Gets the admin language code from config, validates against available languages.
+    """Gets the admin language code from config, validates against available languages.
     Falls back to DEFAULT_LANG_CODE if the admin's chosen language is not available.
     """
-    global translations, DEFAULT_LANG_CODE, CFG_ADMIN_LANG
+    global translations, DEFAULT_LANG_CODE
 
     # CFG_ADMIN_LANG is the language code string from config (e.g., "en", "RU")
-    admin_lang_from_config = CFG_ADMIN_LANG # This comes from config
+    admin_lang_from_config = settings.bot_admin_lang # This comes from config
     if not admin_lang_from_config: # Should not happen given default in config
         admin_lang_from_config = DEFAULT_LANG_CODE
 
@@ -144,23 +139,20 @@ def get_admin_lang_code() -> str:
 
     if normalized_admin_lang in translations:
         return normalized_admin_lang # Return the lowercase version
-    else:
-        logger.warning(f"Admin language '{admin_lang_from_config}' (normalized to '{normalized_admin_lang}') from config is not available. "
-                       f"Falling back to default language '{DEFAULT_LANG_CODE}'. "
-                       f"Available languages: {list(translations.keys())}")
-        return DEFAULT_LANG_CODE
+    logger.warning(f"Admin language '{admin_lang_from_config}' (normalized to '{normalized_admin_lang}') from config is not available. "
+                   f"Falling back to default language '{DEFAULT_LANG_CODE}'. "
+                   f"Available languages: {list(translations.keys())}")
+    return DEFAULT_LANG_CODE
 
 def get_available_languages_for_display() -> list[dict[str, str]]:
-    """
-    Returns the list of available languages with their codes and native names.
+    """Returns the list of available languages with their codes and native names.
     This list is populated by load_translations.
     """
     global AVAILABLE_LANGUAGES_LIST
     return AVAILABLE_LANGUAGES_LIST
 
 def refresh_translations():
-    """
-    Reloads all translations and re-discovers languages.
+    """Reloads all translations and re-discovers languages.
     Useful if language files are updated dynamically.
     """
     logger.info("Refreshing translations...")

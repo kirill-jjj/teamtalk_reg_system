@@ -32,27 +32,27 @@ from .session import AsyncSessionLocal, async_engine, close_db_engine, init_db
 # Optional: Define __all__ to specify what gets imported with "from bot.core.db import *"
 # This is good practice for packages.
 __all__ = [
-    "Base",
-    "TelegramRegistration",
-    "PendingTelegramRegistration", # Added
-    "FastapiRegisteredIp",       # Added
-    "FastapiDownloadToken",      # Added
-    "async_engine",
     "AsyncSessionLocal",
-    "init_db",
-    "close_db_engine",
-    "is_telegram_id_registered",
-    "add_telegram_registration",
-    "get_teamtalk_username_by_telegram_id",
-    "add_pending_telegram_registration",      # Added
-    "get_and_remove_pending_telegram_registration", # Added
-    "cleanup_expired_pending_registrations",  # Added
-    "add_fastapi_registered_ip",              # Added
-    "is_fastapi_ip_registered",               # Added
-    "cleanup_expired_registered_ips",         # Added
+    "Base",
+    "FastapiDownloadToken",      # Added
+    "FastapiRegisteredIp",       # Added
+    "PendingTelegramRegistration", # Added
+    "TelegramRegistration",
     "add_fastapi_download_token",             # Added
+    "add_fastapi_registered_ip",              # Added
+    "add_pending_telegram_registration",      # Added
+    "add_telegram_registration",
+    "async_engine",
+    "cleanup_expired_download_tokens",         # Added
+    "cleanup_expired_pending_registrations",  # Added
+    "cleanup_expired_registered_ips",         # Added
+    "close_db_engine",
+    "get_and_remove_pending_telegram_registration", # Added
     "get_fastapi_download_token",             # Added
+    "get_teamtalk_username_by_telegram_id",
+    "init_db",
+    "is_fastapi_ip_registered",               # Added
+    "is_telegram_id_registered",
     "mark_fastapi_download_token_used",       # Added
-    "remove_fastapi_download_token",          # Added
-    "cleanup_expired_download_tokens"         # Added
+    "remove_fastapi_download_token"          # Added
 ]

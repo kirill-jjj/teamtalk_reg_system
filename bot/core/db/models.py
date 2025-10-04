@@ -1,8 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, BigInteger, Boolean, Column, DateTime, Integer, String
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy.sql import func # For func.now() if used, though default=datetime.utcnow is Python-side
 
 
 class Base(DeclarativeBase):

@@ -16,8 +16,7 @@ from bot.core.db.session import AsyncSessionLocal
 logger = logging.getLogger(__name__)
 
 async def cleanup_temp_file_and_token_task(file_path_to_delete: Path, token_to_remove: str):
-    """
-    Deletes the temporary file and its associated token from the database.
+    """Deletes the temporary file and its associated token from the database.
     This function is intended to be run by a background task.
     """
     try:
@@ -52,8 +51,7 @@ def schedule_temp_file_deletion(
     token_to_remove: str,
     delay_seconds: int
 ):
-    """
-    Schedules a background task to delete a temporary file and its token after a delay.
+    """Schedules a background task to delete a temporary file and its token after a delay.
     """
     # Determine full file path before scheduling the task
     if base_dir_name == "files":
@@ -75,14 +73,13 @@ def schedule_temp_file_deletion(
 
 import configparser  # For modify_teamtalk_ini_from_template
 import io  # For modify_teamtalk_ini_from_template
-import secrets
-import shutil
 from pathlib import Path
+import secrets
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import BackgroundTasks, FastAPI, Request
 
-from bot.core import config as core_config
+from bot.core.config import settings
 
 # Constants for client ZIP generation
 BASE_CLIENT_ZIP_FILENAME = '_base_client_template_fastapi.zip'
@@ -120,7 +117,7 @@ def get_ini_path_from_template_dir_fastapi(template_dir_base: Path) -> Path | No
 
     if ini_path_candidate_upper.exists():
         return ini_path_candidate_upper
-    elif ini_path_candidate_lower.exists():
+    if ini_path_candidate_lower.exists():
         return ini_path_candidate_lower
     logger.warning(f"TeamTalk5.ini not found in {template_dir_base} at {TEAMTALK_INI_FILENAME_IN_ZIP} or {TEAMTALK_INI_FILENAME_LOWER_IN_ZIP}")
     return None
@@ -128,7 +125,7 @@ def get_ini_path_from_template_dir_fastapi(template_dir_base: Path) -> Path | No
 def modify_teamtalk_ini_from_template(
     template_dir_base: Path,
     username: str, password: str,
-    server_name_display: str, host: str, tcpport: int, udpport: int, 
+    server_name_display: str, host: str, tcpport: int, udpport: int,
     user_client_lang: str # 'en' or 'ru'
 ) -> str | None:
     ini_template_path = get_ini_path_from_template_dir_fastapi(template_dir_base)
@@ -140,7 +137,7 @@ def modify_teamtalk_ini_from_template(
     config.optionxform = str
 
     try:
-        with open(ini_template_path, 'r', encoding='utf-8-sig') as f:
+        with open(ini_template_path, encoding='utf-8-sig') as f:
             config.read_file(f)
     except Exception as e:
         logger.error(f"Error reading INI template {ini_template_path}: {e}", exc_info=True)
@@ -161,7 +158,7 @@ def modify_teamtalk_ini_from_template(
     config.set('serverentries', '0_hostaddr', host)
     config.set('serverentries', '0_tcpport', str(tcpport))
     config.set('serverentries', '0_udpport', str(udpport))
-    config.set('serverentries', '0_encrypted', 'true' if core_config.ENCRYPTED else 'false')
+    config.set('serverentries', '0_encrypted', 'true' if settings.encrypted else 'false')
     config.set('serverentries', '0_username', username)
     config.set('serverentries', '0_password', password)
     config.set('serverentries', '0_nickname', username)
@@ -170,7 +167,7 @@ def modify_teamtalk_ini_from_template(
         config.set('serverentries', '0_join-last-channel', 'false')
     if not config.has_option('serverentries', '0_chanpassword'):
         config.set('serverentries', '0_chanpassword', '')
-    
+
     # Explicitly set certificate-related fields
     config.set('serverentries', '0_cadata', '')
     config.set('serverentries', '0_certdata', '')
@@ -189,8 +186,7 @@ def modify_teamtalk_ini_from_template(
 
 # --- Client ZIP Creation ---
 def create_and_save_base_client_zip(app: FastAPI, template_dir_str: str) -> Path | None:
-    """
-    Creates a base client ZIP from the template directory and saves it.
+    """Creates a base client ZIP from the template directory and saves it.
     Returns the path to the created base ZIP, or None on failure.
     Uses core_config.TEAMTALK_CLIENT_TEMPLATE_DIR.
     """
@@ -223,14 +219,13 @@ def create_and_save_base_client_zip(app: FastAPI, template_dir_str: str) -> Path
         return None
 
 def create_client_zip_for_user(
-    app: FastAPI, 
-    username: str, 
+    app: FastAPI,
+    username: str,
     password: str,
-    tt_file_name_on_server: str, 
+    tt_file_name_on_server: str,
     lang_code: str = "en"
 ) -> tuple[Path | None, str]:
-    """
-    Creates a customized client ZIP file for the user by modifying the INI file 
+    """Creates a customized client ZIP file for the user by modifying the INI file
     within the base client ZIP and adding the user's .tt file.
     Returns the path to the new ZIP file and its name, or (None, "") on error.
     """
@@ -247,13 +242,13 @@ def create_client_zip_for_user(
     # Create a unique name for the user's ZIP file
     random_suffix = generate_random_token()[:8]
     # Use a more generic name for the user download, actual name on server is unique.
-    user_zip_filename_for_download = f"{username}_TeamTalk_config.zip" 
-    user_zip_server_name = f"{username}_{core_config.SERVER_NAME}_config_{random_suffix}.zip"
+    user_zip_filename_for_download = f"{username}_TeamTalk_config.zip"
+    user_zip_server_name = f"{username}_{settings.server_name}_config_{random_suffix}.zip"
     user_zip_path_final_location = get_generated_zips_path(app) / user_zip_server_name
 
     # Path to the original client template directory (e.g., "TeamTalk_client_template_EN_RU_portable_v5.9")
     # This is needed by modify_teamtalk_ini_from_template
-    client_template_dir = Path(core_config.TEAMTALK_CLIENT_TEMPLATE_DIR)
+    client_template_dir = Path(settings.teamtalk_client_template_dir)
     if not client_template_dir.is_dir():
         logger.error(f"Error: TEAMTALK_CLIENT_TEMPLATE_DIR '{client_template_dir}' is not a valid directory.")
         return None, ""
@@ -262,10 +257,10 @@ def create_client_zip_for_user(
         template_dir_base=client_template_dir,
         username=username,
         password=password,
-        server_name_display=core_config.SERVER_NAME,
-        host=core_config.HOST_NAME,
-        tcpport=core_config.TCP_PORT,
-        udpport=core_config.UDP_PORT,
+        server_name_display=settings.server_name,
+        host=settings.host_name,
+        tcpport=settings.port,
+        udpport=settings.udp_port,
         user_client_lang=lang_code
     )
 
@@ -282,7 +277,7 @@ def create_client_zip_for_user(
             for item in base_zip.infolist():
                 # Normalize path separators for comparison
                 item_filename_normalized = item.filename.replace("\\", "/")
-                
+
                 if item_filename_normalized.lower() == TEAMTALK_INI_FILENAME_IN_ZIP.lower():
                     # Replace original INI with modified content
                     final_zip_out.writestr(item.filename, modified_ini_content.encode('utf-8-sig'))
@@ -290,7 +285,7 @@ def create_client_zip_for_user(
                 else:
                     # Copy other files as they are
                     final_zip_out.writestr(item.filename, base_zip.read(item.filename))
-            
+
             if not ini_replaced:
                 # This should ideally not happen if base_client_zip is prepared correctly
                 logger.warning(f"INI file '{TEAMTALK_INI_FILENAME_IN_ZIP}' not found in base ZIP. Adding modified INI.")
@@ -304,7 +299,7 @@ def create_client_zip_for_user(
         # Write the new ZIP to its final location
         with open(user_zip_path_final_location, 'wb') as f:
             f.write(temp_zip_io_buffer.getvalue())
-        
+
         return user_zip_path_final_location, user_zip_filename_for_download # Return server path and user-facing name
 
     except Exception as e:

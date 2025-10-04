@@ -6,12 +6,12 @@ from aiogram import Bot as AiogramBot
 from aiogram import Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from ..core import config
+from ..core.config import settings
 from ..core.db.session import close_db_engine, init_db
 from .handlers.admin import router as admin_router
 from .handlers.registration import router as registration_router
+from .middlewares.ban_middleware import UserBanMiddleware  # Added import
 from .middlewares.db_middleware import DbSessionMiddleware
-from .middlewares.ban_middleware import UserBanMiddleware # Added import
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ async def on_shutdown(dispatcher: Dispatcher):
     logger.info("Database engine closed.")
 
 async def run_telegram_bot(shutdown_handler_callback: callable = None, db_ready_event: asyncio.Event = None):
-    bot_instance = AiogramBot(token=config.TG_BOT_TOKEN)
+    bot_instance = AiogramBot(token=settings.tg_bot_token)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
@@ -76,7 +76,7 @@ async def run_telegram_bot(shutdown_handler_callback: callable = None, db_ready_
     try:
         return bot_instance, dp
 
-    except Exception as e:
+    except Exception:
         logger.exception("Error during Telegram bot setup (before polling):", exc_info=True)
         raise
 

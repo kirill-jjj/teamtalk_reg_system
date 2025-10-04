@@ -1,12 +1,5 @@
-import configparser
-import io
 import logging
-import os
-import secrets
-import string
-from typing import Optional, Tuple
 from urllib.parse import quote_plus
-from zipfile import ZIP_DEFLATED, ZipFile
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +8,7 @@ logger = logging.getLogger(__name__)
 def generate_tt_file_content(
     server_name_val: str, host_val: str, tcpport_val: int, udpport_val: int,
     encrypted_val: bool, username_val: str, password_val: str,
-    nickname_val: Optional[str] = None
+    nickname_val: str | None = None
 ) -> str:
     encrypted_str_val = "true" if encrypted_val else "false"
     # Basic XML escaping for username/password in .tt file
@@ -51,7 +44,7 @@ def generate_tt_file_content(
 def generate_tt_link(
     host_val: str, tcpport_val: int, udpport_val: int,
     encrypted_val: bool, username_val: str, password_val: str,
-    nickname_val: Optional[str] = None
+    nickname_val: str | None = None
 ) -> str:
     encrypted_link_val = "1" if encrypted_val else "0"
     encoded_username = quote_plus(username_val)

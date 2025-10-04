@@ -1,7 +1,6 @@
 import logging
-from typing import Any, Dict, List, Optional, Tuple  # Added List
+from typing import Any  # Added List
 
-import pytalk
 from pytalk.enums import UserType as PyTalkUserType
 from pytalk.implementation.TeamTalkPy import TeamTalk5 as sdk
 from pytalk.instance import TeamTalkInstance
@@ -12,7 +11,7 @@ from .connection import pytalk_bot
 logger = logging.getLogger(__name__)
 
 # --- Helper Functions ---
-def _calculate_pytalk_user_rights(teamtalk_default_user_rights_list: List[str]) -> int:
+def _calculate_pytalk_user_rights(teamtalk_default_user_rights_list: list[str]) -> int:
     """Calculates the PyTalk user rights bitmask from the provided list."""
     pytalk_user_rights = 0
     for right_string in teamtalk_default_user_rights_list:
@@ -26,8 +25,7 @@ def _calculate_pytalk_user_rights(teamtalk_default_user_rights_list: List[str]) 
     return pytalk_user_rights
 
 async def _send_broadcast_message_directly(active_server_instance: TeamTalkInstance, content: str):
-    """
-    Workaround function to send a broadcast message by calling the SDK directly.
+    """Workaround function to send a broadcast message by calling the SDK directly.
     This fixes the issue on Linux where the string is not correctly encoded.
     """
     try:
@@ -67,10 +65,10 @@ async def _send_broadcast_message_directly(active_server_instance: TeamTalkInsta
 async def _handle_registration_broadcast(
     active_server_instance: TeamTalkInstance,
     username: str,
-    broadcast_message_text: Optional[str],
+    broadcast_message_text: str | None,
     registration_broadcast_enabled: bool
 ):
-    '''Handles sending a registration broadcast message if enabled and message provided.'''
+    """Handles sending a registration broadcast message if enabled and message provided."""
     if not registration_broadcast_enabled:
         logger.info(f"Registration broadcast is disabled by parameter. Skipping for user '{username}'.")
         return
@@ -83,7 +81,7 @@ async def _handle_registration_broadcast(
     await _send_broadcast_message_directly(active_server_instance, broadcast_message_text)
 
 # --- Main Functions ---
-async def check_username_exists(username: str) -> Optional[bool]:
+async def check_username_exists(username: str) -> bool | None:
     if not pytalk_bot.teamtalks:
         logger.warning("No active TeamTalk server connections in check_username_exists.")
         return None
@@ -119,18 +117,18 @@ async def perform_teamtalk_registration(
     username_str: str,
     password_str: str,
     usertype_to_create: PyTalkUserType,
-    teamtalk_default_user_rights: List[str],
+    teamtalk_default_user_rights: list[str],
     registration_broadcast_enabled: bool,
     host_name: str, # For artefact_data
     tcp_port: int,  # For artefact_data
     udp_port: int,  # For artefact_data
     encrypted: bool,# For artefact_data
     server_name: str,# For artefact_data
-    teamtalk_public_hostname: Optional[str],# For artefact_data
-    nickname_str: Optional[str] = None,
-    source_info: Optional[Dict] = None,
-    broadcast_message_text: Optional[str] = None
-) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
+    teamtalk_public_hostname: str | None,# For artefact_data
+    nickname_str: str | None = None,
+    source_info: dict | None = None,
+    broadcast_message_text: str | None = None
+) -> tuple[bool, str | None, dict[str, Any] | None]:
 
     if not pytalk_bot.teamtalks:
         logger.error("TeamTalk bot (pytalk_bot) has no active server connections for registration.")
@@ -184,4 +182,4 @@ async def perform_teamtalk_registration(
         return False, "MODULE_UNAVAILABLE", None
     except Exception as e_reg:
         logger.exception(f"General error during SDK registration for user {username_str}: {e_reg}")
-        return False, f"UNEXPECTED_ERROR:{str(e_reg)}", None
+        return False, f"UNEXPECTED_ERROR:{e_reg!s}", None

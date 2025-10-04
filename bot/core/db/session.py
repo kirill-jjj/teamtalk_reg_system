@@ -7,12 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 # The previous subtask used `from .config import DB_NAME_CONFIG` when modifying database.py
 # which was in the same dir as config.py. Now session.py is in a 'db' subdirectory.
 # So, `from ..config import DB_NAME_CONFIG` should be correct.
-from ..config import DB_NAME_CONFIG
+from ..config import settings
 from .models import Base  # Base is now in models.py in the same 'db' directory
 
 logger = logging.getLogger(__name__)
 
-DB_ASYNC_URL = f"sqlite+aiosqlite:///{DB_NAME_CONFIG}"
+DB_ASYNC_URL = f"sqlite+aiosqlite:///{settings.db_name}"
 
 async_engine = create_async_engine(DB_ASYNC_URL)
 AsyncSessionLocal = async_sessionmaker(bind=async_engine, expire_on_commit=False, class_=AsyncSession)

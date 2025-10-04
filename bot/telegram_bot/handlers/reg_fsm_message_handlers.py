@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...core import config
+from ...core.config import settings
 from ...core.db import is_telegram_id_registered
 from ...core.localization import get_translator
 from ...teamtalk import users as tt_users_service
@@ -24,7 +24,7 @@ fsm_router = Router()
 @fsm_router.message(RegistrationStates.awaiting_username)
 async def username_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
-    user_lang_code = data.get("selected_language", config.CFG_ADMIN_LANG)
+    user_lang_code = data.get("selected_language", settings.bot_admin_lang)
     _ = get_translator(user_lang_code)
 
     username = message.text.strip()
@@ -49,7 +49,7 @@ async def username_handler(message: types.Message, state: FSMContext):
 async def password_handler(message: types.Message, state: FSMContext, db_session: AsyncSession, bot: AiogramBot):
     initiator_telegram_id = message.from_user.id
     current_state_data = await state.get_data()
-    user_lang_code = current_state_data.get("selected_language", config.CFG_ADMIN_LANG)
+    user_lang_code = current_state_data.get("selected_language", settings.bot_admin_lang)
     _ = get_translator(user_lang_code)
 
     is_admin_registrar = current_state_data.get("is_admin_registrar", False)
@@ -83,7 +83,7 @@ async def password_handler(message: types.Message, state: FSMContext, db_session
 async def nickname_input_handler(message: types.Message, state: FSMContext, bot: AiogramBot, db_session: AsyncSession):
     nickname_value = message.text.strip()
     current_state_data = await state.get_data()
-    user_lang_code = current_state_data.get("selected_language", config.CFG_ADMIN_LANG)
+    user_lang_code = current_state_data.get("selected_language", settings.bot_admin_lang)
     _ = get_translator(user_lang_code)
 
     if not nickname_value:

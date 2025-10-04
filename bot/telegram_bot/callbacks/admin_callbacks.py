@@ -1,5 +1,6 @@
 from aiogram.filters.callback_data import CallbackData
 
+
 class AdminDeleteCallback(CallbackData, prefix="admin_del"):
     # user_telegram_id is the ID of the user TO BE DELETED
     user_telegram_id: int

@@ -1,8 +1,9 @@
+from collections.abc import Awaitable, Callable
 import logging
-from typing import Any, Awaitable, Callable, Dict
+from typing import Any
 
 from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject, User # For type hinting event.from_user
+from aiogram.types import TelegramObject, User  # For type hinting event.from_user
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Assuming bot.core.db.crud is the correct path from this middleware's location
@@ -16,9 +17,9 @@ logger = logging.getLogger(__name__)
 class UserBanMiddleware(BaseMiddleware):
     async def __call__(
         self,
-        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
         event: TelegramObject,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> Any:
         # Try to get user from the event
         # The dispatcher populates 'event_from_user' for most common event types

@@ -1,15 +1,17 @@
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from ...core.localization import get_translator, get_admin_lang_code
 
-from ..callbacks.admin_callbacks import AdminBanListActionCallback, AdminTTAccountsCallback # Import new CallbackData
+from ...core.localization import get_admin_lang_code, get_translator
+from ..callbacks.admin_callbacks import (  # Import new CallbackData
+    AdminBanListActionCallback,
+    AdminTTAccountsCallback,
+)
 
 # Define the callback data for the button
 CALLBACK_DATA_DELETE_USER = "admin_delete_user_start" # String callback for deleting TG user by TG ID
 
 def get_admin_panel_keyboard() -> InlineKeyboardMarkup:
-    """
-    Returns an inline keyboard with admin-specific actions.
+    """Returns an inline keyboard with admin-specific actions.
     """
     _ = get_translator(get_admin_lang_code()) # Get translator
     builder = InlineKeyboardBuilder()

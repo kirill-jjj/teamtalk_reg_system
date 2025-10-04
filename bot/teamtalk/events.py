@@ -1,31 +1,30 @@
 import asyncio
+from asyncio import Task
 import logging
 import time
-from asyncio import Task
-from typing import List, Dict, Tuple
 
 from pytalk import Channel as TeamTalkChannel
-from pytalk import UserAccount, user, UserType, TeamTalkInstance
+from pytalk import TeamTalkInstance, UserAccount, UserType, user
 from pytalk.message import Message
 from pytalk.server import Server as TeamTalkServer
 
-from bot.core import config
+from bot.core.config import settings
 from bot.core.db.crud import add_banned_user, get_telegram_id_by_teamtalk_username
 from bot.core.db.session import AsyncSessionLocal
+
+from ..core.localization import get_admin_lang_code, get_translator
 from .connection import force_restart_instance_on_event, pytalk_bot
-from ..core.localization import get_translator, get_admin_lang_code
 
 logger = logging.getLogger(__name__)
 
 # A cache to hold usernames that were recently deleted.
 # Maps username -> (timestamp, notification_task)
-recently_deleted_users: Dict[str, Tuple[float, Task]] = {}
+recently_deleted_users: dict[str, tuple[float, Task]] = {}
 DELETION_WINDOW_SECONDS = 2  # 2-second window to detect a quick delete/create as an update.
 
 
 async def _send_delayed_removal_notification(username: str):
-    """
-    Waits for a defined period and then sends a removal notification.
+    """Waits for a defined period and then sends a removal notification.
     This task is intended to be cancelled if the user is re-created quickly.
     """
     try:
@@ -34,11 +33,10 @@ async def _send_delayed_removal_notification(username: str):
         logger.info(f"Sending delayed removal notification for '{username}' as no re-creation was detected.")
 
         # Clean up the cache entry for this user
-        if username in recently_deleted_users:
-            del recently_deleted_users[username]
+        recently_deleted_users.pop(username, None)
 
         aiogram_bot = pytalk_bot.aiogram_bot_ref
-        if not aiogram_bot or not config.ADMIN_IDS:
+        if not aiogram_bot or not settings.admin_ids:
             logger.error("_send_delayed_removal_notification: Aiogram bot or ADMIN_IDS not configured.")
             return
 
@@ -46,7 +44,7 @@ async def _send_delayed_removal_notification(username: str):
 
         message_to_send = _("TeamTalk: User account '{username}' has been REMOVED.").format(username=username)
 
-        for admin_id in config.ADMIN_IDS:
+        for admin_id in settings.admin_ids:
             try:
                 chat_id_int = int(admin_id)
                 await aiogram_bot.send_message(chat_id=chat_id_int, text=message_to_send)
@@ -87,17 +85,16 @@ async def _handle_banning_on_tt_account_removal(tt_username: str, server_host_in
             logger.error(f"Error during automatic banning process for TeamTalk user '{tt_username}': {e}", exc_info=True)
 
 
-def get_admin_users(teamtalk_instance: TeamTalkInstance) -> List[user]:
+def get_admin_users(teamtalk_instance: TeamTalkInstance) -> list[user]:
+    """Retrieves a list of admin users from the server.
     """
-    Retrieves a list of admin users from the server.
-    """
-    admin_users: List[user] = []
+    admin_users: list[user] = []
     if not teamtalk_instance or not hasattr(teamtalk_instance, 'server'):
         logger.warning("get_admin_users: Invalid teamtalk_instance or server attribute missing.")
         return admin_users
 
     try:
-        all_users: List[user] = teamtalk_instance.server.get_users()
+        all_users: list[user] = teamtalk_instance.server.get_users()
     except Exception as e:
         logger.error(f"get_admin_users: Error getting users from server: {e}")
         return admin_users
@@ -186,8 +183,7 @@ async def on_my_kicked_from_channel(channel: TeamTalkChannel):
 
 @pytalk_bot.event
 async def on_user_account_new(account: UserAccount):
-    """
-    Handles new user account creation, detecting if it's an update to a recently deleted account.
+    """Handles new user account creation, detecting if it's an update to a recently deleted account.
     """
     raw_account_username = getattr(account, 'username', 'UnknownUser')
     account_username_str = raw_account_username.decode('utf-8') if isinstance(raw_account_username, bytes) else str(raw_account_username)
@@ -196,7 +192,7 @@ async def on_user_account_new(account: UserAccount):
     print(f"User account '{account_username_str}' created.")
 
     aiogram_bot = pytalk_bot.aiogram_bot_ref
-    if not aiogram_bot or not config.ADMIN_IDS:
+    if not aiogram_bot or not settings.admin_ids:
         logger.error("on_user_account_new: Aiogram bot or ADMIN_IDS not configured. Cannot send notifications.")
         return
 
@@ -217,7 +213,7 @@ async def on_user_account_new(account: UserAccount):
             logger.info(f"User '{account_username_str}' was deleted but re-created outside the time window. Treating as NEW.")
             # The removal task for the old deletion will proceed as normal.
 
-    for admin_id in config.ADMIN_IDS:
+    for admin_id in settings.admin_ids:
         try:
             chat_id_int = int(admin_id)
             logger.info(f"Attempting to send TeamTalk {log_prefix} notification for '{account_username_str}' to Telegram admin ID: {chat_id_int}")
@@ -229,8 +225,7 @@ async def on_user_account_new(account: UserAccount):
 
 @pytalk_bot.event
 async def on_user_account_remove(account: UserAccount):
-    """
-    Handles user account removal, scheduling a delayed notification to detect updates.
+    """Handles user account removal, scheduling a delayed notification to detect updates.
     """
     raw_account_username = getattr(account, 'username', 'UnknownUser')
     account_username_str = raw_account_username.decode('utf-8') if isinstance(raw_account_username, bytes) else str(raw_account_username)

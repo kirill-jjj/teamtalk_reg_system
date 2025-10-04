@@ -1,5 +1,4 @@
 import random
-import time
 
 
 class Backoff:
@@ -11,7 +10,7 @@ class Backoff:
         self._attempts = 0
 
     def delay(self) -> float | None:
-        '''Calculates the next delay duration. Returns None if max_tries is exceeded.'''
+        """Calculates the next delay duration. Returns None if max_tries is exceeded."""
         if self.max_tries is not None and self._attempts >= self.max_tries:
             return None
 
@@ -26,10 +25,10 @@ class Backoff:
         return actual_delay
 
     def reset(self):
-        '''Resets the attempt counter.'''
+        """Resets the attempt counter."""
         self._attempts = 0
 
     @property
     def attempts(self) -> int:
-        '''Returns the current number of attempts.'''
+        """Returns the current number of attempts."""
         return self._attempts

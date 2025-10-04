@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-A utility for managing project localization files using Babel.
+"""A utility for managing project localization files using Babel.
 
 This script provides a command-line interface to perform the following actions:
 - extract: Extract translatable strings from the source code into a .pot file.
@@ -11,10 +10,9 @@ For help, use the 'help' command. When run without arguments,
 all three actions are performed sequentially.
 """
 
-import sys
-import subprocess
 from pathlib import Path
-from typing import List
+import subprocess
+import sys
 
 # --- Configuration: Explicitly define constants ---
 PROJECT_NAME = "teamtalk_reg_system"
@@ -35,9 +33,8 @@ except NameError:
     LOCALE_DIR = BASE_DIR / "locales"
     POT_FILE = LOCALE_DIR / f"{LOCALE_DOMAIN}.pot"
 
-def run_command(command: List[str]) -> None:
-    """
-    Executes an external command and handles errors. (DRY principle)
+def run_command(command: list[str]) -> None:
+    """Executes an external command and handles errors. (DRY principle)
 
     Args:
         command: The command and its arguments as a list.

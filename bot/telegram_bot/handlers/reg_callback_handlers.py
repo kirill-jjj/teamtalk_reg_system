@@ -1,5 +1,4 @@
 import logging
-from typing import Any, Dict, Optional
 
 from aiogram import Bot as AiogramBot
 from aiogram import F, Router, types
@@ -7,12 +6,9 @@ from aiogram import F, Router, types
 # CallbackData itself is no longer defined here, but imported for type hinting if needed,
 # or used by the imported CallbackData classes.
 from aiogram.fsm.context import FSMContext
-from aiogram.utils.keyboard import (
-    InlineKeyboardBuilder,  # Not used directly in this file after refactor
-)
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...core import config
+from ...core.config import settings
 from ...core.db import (
     get_and_remove_pending_telegram_registration,
     is_telegram_id_registered,
@@ -71,7 +67,7 @@ async def language_selection_handler(callback_query: types.CallbackQuery, callba
 @callback_router.callback_query(RegistrationStates.awaiting_tt_account_type, TTAccountTypeCallback.filter(F.action == "select")) # Assuming action
 async def tt_account_type_choice_handler(callback_query: types.CallbackQuery, callback_data: TTAccountTypeCallback, state: FSMContext, bot: AiogramBot):
     current_fsm_data = await state.get_data()
-    user_lang_code = current_fsm_data.get("selected_language", config.CFG_ADMIN_LANG)
+    user_lang_code = current_fsm_data.get("selected_language", settings.bot_admin_lang)
     _ = get_translator(user_lang_code)
 
     await state.update_data(tt_account_type=callback_data.account_type) # 'account_type' from TTAccountTypeCallback
@@ -113,7 +109,7 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
     source_info_from_request = pending_reg_data_model.source_info # This is already a dict
     registrant_tg_username = source_info_from_request.get("telegram_username")
 
-    user_specific_lang_code = source_info_from_request.get("selected_language", config.CFG_ADMIN_LANG)
+    user_specific_lang_code = source_info_from_request.get("selected_language", settings.bot_admin_lang)
     _ = get_translator(user_specific_lang_code)
 
     # Check if already registered *before* processing, especially for "verify"
@@ -158,17 +154,11 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
                 f"{registrant_telegram_info}"
             )
 
-            if config.ADMIN_IDS:
-                for other_admin_id_str in config.ADMIN_IDS:
-                    try:
-                        other_admin_id = int(other_admin_id_str)
-                        if other_admin_id != acting_admin_id:
-                            logger.info(f"Notifying admin {other_admin_id} about registration approval by {acting_admin_id} for TT user {username_val}")
-                            await bot.send_message(chat_id=other_admin_id, text=notification_message)
-                    except ValueError:
-                        logger.error(f"Invalid Telegram admin ID format in config: '{other_admin_id_str}'. Must be an integer.")
-                    except Exception as e:
-                        logger.error(f"Failed to send approval notification to admin {other_admin_id_str} for TT user {username_val}. Error: {e}")
+            if settings.admin_ids:
+                for other_admin_id in settings.admin_ids:
+                    if other_admin_id != acting_admin_id:
+                        logger.info(f"Notifying admin {other_admin_id} about registration approval by {acting_admin_id} for TT user {username_val}")
+                        await bot.send_message(chat_id=other_admin_id, text=notification_message)
             else:
                 logger.info("No ADMIN_IDS configured, skipping notification to other admins.")
         else:
@@ -202,17 +192,11 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
             f"{registrant_telegram_info}"
         )
 
-        if config.ADMIN_IDS:
-            for other_admin_id_str in config.ADMIN_IDS:
-                try:
-                    other_admin_id = int(other_admin_id_str)
-                    if other_admin_id != acting_admin_id:
-                        logger.info(f"Notifying admin {other_admin_id} about registration rejection by {acting_admin_id} for TT user {username_val}")
-                        await bot.send_message(chat_id=other_admin_id, text=notification_message)
-                except ValueError:
-                    logger.error(f"Invalid Telegram admin ID format in config: '{other_admin_id_str}'. Must be an integer.")
-                except Exception as e:
-                    logger.error(f"Failed to send rejection notification to admin {other_admin_id_str} for TT user {username_val}. Error: {e}")
+        if settings.admin_ids:
+            for other_admin_id in settings.admin_ids:
+                if other_admin_id != acting_admin_id:
+                    logger.info(f"Notifying admin {other_admin_id} about registration rejection by {acting_admin_id} for TT user {username_val}")
+                    await bot.send_message(chat_id=other_admin_id, text=notification_message)
         else:
             logger.info("No ADMIN_IDS configured, skipping notification to other admins about rejection.")
 
@@ -225,7 +209,7 @@ async def admin_verification_handler(callback_query: types.CallbackQuery, callba
 async def nickname_choice_handler(callback_query: types.CallbackQuery, callback_data: NicknameChoiceCallback, state: FSMContext, bot: AiogramBot, db_session: AsyncSession):
     choice_action = callback_data.action
     current_state_data = await state.get_data()
-    user_lang_code = current_state_data.get("selected_language", config.CFG_ADMIN_LANG)
+    user_lang_code = current_state_data.get("selected_language", settings.bot_admin_lang)
     _ = get_translator(user_lang_code)
 
     await callback_query.answer()

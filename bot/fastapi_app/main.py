@@ -3,10 +3,9 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from bot.core.config import FORCE_USER_LANG
+from bot.core.config import settings
 from bot.core.localization import DEFAULT_LANG_CODE, get_translator
 
 logger = logging.getLogger(__name__)
@@ -19,8 +18,8 @@ def i18n_context_processor(request: Request):
     translator = None
     final_lang_code = DEFAULT_LANG_CODE # Initialize with default
 
-    if FORCE_USER_LANG and FORCE_USER_LANG.strip():
-        forced_lang_code = FORCE_USER_LANG.strip()
+    if settings.force_user_lang:
+        forced_lang_code = settings.force_user_lang
         _ = get_translator(forced_lang_code)
         # Validate if the language is genuinely available
         original_string = "Username:" # A common string that should be translated
@@ -54,7 +53,6 @@ app.state.base_client_zip_path_on_disk = Path("dummy_base_client.zip")
 # --- Startup and Shutdown Event Handlers ---
 import shutil
 
-from bot.core import config as core_config
 from bot.core.localization import refresh_translations
 from bot.fastapi_app.utils import (
     create_and_save_base_client_zip,
@@ -67,7 +65,7 @@ from bot.fastapi_app.utils import (
 async def initial_fastapi_app_setup():
     logger.info("Running FastAPI startup tasks...")
     # 1. Set cached server name
-    app.state.cached_server_name = core_config.SERVER_NAME
+    app.state.cached_server_name = settings.server_name
 
     # 2. Create/clean generated files/zips directories
     generated_files_dir = get_generated_files_path(app)
@@ -85,8 +83,8 @@ async def initial_fastapi_app_setup():
     logger.info(f"Cleaned and created directory: {generated_zips_dir}")
 
     # 3. Create and save base client ZIP
-    if core_config.TEAMTALK_CLIENT_TEMPLATE_DIR:
-        base_zip_path = create_and_save_base_client_zip(app, core_config.TEAMTALK_CLIENT_TEMPLATE_DIR)
+    if settings.teamtalk_client_template_dir:
+        base_zip_path = create_and_save_base_client_zip(app, settings.teamtalk_client_template_dir)
         if base_zip_path:
             app.state.base_client_zip_path_on_disk = base_zip_path
             logger.info(f"Base client ZIP created at: {base_zip_path}")

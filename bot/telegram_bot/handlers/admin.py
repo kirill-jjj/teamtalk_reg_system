@@ -1,36 +1,46 @@
+from datetime import datetime, timedelta
 import logging
 import secrets
-from datetime import datetime, timedelta
 
-import logging
-from aiogram import types, Bot as AiogramBot, F, Router
+from aiogram import Bot as AiogramBot
+from aiogram import F, Router, types
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.types import InlineKeyboardMarkup
+
 # CallbackData itself is not directly used here anymore, but kept if other CBs are defined inline
 # from aiogram.filters.callback_data import CallbackData
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...core import config
+from ...core.config import settings
 from ...core.db.crud import (
+    add_banned_user,
     create_deeplink_token,
     delete_telegram_registration,
     get_all_telegram_registrations,
-    add_banned_user,
     get_banned_users,
     remove_banned_user,
 )
 from ...core.db.models import TelegramRegistration
-from ...core.localization import get_translator, get_admin_lang_code
-# Import the callbacks from the new location
-from ..callbacks.admin_callbacks import AdminDeleteCallback, AdminBanListActionCallback, AdminTTAccountsCallback # Added AdminTTAccountsCallback
-from ..keyboards.admin_keyboards import get_admin_panel_keyboard, CALLBACK_DATA_DELETE_USER
-from ..states import AdminActions
-from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardMarkup
+from ...core.localization import get_admin_lang_code, get_translator
 
 # For TeamTalk interaction
 from ...teamtalk.connection import pytalk_bot
+
+# Import the callbacks from the new location
+from ..callbacks.admin_callbacks import (  # Added AdminTTAccountsCallback
+    AdminBanListActionCallback,
+    AdminDeleteCallback,
+    AdminTTAccountsCallback,
+)
+from ..keyboards.admin_keyboards import (
+    CALLBACK_DATA_DELETE_USER,
+    get_admin_panel_keyboard,
+)
+from ..states import AdminActions
+
 # from pytalk import UserAccount # For type hinting, if directly used. Pytalk objects are often dynamic.
 
 logger = logging.getLogger(__name__)
@@ -40,15 +50,7 @@ router = Router()
 @router.message(Command("adminpanel"))
 async def admin_panel_handler(message: types.Message):
     # Admin check
-    admin_ids_int = []
-    if config.ADMIN_IDS:
-        for admin_id_str in config.ADMIN_IDS:
-            try:
-                admin_ids_int.append(int(admin_id_str))
-            except ValueError:
-                logger.warning(f"Invalid admin ID in config: {admin_id_str}. Skipping.")
-
-    if message.from_user.id not in admin_ids_int:
+    if message.from_user.id not in settings.admin_ids:
         logger.warning(f"User {message.from_user.id} (not an admin) tried to use /adminpanel.")
         return
 
@@ -64,15 +66,7 @@ async def admin_panel_handler(message: types.Message):
 @router.callback_query(F.data == CALLBACK_DATA_DELETE_USER)
 async def delete_user_start_handler(callback_query: types.CallbackQuery, db_session: AsyncSession): # Removed FSMContext, added db_session
     # Admin check (important for callback queries too)
-    admin_ids_int = []
-    if config.ADMIN_IDS:
-        for admin_id_str in config.ADMIN_IDS:
-            try:
-                admin_ids_int.append(int(admin_id_str))
-            except ValueError:
-                logger.warning(f"Invalid admin ID in config for callback: {admin_id_str}. Skipping.")
-
-    if callback_query.from_user.id not in admin_ids_int:
+    if callback_query.from_user.id not in settings.admin_ids:
         logger.warning(f"User {callback_query.from_user.id} (not an admin) tried to use delete user callback.")
         await callback_query.answer(_("Permission denied."), show_alert=True) # Notify user
         return
@@ -119,15 +113,7 @@ async def delete_user_start_handler(callback_query: types.CallbackQuery, db_sess
 @router.callback_query(AdminDeleteCallback.filter()) # Changed to use AdminDeleteCallback.filter()
 async def confirm_delete_user_handler(callback_query: types.CallbackQuery, db_session: AsyncSession, callback_data: AdminDeleteCallback): # Added callback_data parameter
     # Admin check
-    admin_ids_int = []
-    if config.ADMIN_IDS:
-        for admin_id_str in config.ADMIN_IDS:
-            try:
-                admin_ids_int.append(int(admin_id_str))
-            except ValueError:
-                logger.warning(f"Invalid admin ID in config for callback: {admin_id_str}. Skipping.")
-
-    if callback_query.from_user.id not in admin_ids_int:
+    if callback_query.from_user.id not in settings.admin_ids:
         logger.warning(f"User {callback_query.from_user.id} (not an admin) tried to use confirm delete user callback.")
         await callback_query.answer(_("Permission denied."), show_alert=True)
         return
@@ -497,25 +483,14 @@ async def confirm_delete_tt_account_handler(callback_query: types.CallbackQuery,
 @router.message(Command("generate"))
 async def generate_deeplink_handler(message: types.Message, bot: AiogramBot, db_session: AsyncSession):
     # Check if the user is an admin
-    # Ensure ADMIN_IDS in config contains integers or strings that can be cast to int
-    # For this comparison, message.from_user.id is an int.
-    # config.ADMIN_IDS stores them as strings if loaded from .env, cast them for comparison.
-    admin_ids_int = []
-    if config.ADMIN_IDS:
-        for admin_id_str in config.ADMIN_IDS:
-            try:
-                admin_ids_int.append(int(admin_id_str))
-            except ValueError:
-                logger.warning(f"Invalid admin ID in config: {admin_id_str}. Skipping.")
-
-    if message.from_user.id not in admin_ids_int:
+    if message.from_user.id not in settings.admin_ids:
         logger.warning(f"User {message.from_user.id} (not an admin) tried to use /generate.")
         # Optionally send a "permission denied" message if desired, or just return.
         # For now, just returning to avoid notifying non-admins about admin commands.
         return
 
     # Check if deeplink registration is enabled
-    if not config.TELEGRAM_DEEPLINK_REGISTRATION_ENABLED:
+    if not settings.telegram_deeplink_registration_enabled:
         admin_lang = get_admin_lang_code()
         _ = get_translator(admin_lang)
         await message.reply(_("Deeplink registration is currently disabled in the configuration."))

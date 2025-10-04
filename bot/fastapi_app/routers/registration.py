@@ -1,15 +1,13 @@
-import logging
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+import logging
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pytalk.enums import UserType as PyTalkUserType
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.core import config as core_config
-from bot.core.config import FORCE_USER_LANG
+from bot.core.config import settings
 from bot.core.db import (
     add_fastapi_download_token,
     add_fastapi_registered_ip,
@@ -52,7 +50,7 @@ async def _validate_web_registration_request(
     user_ip: str,
     translator,
     db: AsyncSession
-) -> Optional[HTTPException]:
+) -> HTTPException | None:
     # Check for empty username/password
     if not username or not password:
         logger.warning(f"Validation failed for IP {user_ip}: Empty username or password.")
@@ -69,7 +67,7 @@ async def _validate_web_registration_request(
         if username_exists is True:
             logger.warning(f"Validation failed for IP {user_ip} (Username: {username}): Username already taken.")
             return HTTPException(status_code=400, detail=translator("username_taken_error"))
-        elif username_exists is None: # Indicates an error during the check
+        if username_exists is None: # Indicates an error during the check
             logger.error(f"Validation failed for IP {user_ip} (Username: {username}): check_username_exists returned None (error).")
             return HTTPException(status_code=500, detail=translator("registration_failed_error"))
     except Exception as e:
@@ -81,12 +79,12 @@ async def _validate_web_registration_request(
 async def _execute_tt_registration_for_web(
     username: str,
     password: str,
-    nickname: Optional[str],
+    nickname: str | None,
     source_info_data: dict,
-) -> Tuple[bool, Optional[Dict[str, Any]]]: # Return success status and artefact_data
+) -> tuple[bool, dict[str, Any] | None]: # Return success status and artefact_data
     try:
         broadcast_text_for_tt = None
-        if core_config.REGISTRATION_BROADCAST_ENABLED:
+        if settings.teamtalk_registration_broadcast_enabled:
             # Use admin language for the broadcast message from web context as well
             admin_lang_translator = get_translator(get_admin_lang_code())
             broadcast_text_for_tt = admin_lang_translator("User {} was registered.").format(username)
@@ -98,14 +96,14 @@ async def _execute_tt_registration_for_web(
             nickname_str=nickname,
             source_info=source_info_data,
             broadcast_message_text=broadcast_text_for_tt,
-            teamtalk_default_user_rights=core_config.TEAMTALK_DEFAULT_USER_RIGHTS,
-            registration_broadcast_enabled=core_config.REGISTRATION_BROADCAST_ENABLED,
-            host_name=core_config.HOST_NAME,
-            tcp_port=core_config.TCP_PORT,
-            udp_port=core_config.UDP_PORT,
-            encrypted=core_config.ENCRYPTED,
-            server_name=core_config.SERVER_NAME,
-            teamtalk_public_hostname=core_config.TEAMTALK_PUBLIC_HOSTNAME
+            teamtalk_default_user_rights=settings.teamtalk_default_user_rights,
+            registration_broadcast_enabled=settings.teamtalk_registration_broadcast_enabled,
+            host_name=settings.host_name,
+            tcp_port=settings.port,
+            udp_port=settings.udp_port,
+            encrypted=settings.encrypted,
+            server_name=settings.server_name,
+            teamtalk_public_hostname=settings.tt_public_hostname
         )
         if not reg_success_bool:
             logger.error(f"TeamTalk registration failed for user {username} via web, perform_teamtalk_registration returned False.")
@@ -119,9 +117,9 @@ async def _execute_tt_registration_for_web(
 async def _prepare_downloadables_for_web(
     request: Request,
     background_tasks: BackgroundTasks,
-    artefact_data: Dict[str, Any],
+    artefact_data: dict[str, Any],
     db: AsyncSession
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     username = artefact_data["username"]
     password = artefact_data["password"]
     file_generation_nickname = artefact_data["final_nickname"]
@@ -144,7 +142,7 @@ async def _prepare_downloadables_for_web(
     try:
         with open(tt_file_path, "w", encoding="utf-8") as f:
             f.write(tt_content)
-    except IOError as e:
+    except OSError as e:
         logger.error(f"Failed to write .tt file {tt_file_path}: {e}", exc_info=True)
         return {
             "tt_download_link_token": None, "tt_file_name_for_user": None,
@@ -153,7 +151,7 @@ async def _prepare_downloadables_for_web(
         }
 
     tt_token = generate_random_token()
-    expires_at_dt = datetime.utcnow() + timedelta(seconds=core_config.GENERATED_FILE_TTL_SECONDS)
+    expires_at_dt = datetime.utcnow() + timedelta(seconds=settings.generated_file_ttl_seconds)
     await add_fastapi_download_token(
         db=db,
         token=tt_token,
@@ -165,7 +163,7 @@ async def _prepare_downloadables_for_web(
     # schedule_temp_file_deletion now needs the token to remove it from DB
     schedule_temp_file_deletion(
         background_tasks, request.app, tt_file_path.name, "files", tt_token, # Pass tt_file_path.name
-        delay_seconds=core_config.GENERATED_FILE_TTL_SECONDS
+        delay_seconds=settings.generated_file_ttl_seconds
     )
 
     tt_quick_link = generate_tt_link(
@@ -174,9 +172,9 @@ async def _prepare_downloadables_for_web(
         username_val=username, password_val=password, nickname_val=file_generation_nickname
     )
 
-    zip_token: Optional[str] = None
-    actual_client_zip_filename_for_user: Optional[str] = None
-    if core_config.TEAMTALK_CLIENT_TEMPLATE_DIR:
+    zip_token: str | None = None
+    actual_client_zip_filename_for_user: str | None = None
+    if settings.teamtalk_client_template_dir:
         zip_file_path_on_server, client_zip_user_download_name = create_client_zip_for_user(
             app=request.app, username=username, password=password,
             tt_file_name_on_server=tt_file_name_for_user, lang_code=user_lang_code
@@ -195,7 +193,7 @@ async def _prepare_downloadables_for_web(
             # schedule_temp_file_deletion now needs the token to remove it from DB
             schedule_temp_file_deletion(
                 background_tasks, request.app, zip_file_path_on_server.name, "zips", zip_token, # Pass zip_file_path_on_server.name
-                delay_seconds=core_config.GENERATED_FILE_TTL_SECONDS
+                delay_seconds=settings.generated_file_ttl_seconds
             )
         else:
             logger.warning(f"Failed to create client ZIP for web user {username}")
@@ -217,16 +215,16 @@ async def register_page_get(request: Request):
     effective_lang_code = DEFAULT_LANG_CODE
     language_is_forced = False
 
-    if FORCE_USER_LANG and FORCE_USER_LANG.strip():
-        _ = get_translator(FORCE_USER_LANG.strip())
+    if settings.force_user_lang:
+        _ = get_translator(settings.force_user_lang)
         original_string = "Username:" # Test string for validation
         translated_string = _(original_string)
         if translated_string != original_string:
-            effective_lang_code = FORCE_USER_LANG.strip()
+            effective_lang_code = settings.force_user_lang
             language_is_forced = True # Used to decide if we should even check cookies
             logger.info(f"Web: Language forced to {effective_lang_code} by config.")
         else:
-            logger.warning(f"Web: FORCE_USER_LANG set to '{FORCE_USER_LANG.strip()}' but seems invalid/incomplete. Falling back.")
+            logger.warning(f"Web: FORCE_USER_LANG set to '{settings.force_user_lang}' but seems invalid/incomplete. Falling back.")
             # Fallback to cookie or default
             effective_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     else:
@@ -235,7 +233,7 @@ async def register_page_get(request: Request):
 
     translator = get_translator(effective_lang_code)
     available_languages = get_available_languages_for_display()
-    
+
     # Prepare context for the template.
     # The global context processor already adds 'current_lang' and 'language_forced'.
     # We set 'current_lang' here mainly for any direct use within this function,
@@ -245,7 +243,7 @@ async def register_page_get(request: Request):
     context = {
         "request": request,
         "title": translator("registration_title"),
-        "message": "", 
+        "message": "",
         "show_form": True, # Main form is now always shown initially, template handles visibility post-registration
         "current_lang": effective_lang_code, # Reflects forced or cookie lang
         "server_name_from_env": request.app.state.cached_server_name,
@@ -269,7 +267,7 @@ async def register_page_post(
     background_tasks: BackgroundTasks,
     username: str = Form(...),
     password: str = Form(...),
-    nickname: Optional[str] = Form(None),
+    nickname: str | None = Form(None),
     db: AsyncSession = Depends(get_db_session)
 ):
     user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
@@ -348,7 +346,7 @@ async def register_page_post(
             "server_name_from_env": request.app.state.cached_server_name,
             "available_languages": available_languages
         }, status_code=500)
-    
+
     success_title = translator("registration_successful_title")
     success_message = translator("registration_successful_message")
     available_languages = get_available_languages_for_display()

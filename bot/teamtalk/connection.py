@@ -1,19 +1,18 @@
 import asyncio
 import logging
-from typing import Optional
 
 from aiogram import Bot as AiogramBot
 import pytalk
 from pytalk.enums import Status, TeamTalkServerInfo
 
-from bot.core import config
+from bot.core.config import settings
 
 from .backoff import Backoff
 
 logger = logging.getLogger(__name__)
 
-pytalk_bot = pytalk.TeamTalkBot(client_name=config.CLIENT_NAME)
-pytalk_bot.aiogram_bot_ref: Optional[AiogramBot] = None # Holds the Aiogram Bot instance
+pytalk_bot = pytalk.TeamTalkBot(client_name=settings.client_name)
+pytalk_bot.aiogram_bot_ref: AiogramBot | None = None # Holds the Aiogram Bot instance
 active_instance_restarts = {} # Key: server_host_port, Value: asyncio.Task
 
 def set_aiogram_bot_instance(bot: AiogramBot):
@@ -25,7 +24,7 @@ def set_aiogram_bot_instance(bot: AiogramBot):
 
 async def initialize_teamtalk_connection(
     host_name: str, tcp_port: int, udp_port: int, user_name: str, password: str,
-    nickname: str, encrypted: bool, join_channel_path: Optional[str],
+    nickname: str, encrypted: bool, join_channel_path: str | None,
     join_channel_pass: str, bot_gender: str, bot_status_text: str
 ) -> bool:
     server_info_pytalk = TeamTalkServerInfo(
@@ -78,13 +77,12 @@ async def initialize_teamtalk_connection(
             active_server_instance.change_status(status_flags=mapped_gender_status, status_message=bot_status_text)
             logger.info(f"Set TeamTalk status to '{bot_status_text}' with gender '{bot_gender}'.")
             return True
-        else:
-            logger.error(f"Failed to connect or login to TeamTalk server: {host_name}")
-            # Attempt to remove the potentially partially added server instance
-            if pytalk_bot.teamtalks and pytalk_bot.teamtalks[-1].server_info.host == host_name and pytalk_bot.teamtalks[-1].server_info.tcp_port == tcp_port:
-                pytalk_bot.teamtalks.pop()
-                logger.info(f"Removed potentially failed server instance for {host_name}:{tcp_port} from list.")
-            return False
+        logger.error(f"Failed to connect or login to TeamTalk server: {host_name}")
+        # Attempt to remove the potentially partially added server instance
+        if pytalk_bot.teamtalks and pytalk_bot.teamtalks[-1].server_info.host == host_name and pytalk_bot.teamtalks[-1].server_info.tcp_port == tcp_port:
+            pytalk_bot.teamtalks.pop()
+            logger.info(f"Removed potentially failed server instance for {host_name}:{tcp_port} from list.")
+        return False
     except Exception as e:
         logger.error(f"Error initializing TeamTalk connection for {host_name}: {e}", exc_info=True)
         # Attempt to remove the potentially partially added server instance on general exception too
@@ -133,7 +131,7 @@ async def close_teamtalk_connection():
 
 async def launch_teamtalk_service(
     host_name: str, tcp_port: int, udp_port: int, user_name: str, password: str,
-    nickname: str, encrypted: bool, join_channel_path: Optional[str],
+    nickname: str, encrypted: bool, join_channel_path: str | None,
     join_channel_pass: str, bot_gender: str, bot_status_text: str
 ):
     logger.info("Starting PyTalk bot service...")
@@ -145,7 +143,7 @@ async def launch_teamtalk_service(
             ):
                 logger.error("Failed to initialize main TeamTalk connection. Service may not work as expected.")
             await pytalk_bot._start()
-    except Exception as e:
+    except Exception:
         logger.exception("Exception in PyTalk bot service loop:", exc_info=True)
     finally:
         logger.info("PyTalk bot service stopped.")
@@ -158,7 +156,7 @@ async def force_restart_instance_on_event(
     password: str,
     nickname: str,
     encrypted: bool,
-    join_channel_path: Optional[str],
+    join_channel_path: str | None,
     join_channel_pass: str,
     bot_gender: str,
     bot_status_text: str
@@ -211,11 +209,11 @@ async def force_restart_instance_on_event(
         else:
             logger.info(f"No existing instance found for {server_key} in pytalk_bot.teamtalks list, or already removed.")
 
-        base_delay = getattr(config, 'TT_RECONNECT_BASE_DELAY', 5)
-        exponent = getattr(config, 'TT_RECONNECT_EXPONENT', 2)
-        max_delay = getattr(config, 'TT_RECONNECT_MAX_DELAY', 60)
+        base_delay = getattr(settings, 'TT_RECONNECT_BASE_DELAY', 5)
+        exponent = getattr(settings, 'TT_RECONNECT_EXPONENT', 2)
+        max_delay = getattr(settings, 'TT_RECONNECT_MAX_DELAY', 60)
         # Use a specific max_tries for restarts, could be different from general reconnection
-        max_tries_restart = getattr(config, 'TT_RESTART_MAX_TRIES', 3)
+        max_tries_restart = getattr(settings, 'TT_RESTART_MAX_TRIES', 3)
 
         backoff_controller = Backoff(base=base_delay, exponent=exponent, max_value=max_delay, max_tries=max_tries_restart)
 
@@ -233,11 +231,9 @@ async def force_restart_instance_on_event(
             if success:
                 logger.info(f"Successfully re-initialized and connected instance for server {server_key}.")
                 break
-            else:
-                logger.warning(f"Failed to re-initialize instance for {server_key} on attempt {backoff_controller.attempts}.")
+            logger.warning(f"Failed to re-initialize instance for {server_key} on attempt {backoff_controller.attempts}.")
 
-        if server_key in active_instance_restarts:
-            del active_instance_restarts[server_key]
+        active_instance_restarts.pop(server_key, None)
 
     task = asyncio.create_task(restart_task())
     active_instance_restarts[server_key] = task
