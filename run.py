@@ -1,10 +1,10 @@
 import argparse
 import asyncio
+import functools
 import logging
 import os
 from pathlib import Path
 import sys
-import functools
 
 from aiogram import Bot as AiogramBot
 from aiogram import Dispatcher
@@ -166,7 +166,7 @@ class Application:
         logger.info("PyTalk event handlers registered.")
 
         # 4. Initialize Telegram Bot
-        self.telegram_bot, self.dispatcher = await run_telegram_bot()
+        self.telegram_bot, self.dispatcher = await run_telegram_bot(self.pytalk_bot)
         if self.telegram_bot:
             # Pass the Aiogram bot instance to the pytalk_bot
             self.pytalk_bot.aiogram_bot_ref = self.telegram_bot

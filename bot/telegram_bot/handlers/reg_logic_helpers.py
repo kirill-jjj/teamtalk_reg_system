@@ -109,6 +109,7 @@ async def _send_tt_credentials_to_user(
 
 
 async def _process_actual_registration(
+    pytalk_bot_instance: pytalk.TeamTalkBot, # New argument
     db_session: AsyncSession,
     state_data: RegistrationStateData,
     source_info: dict,  # The dict passed to TT server
@@ -134,12 +135,13 @@ async def _process_actual_registration(
         reg_msg_key_or_detail,
         artefact_data_val,
     ) = await tt_users_service.perform_teamtalk_registration(
+        pytalk_bot_instance, # New argument
         username_str=state_data.name,
         password_str=state_data.password,
         usertype_to_create=tt_usertype_for_sdk,
         nickname_str=state_data.nickname,
         source_info=source_info,
-        broadcast_message_text=broadcast_text_for_tt,
+        broadcast_message_text=broadcast_message_text,
         teamtalk_default_user_rights=settings.teamtalk_default_user_rights,
         registration_broadcast_enabled=settings.teamtalk_registration_broadcast_enabled,
         host_name=settings.host_name,
@@ -148,7 +150,6 @@ async def _process_actual_registration(
         encrypted=settings.encrypted,
         server_name=settings.server_name,
         teamtalk_public_hostname=settings.tt_public_hostname,
-    )
 
     registrant_user_id = state_data.registrant_telegram_id
     if success:
@@ -237,7 +238,10 @@ async def _process_actual_registration(
     return success, reg_msg_key_or_detail, artefact_data_val
 
 
+import pytalk # New import
+
 async def _handle_registration_continuation(
+    pytalk_bot_instance: pytalk.TeamTalkBot, # New argument
     db_session: AsyncSession,
     state: FSMContext,
     bot: AiogramBot,
@@ -345,6 +349,7 @@ async def _handle_registration_continuation(
             )
 
         await _process_actual_registration(
+            pytalk_bot_instance, # New argument
             db_session=db_session,
             state_data=state_data,
             source_info=source_info,

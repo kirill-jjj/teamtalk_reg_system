@@ -24,7 +24,9 @@ fsm_router = Router()
 
 
 @fsm_router.message(RegistrationStates.awaiting_username)
-async def username_handler(message: types.Message, state: FSMContext):
+import pytalk # New import
+
+async def username_handler(pytalk_bot_instance: pytalk.TeamTalkBot, message: types.Message, state: FSMContext):
     fsm_data = await state.get_data()
     state_data = RegistrationStateData.model_validate(fsm_data or {})
 
@@ -37,7 +39,7 @@ async def username_handler(message: types.Message, state: FSMContext):
         return
 
     logger.debug("Validating username from Telegram: '%s' for user %s", username, message.from_user.id)
-    username_check_result = await tt_users_service.check_username_exists(username)
+    username_check_result = await tt_users_service.check_username_exists(pytalk_bot_instance, username)
 
     if username_check_result is True:
         await message.reply(_("Sorry, this username is already taken. Please choose another username."))
@@ -53,6 +55,7 @@ async def username_handler(message: types.Message, state: FSMContext):
 
 @fsm_router.message(RegistrationStates.awaiting_password)
 async def password_handler(
+    pytalk_bot_instance: pytalk.TeamTalkBot, # New argument
     message: types.Message, state: FSMContext, db_session: AsyncSession, bot: AiogramBot
 ):
     fsm_data = await state.get_data()
@@ -97,6 +100,7 @@ async def password_handler(
 
 @fsm_router.message(RegistrationStates.awaiting_nickname)
 async def nickname_input_handler(
+    pytalk_bot_instance: pytalk.TeamTalkBot, # New argument
     message: types.Message, state: FSMContext, bot: AiogramBot, db_session: AsyncSession
 ):
     nickname_value = message.text.strip()

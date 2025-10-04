@@ -15,11 +15,15 @@ from .middlewares.db_middleware import DbSessionMiddleware
 logger = logging.getLogger(__name__)
 
 
-async def run_telegram_bot():
+import pytalk  # New import
+
+
+async def run_telegram_bot(pytalk_bot_instance: pytalk.TeamTalkBot):
     bot_instance = AiogramBot(token=settings.tg_bot_token)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
     dp["dispatcher"] = dp
+    dp["pytalk_bot_instance"] = pytalk_bot_instance # Pass pytalk_bot_instance to dispatcher context
 
     # Register DbSessionMiddleware
     dp.update.outer_middleware(DbSessionMiddleware())

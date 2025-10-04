@@ -11,6 +11,7 @@ from aiogram.types import InlineKeyboardMarkup
 # CallbackData itself is not directly used here anymore, but kept if other CBs are defined inline
 # from aiogram.filters.callback_data import CallbackData
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+import pytalk  # New import
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,8 +28,6 @@ from ...core.db.models import TelegramRegistration
 from ...core.localization import get_admin_lang_code, get_translator
 
 # For TeamTalk interaction
-from ...teamtalk.connection import pytalk_bot
-
 # Import the callbacks from the new location
 from ..callbacks.admin_callbacks import (  # Added AdminTTAccountsCallback
     AdminBanListActionCallback,
@@ -311,14 +310,14 @@ async def process_manual_ban_handler(message: types.Message, state: FSMContext, 
 # --- TeamTalk Account Listing Handler ---
 
 @router.callback_query(AdminTTAccountsCallback.filter(F.action == "list_all"))
-async def list_all_tt_accounts_handler(callback_query: types.CallbackQuery): # Removed db_session as not used
+async def list_all_tt_accounts_handler(pytalk_bot_instance: pytalk.TeamTalkBot, callback_query: types.CallbackQuery):
     await callback_query.answer()
     admin_lang = get_admin_lang_code()
     _ = get_translator(admin_lang)
 
     tt_instance = None
-    if pytalk_bot.teamtalks and len(pytalk_bot.teamtalks) > 0:
-        tt_instance = pytalk_bot.teamtalks[0] # Assuming one primary TT instance
+    if pytalk_bot_instance.teamtalks and len(pytalk_bot_instance.teamtalks) > 0:
+        tt_instance = pytalk_bot_instance.teamtalks[0] # Assuming one primary TT instance
 
     if not tt_instance or not tt_instance.connected or not hasattr(tt_instance, 'server'): # Changed is_connected() to connected
         logger.warning("list_all_tt_accounts_handler: TeamTalk instance not available or not connected.")
@@ -422,7 +421,7 @@ async def prompt_delete_tt_account_handler(callback_query: types.CallbackQuery, 
 
 
 @router.callback_query(AdminTTAccountsCallback.filter(F.action == "delete_confirm"))
-async def confirm_delete_tt_account_handler(callback_query: types.CallbackQuery, callback_data: AdminTTAccountsCallback):
+async def confirm_delete_tt_account_handler(pytalk_bot_instance: pytalk.TeamTalkBot, callback_query: types.CallbackQuery, callback_data: AdminTTAccountsCallback):
     admin_lang = get_admin_lang_code()
     _ = get_translator(admin_lang)
 
@@ -438,8 +437,8 @@ async def confirm_delete_tt_account_handler(callback_query: types.CallbackQuery,
         return
 
     tt_instance = None
-    if pytalk_bot.teamtalks and len(pytalk_bot.teamtalks) > 0:
-        tt_instance = pytalk_bot.teamtalks[0] # Assuming one primary TT instance
+    if pytalk_bot_instance.teamtalks and len(pytalk_bot_instance.teamtalks) > 0:
+        tt_instance = pytalk_bot_instance.teamtalks[0] # Assuming one primary TT instance
 
     if not tt_instance or not tt_instance.connected or not hasattr(tt_instance, 'server'): # Changed is_connected() to connected
         logger.warning("confirm_delete_tt_account_handler: TeamTalk instance not available or not connected for deleting %s.", tt_username)
