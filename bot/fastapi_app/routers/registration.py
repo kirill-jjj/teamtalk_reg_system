@@ -35,6 +35,7 @@ from bot.fastapi_app.utils import (
 )
 from bot.teamtalk import users as teamtalk_users_service
 from bot.utils.file_generator import generate_tt_file_content, generate_tt_link
+from bot.utils.schemas import TTConnectionInfo, TTUserInfo
 
 # Import DB dependency and CRUD functions
 from ..dependencies import get_db_session
@@ -92,28 +93,31 @@ async def _execute_tt_registration_for_web(
         return False, None
 
 
+from bot.utils.schemas import TTConnectionInfo, TTUserInfo
+
 async def _prepare_downloadables_for_web(
     request: Request,
     background_tasks: BackgroundTasks,
     artefact_data: TeamTalkRegistrationArtefacts,
     db: AsyncSession,
 ) -> dict[str, Any]:
-    username = artefact_data.username
-    password = artefact_data.password
-    file_generation_nickname = artefact_data.final_nickname
     user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     translator = get_translator(user_lang_code)
 
-    tt_content = generate_tt_file_content(
-        server_name_val=artefact_data.server_name,
-        host_val=artefact_data.effective_hostname,
-        tcpport_val=artefact_data.tcp_port,
-        udpport_val=artefact_data.udp_port,
-        encrypted_val=artefact_data.encrypted,
-        username_val=username,
-        password_val=password,
-        nickname_val=file_generation_nickname,
+    connection_info = TTConnectionInfo(
+        server_name=artefact_data.server_name,
+        host=artefact_data.effective_hostname,
+        tcpport=artefact_data.tcp_port,
+        udpport=artefact_data.udp_port,
+        encrypted=artefact_data.encrypted,
     )
+    user_info = TTUserInfo(
+        username=artefact_data.username,
+        password=artefact_data.password,
+        nickname=artefact_data.final_nickname,
+    )
+
+    tt_content = generate_tt_file_content(connection_info, user_info)
     tt_file_name_for_user = f"{artefact_data.server_name}.tt"
     tt_file_path = get_generated_files_path(request.app) / tt_file_name_for_user
 
@@ -153,15 +157,7 @@ async def _prepare_downloadables_for_web(
         delay_seconds=settings.generated_file_ttl_seconds,
     )
 
-    tt_quick_link = generate_tt_link(
-        host_val=artefact_data.effective_hostname,
-        tcpport_val=artefact_data.tcp_port,
-        udpport_val=artefact_data.udp_port,
-        encrypted_val=artefact_data.encrypted,
-        username_val=username,
-        password_val=password,
-        nickname_val=file_generation_nickname,
-    )
+    tt_quick_link = generate_tt_link(connection_info, user_info)
 
     zip_token: str | None = None
     actual_client_zip_filename_for_user: str | None = None

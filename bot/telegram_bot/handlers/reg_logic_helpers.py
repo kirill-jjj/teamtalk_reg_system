@@ -14,6 +14,7 @@ from ...core.config import settings
 from ...core.db import add_pending_telegram_registration, add_telegram_registration
 from ...core.localization import get_admin_lang_code, get_translator
 from ...teamtalk import users as tt_users_service
+from ...utils.schemas import TTConnectionInfo, TTUserInfo
 from ...utils.file_generator import generate_tt_file_content, generate_tt_link
 from ..schemas import RegistrationStateData
 from ..states import RegistrationStates
@@ -62,25 +63,21 @@ async def _send_tt_credentials_to_user(
 ):
     _ = get_translator(user_lang_code)
 
-    tt_file_content_str = generate_tt_file_content(
-        server_name_val=artefact_data["server_name"],
-        host_val=artefact_data["effective_hostname"],
-        tcpport_val=artefact_data["tcp_port"],
-        udpport_val=artefact_data["udp_port"],
-        encrypted_val=artefact_data["encrypted"],
-        username_val=artefact_data["username"],
-        password_val=artefact_data["password"],
-        nickname_val=artefact_data["final_nickname"],
+    connection_info = TTConnectionInfo(
+        server_name=artefact_data["server_name"],
+        host=artefact_data["effective_hostname"],
+        tcpport=artefact_data["tcp_port"],
+        udpport=artefact_data["udp_port"],
+        encrypted=artefact_data["encrypted"],
     )
-    tt_link_str = generate_tt_link(
-        host_val=artefact_data["effective_hostname"],
-        tcpport_val=artefact_data["tcp_port"],
-        udpport_val=artefact_data["udp_port"],
-        encrypted_val=artefact_data["encrypted"],
-        username_val=artefact_data["username"],
-        password_val=artefact_data["password"],
-        nickname_val=artefact_data["final_nickname"],
+    user_info = TTUserInfo(
+        username=artefact_data["username"],
+        password=artefact_data["password"],
+        nickname=artefact_data["final_nickname"],
     )
+
+    tt_file_content_str = generate_tt_file_content(connection_info, user_info)
+    tt_link_str = generate_tt_link(connection_info, user_info)
 
     tt_file_bytes = bytes(tt_file_content_str, encoding="utf-8")
     server_name_for_file = artefact_data["server_name"]
