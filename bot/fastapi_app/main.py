@@ -3,26 +3,32 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.templating import Jinja2Templates
 
 from bot.core.config import settings
-from bot.core.localization import DEFAULT_LANG_CODE, get_translator
+from bot.core.localization import (
+    DEFAULT_LANG_CODE,
+    get_available_languages_for_display,
+    get_translator,
+)
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(root_path=os.getenv("ROOT_PATH", "/"))
 
+
 # --- Jinja2 Context Processor for i18n ---
 def i18n_context_processor(request: Request):
     language_forced = False
     translator = None
-    final_lang_code = DEFAULT_LANG_CODE # Initialize with default
+    final_lang_code = DEFAULT_LANG_CODE  # Initialize with default
 
     if settings.force_user_lang:
         forced_lang_code = settings.force_user_lang
         _ = get_translator(forced_lang_code)
         # Validate if the language is genuinely available
-        original_string = "Username:" # A common string that should be translated
+        original_string = "Username:"  # A common string that should be translated
         translated_string = _(original_string)
 
         if translated_string != original_string:
@@ -31,23 +37,58 @@ def i18n_context_processor(request: Request):
             language_forced = True
             final_lang_code = forced_lang_code
         else:
-            logger.warning(f"FORCE_USER_LANG was set to '{forced_lang_code}', but this language pack seems unavailable or incomplete for web. Falling back.")
+            logger.warning(
+                f"FORCE_USER_LANG was set to '{forced_lang_code}', but this language pack seems unavailable or incomplete for web. Falling back."
+            )
             # Fallback logic will be handled by the else block or default initialization
 
-    if not translator: # If not forced or forced language was invalid
+    if not translator:  # If not forced or forced language was invalid
         cookie_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
         translator = get_translator(cookie_lang_code)
         final_lang_code = cookie_lang_code
-        language_forced = False # Ensure it's false if we fell back or it was never set
+        language_forced = False  # Ensure it's false if we fell back or it was never set
 
-    return {"_": translator, "language_forced": language_forced, "current_lang": final_lang_code}
+    return {
+        "_": translator,
+        "language_forced": language_forced,
+        "current_lang": final_lang_code,
+    }
+
 
 app.state.templates = Jinja2Templates(
-    directory="bot/fastapi_app/templates",
-    context_processors=[i18n_context_processor]
+    directory="bot/fastapi_app/templates", context_processors=[i18n_context_processor]
 )
 app.state.cached_server_name = "DefaultServerName (Not yet loaded)"
 app.state.base_client_zip_path_on_disk = Path("dummy_base_client.zip")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
+    translator = get_translator(user_lang_code)
+    available_languages = get_available_languages_for_display()
+
+    # Format Pydantic's validation errors into a user-friendly string
+    error_messages = []
+    for error in exc.errors():
+        # error['loc'] is a tuple like ('body', 'username')
+        field = error["loc"][-1]
+        message = error["msg"]
+        error_messages.append(f"{field.capitalize()}: {message}")
+
+    return app.state.templates.TemplateResponse(
+        "register.html",
+        {
+            "request": request,
+            "title": translator("registration_title"),
+            "message": "\n".join(error_messages),
+            "show_form": True,
+            "current_lang": user_lang_code,
+            "server_name_from_env": app.state.cached_server_name,
+            "available_languages": available_languages,
+        },
+        status_code=400,
+    )
 
 
 # --- Startup and Shutdown Event Handlers ---
@@ -84,20 +125,25 @@ async def initial_fastapi_app_setup():
 
     # 3. Create and save base client ZIP
     if settings.teamtalk_client_template_dir:
-        base_zip_path = create_and_save_base_client_zip(app, settings.teamtalk_client_template_dir)
+        base_zip_path = create_and_save_base_client_zip(
+            app, settings.teamtalk_client_template_dir
+        )
         if base_zip_path:
             app.state.base_client_zip_path_on_disk = base_zip_path
             logger.info(f"Base client ZIP created at: {base_zip_path}")
         else:
-            logger.error("Failed to create base client ZIP. Functionality requiring it may be affected.")
+            logger.error(
+                "Failed to create base client ZIP. Functionality requiring it may be affected."
+            )
             app.state.base_client_zip_path_on_disk = Path("dummy_base_client.zip")
     else:
-        logger.info("TEAMTALK_CLIENT_TEMPLATE_DIR not configured. Skipping base client ZIP creation.")
+        logger.info(
+            "TEAMTALK_CLIENT_TEMPLATE_DIR not configured. Skipping base client ZIP creation."
+        )
         app.state.base_client_zip_path_on_disk = Path("dummy_base_client.zip")
 
     # 4. Clear runtime state
     logger.info("Download tokens and registered IPs are now DB-managed.")
-
 
     # 5. Refresh translations
     try:
@@ -107,6 +153,7 @@ async def initial_fastapi_app_setup():
         logger.error(f"Error refreshing translations: {e}", exc_info=True)
 
     logger.info("FastAPI startup tasks completed.")
+
 
 @app.on_event("shutdown")
 async def cleanup_fastapi_resources():
@@ -129,6 +176,7 @@ async def cleanup_fastapi_resources():
 from bot.fastapi_app.routers import registration
 
 app.include_router(registration.router)
+
 
 @app.get("/")
 async def root():
