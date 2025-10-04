@@ -102,7 +102,10 @@ These instructions assume you have Python 3.11+ installed.
         *   `ADMIN_IDS`: A list of Telegram User IDs for bot administrators (e.g., `[12345, 67890]`).
         *   TeamTalk server connection details (`HOST_NAME`, `PORT`, `USER_NAME`, `PASSWORD`).
         *   Web registration settings (if enabled, using variables like `WEB_APP_HOST`, `WEB_APP_PORT`).
-    *   You can use a different configuration file by setting the `CONFIG_FILE` environment variable (e.g., `CONFIG_FILE=test.config.toml uv run python run.py`).
+    *   You can use a different configuration file by passing the `--config` argument when running the bot:
+        ```bash
+        uv run python run.py --config your_config.toml
+        ```
 
 6.  **Run the application using `uv`:**
     This command will run the `run.py` script within the `uv`-managed virtual environment. `run.py` now starts both the Telegram bot and the FastAPI web application (using Uvicorn).

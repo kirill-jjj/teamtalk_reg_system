@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 import logging
 import secrets
 
-from aiogram import Bot as AiogramBot
+from aiogram import Bot as AiogramBot, Dispatcher
 from aiogram import F, Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -61,6 +61,18 @@ async def admin_panel_handler(message: types.Message):
 
     keyboard = get_admin_panel_keyboard()
     await message.reply(reply_text, reply_markup=keyboard)
+
+
+@router.message(Command("exit"))
+async def exit_command_handler(message: types.Message, dispatcher: "Dispatcher"):
+    """Handles the /exit command to gracefully shut down the bot."""
+    if message.from_user.id not in settings.admin_ids:
+        logger.warning(f"User {message.from_user.id} (not an admin) tried to use /exit.")
+        return
+
+    logger.info(f"Admin {message.from_user.id} initiated bot shutdown.")
+    await message.reply("Shutting down...")
+    await dispatcher.shutdown()
 
 
 @router.callback_query(F.data == CALLBACK_DATA_DELETE_USER)

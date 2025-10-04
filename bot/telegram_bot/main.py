@@ -37,6 +37,7 @@ async def run_telegram_bot(shutdown_handler_callback: callable = None, db_ready_
     bot_instance = AiogramBot(token=settings.tg_bot_token)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
+    dp["dispatcher"] = dp
 
     # Register DbSessionMiddleware
     dp.update.outer_middleware(DbSessionMiddleware())

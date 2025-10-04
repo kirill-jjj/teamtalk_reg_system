@@ -2,6 +2,22 @@ import asyncio
 import logging
 from pathlib import Path
 import sys
+import os
+
+# --- Argument parsing for config file ---
+# This is done before importing the settings module to ensure the environment
+# variable is set before Pydantic-Settings tries to load the configuration.
+if "--config" in sys.argv:
+    try:
+        config_file_index = sys.argv.index("--config") + 1
+        config_file = sys.argv[config_file_index]
+        os.environ["CONFIG_FILE"] = config_file
+        # Use a print statement here as logger is not configured yet
+        print(f"INFO: Using config file specified via --config: '{config_file}'")
+    except (ValueError, IndexError):
+        print("ERROR: --config flag must be followed by a file path.", file=sys.stderr)
+        sys.exit(1)
+
 
 import uvicorn
 

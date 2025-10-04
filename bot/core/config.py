@@ -145,9 +145,9 @@ class Settings(BaseSettings):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         return (
-            env_settings,
             init_settings,
             TomlConfigSettingsSource(settings_cls),
+            env_settings,
             file_secret_settings,
         )
 

@@ -50,26 +50,21 @@ coverage.xml
 .pytest_cache/
 
 # Translations
-#*.mo # Закомментируем общую, так как есть более специфичная ниже
-*.pot # .pot файлы обычно коммитят, т.к. это шаблон для переводчиков
+*.pot
+**/LC_MESSAGES/*.mo
 
-# Django stuff:
+# Log files
 *.log
-# local_settings.py # Если не используется, можно убрать
-db.sqlite3 # Если имя твоей БД другое, измени
-db.sqlite3-journal # И его журнал
 
-# Flask stuff:
+# Instance folders
 instance/
-.webassets-cache
-generated_data_fastapi/
 
-
-# Scrapy stuff:
+# Scrapy stuff
 .scrapy
 
-# Sphinx documentation
+# Documentation build output
 docs/_build/
+/site
 
 # PyBuilder
 target/
@@ -91,7 +86,7 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
-# Environments
+# Environment variables
 *.env
 .env
 .venv
@@ -101,37 +96,34 @@ ENV/
 env.bak/
 venv.bak/
 
-# Spyder project settings
+# IDE settings
 .spyderproject
 .spyproject
-
-# Rope project settings
 .ropeproject
 
-# mkdocs documentation
-/site
-
-# mypy
+# Type checker caches
 .mypy_cache/
 .dmypy.json
 dmypy.json
-
-# Pyre type checker
 .pyre/
 
-# Compiled gettext files and pot file
-**/LC_MESSAGES/*.mo
-messages.pot
+# Database files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite3
+*.sqlite3-journal
 
-# SQLite database file for the bot
-users.db
-users.db-journal
-
-uv cache
+# UV cache
 .uv_cache/
 
-# Pydantic docs folder
+# Generated data
+generated_data_fastapi/
 pydantic-docs/
 
-# Test database
-test.db
+# Configuration files
+# Ignore all .toml files, but re-include specific ones needed for the project.
+*.toml
+!pyproject.toml
+!config.toml
