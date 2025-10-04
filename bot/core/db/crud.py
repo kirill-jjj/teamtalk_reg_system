@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 import logging
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlmodel import select
 from sqlalchemy.exc import IntegrityError as SQLAlchemyIntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 

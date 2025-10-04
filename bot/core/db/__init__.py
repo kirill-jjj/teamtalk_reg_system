@@ -19,7 +19,6 @@ from .crud import (
     remove_fastapi_download_token,
 )
 from .models import (
-    Base,
     FastapiDownloadToken,
     FastapiRegisteredIp,
     PendingTelegramRegistration,
@@ -33,7 +32,7 @@ from .session import AsyncSessionLocal, async_engine, close_db_engine, init_db
 # This is good practice for packages.
 __all__ = [
     "AsyncSessionLocal",
-    "Base",
+
     "FastapiDownloadToken",      # Added
     "FastapiRegisteredIp",       # Added
     "PendingTelegramRegistration", # Added

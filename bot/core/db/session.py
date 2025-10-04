@@ -6,14 +6,9 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlmodel import SQLModel
 
-# Assuming config.py is in the parent directory 'core' relative to 'db' directory.
-# If bot.core.config is the reliable absolute path, that could be used too.
-# The previous subtask used `from .config import DB_NAME_CONFIG` when modifying database.py
-# which was in the same dir as config.py. Now session.py is in a 'db' subdirectory.
-# So, `from ..config import DB_NAME_CONFIG` should be correct.
 from ..config import settings
-from .models import Base  # Base is now in models.py in the same 'db' directory
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +35,7 @@ AsyncSessionLocal = async_sessionmaker(
 
 async def init_db():
     async with async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(SQLModel.metadata.create_all)
     logger.info("Database initialized.")
 
 
