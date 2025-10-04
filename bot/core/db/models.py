@@ -9,7 +9,8 @@ class TelegramRegistration(SQLModel, table=True):
     __tablename__ = "telegram_registrations"
 
     telegram_id: int | None = Field(
-        default=None, sa_column=Column(BigInteger, primary_key=True, autoincrement=False)
+        default=None,
+        sa_column=Column(BigInteger, primary_key=True, autoincrement=False),
     )
     teamtalk_username: str = Field(unique=True)
 

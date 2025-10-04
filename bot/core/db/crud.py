@@ -44,7 +44,8 @@ async def add_telegram_registration(
             telegram_id=telegram_id, teamtalk_username=teamtalk_username
         )
         session.add(new_registration)
-        await session.flush()  # Flush to get instance persisted for return or catch error
+        await session.flush()
+        # Flush to get instance persisted for return or catch error
         logger.info(
             "Successfully added Telegram ID %s with TeamTalk username %s to session.",
             telegram_id, teamtalk_username
@@ -75,7 +76,9 @@ async def get_teamtalk_username_by_telegram_id(
     return user.teamtalk_username if user else None
 
 
-async def get_all_telegram_registrations(db_session: AsyncSession) -> list[TelegramRegistration]:
+async def get_all_telegram_registrations(
+    db_session: AsyncSession
+) -> list[TelegramRegistration]:
     """Retrieves all entries from the TelegramRegistration table."""
     stmt = select(TelegramRegistration)
     result = await db_session.execute(stmt)
@@ -87,7 +90,9 @@ async def get_all_telegram_registrations(db_session: AsyncSession) -> list[Teleg
 async def get_user_by_identifier(
     db_session: AsyncSession, identifier: str
 ) -> TelegramRegistration | None:
-    """Retrieves a user by Telegram ID (if identifier is numeric) or TeamTalk username."""
+    """Retrieves a user by Telegram ID (if identifier is numeric)
+    or TeamTalk username.
+    """
     stmt = None
     if identifier.isdigit():
         try:
@@ -97,7 +102,8 @@ async def get_user_by_identifier(
             )
             logger.info("Attempting to find user by Telegram ID: %s", telegram_id)
         except ValueError:
-            # This case should ideally not be hit if isdigit() is true, but as a safeguard.
+            # This case should ideally not be hit if isdigit() is true,
+            # but as a safeguard.
             logger.warning(
                 "Identifier '%s' is all digits but failed to convert to int.",
                 identifier
@@ -127,8 +133,12 @@ async def get_user_by_identifier(
     return None # Should not be reached if logic is correct, but as a failsafe.
 
 
-async def delete_telegram_registration(db_session: AsyncSession, telegram_id: int) -> bool:
-    """Deletes a user from the TelegramRegistration table based on telegram_id and commits."""
+async def delete_telegram_registration(
+    db_session: AsyncSession, telegram_id: int
+) -> bool:
+    """Deletes a user from the TelegramRegistration table based on
+    telegram_id and commits.
+    """
     logger.info("Attempting to delete registration for Telegram ID: %s", telegram_id)
     stmt = delete(TelegramRegistration).where(
         TelegramRegistration.telegram_id == telegram_id
@@ -202,8 +212,8 @@ async def get_and_remove_pending_telegram_registration(
     pending_reg = result.scalars().first()
     if pending_reg:
         await db.delete(pending_reg)
-        await db.flush() # Ensure delete is processed
-        logger.info("Retrieved and removed pending registration for request_key: %s", request_key)
+        await db.flush()  # Ensure delete is processed
+        logger.info("Removed pending registration for request_key: %s", request_key)
         return pending_reg
     logger.info("No pending registration found for request_key: %s", request_key)
     return None
@@ -238,7 +248,9 @@ async def add_fastapi_registered_ip(
     # work to update timestamp if desired. For now, let's keep it simple: add
     # if new, or let IntegrityError be caught by caller if it's a duplicate.
     registered_ip = FastapiRegisteredIp(
-        ip_address=ip_address, username=username, registration_timestamp=datetime.now(UTC)
+        ip_address=ip_address,
+        username=username,
+        registration_timestamp=datetime.now(UTC),
     )
     db.add(registered_ip)
     try:
@@ -331,7 +343,11 @@ async def mark_fastapi_download_token_used(
     stmt = select(FastapiDownloadToken).where(FastapiDownloadToken.token == token)
     result = await db.execute(stmt)
     token_entry = result.scalars().first()
-    if token_entry and not token_entry.is_used and token_entry.expires_at >= datetime.now(UTC):
+    if (
+        token_entry
+        and not token_entry.is_used
+        and token_entry.expires_at >= datetime.now(UTC)
+    ):
         token_entry.is_used = True
         await db.flush()
         logger.info("Marked download token %s as used.", token)
@@ -380,7 +396,8 @@ async def create_deeplink_token(
         generated_by_admin_id=generated_by_admin_id
     )
     db.add(new_token)
-    await db.commit()  # Commit to make it available for refresh and subsequent operations
+    await db.commit()
+    # Commit to make it available for refresh and subsequent operations
     await db.refresh(new_token)
     logger.info("Created deeplink token: %s expiring at %s", token_str, expires_at)
     return new_token
@@ -508,13 +525,21 @@ async def get_banned_users(db_session: AsyncSession) -> list[BannedUser]:
     result = await db_session.execute(stmt)
     return list(result.scalars().all()) # Ensure it's a list, not just an iterable
 
-async def get_telegram_id_by_teamtalk_username(db_session: AsyncSession, teamtalk_username: str) -> int | None:
+async def get_telegram_id_by_teamtalk_username(
+    db_session: AsyncSession, teamtalk_username: str
+) -> int | None:
     # This function assumes TelegramRegistration table links TT usernames and TG IDs
-    stmt = select(TelegramRegistration.telegram_id).where(TelegramRegistration.teamtalk_username == teamtalk_username)
+    stmt = select(TelegramRegistration.telegram_id).where(
+        TelegramRegistration.teamtalk_username == teamtalk_username
+    )
     result = await db_session.execute(stmt)
     telegram_id = result.scalar_one_or_none()
     if telegram_id:
-        logger.debug("Found Telegram ID %s for TeamTalk username '%s'.", telegram_id, teamtalk_username)
+        logger.debug(
+            "Found Telegram ID %s for TeamTalk username '%s'.",
+            telegram_id,
+            teamtalk_username,
+        )
     else:
-        logger.debug("No Telegram ID found for TeamTalk username '%s'.", teamtalk_username)
+        logger.debug("No Telegram ID for TT username '%s'.", teamtalk_username)
     return telegram_id

@@ -18,7 +18,7 @@ async def periodic_database_cleanup():
     """
     logger.info("Starting periodic database cleanup task...")
     logger.info("Cleanup interval: %s seconds.", settings.db_cleanup_interval_seconds)
-    logger.info("Pending registration TTL: %s seconds.", settings.pending_reg_ttl_seconds)
+    logger.info("Pending reg TTL: %s seconds.", settings.pending_reg_ttl_seconds)
     logger.info("Registered IP TTL: %s seconds.", settings.registered_ip_ttl_seconds)
 
     while True:
@@ -29,7 +29,7 @@ async def periodic_database_cleanup():
                     db, older_than_seconds=settings.pending_reg_ttl_seconds
                 )
                 if deleted_pending_regs > 0:
-                    logger.info("Cleaned up %s expired pending registrations.", deleted_pending_regs)
+                    logger.info("Cleaned up %s expired pending regs.", deleted_pending_regs)
 
                 deleted_ips = await cleanup_expired_registered_ips(
                     db, older_than_seconds=settings.registered_ip_ttl_seconds
@@ -39,13 +39,13 @@ async def periodic_database_cleanup():
 
                 deleted_tokens = await cleanup_expired_download_tokens(db)
                 if deleted_tokens > 0:
-                    logger.info("Cleaned up %s expired or used download tokens.", deleted_tokens)
+                    logger.info("Cleaned up %s expired/used download tokens.", deleted_tokens)
 
                 deleted_deeplinks_count = await delete_expired_or_used_tokens(db)
                 if deleted_deeplinks_count > 0:
-                    logger.info("Periodic cleanup: Deleted %s expired or used deeplink tokens.", deleted_deeplinks_count)
+                    logger.info("Periodic cleanup: Deleted %s expired/used deeplink tokens.", deleted_deeplinks_count)
                 else:
-                    logger.debug("Periodic cleanup: No expired or used deeplink tokens to delete.")
+                    logger.debug("Periodic cleanup: No expired/used deeplink tokens to delete.")
 
                 await db.commit() # Commit all changes made during this cleanup cycle
                 logger.info("Database cleanup cycle finished.")

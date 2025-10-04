@@ -50,7 +50,8 @@ async def _execute_tt_registration_for_web(
     password: str,
     nickname: str | None,
     source_info_data: dict,
-) -> tuple[bool, TeamTalkRegistrationArtefacts | None]:  # Return success status and artefact_data
+) -> tuple[bool, TeamTalkRegistrationArtefacts | None]:
+    # Return success status and artefact_data
     try:
         broadcast_text_for_tt = None
         if settings.teamtalk_registration_broadcast_enabled:
@@ -80,7 +81,9 @@ async def _execute_tt_registration_for_web(
         )
         if not reg_success_bool:
             logger.error(
-                f"TeamTalk registration failed for user {username} via web, perform_teamtalk_registration returned False."
+                "TeamTalk registration failed for user %s via web, "
+                "perform_teamtalk_registration returned False.",
+                username,
             )
             return False, None
         logger.info("TeamTalk registration successful for user %s via web.", username)
@@ -180,7 +183,8 @@ async def _prepare_downloadables_for_web(
                 filepath_on_server=zip_file_path_on_server.name,  # Store only filename
                 original_filename=actual_client_zip_filename_for_user,
                 token_type="client_zip",
-                expires_at=expires_at_dt,  # Use same expiry for both tokens from one request
+                expires_at=expires_at_dt,
+                # Use same expiry for both tokens from one request
             )
             # schedule_temp_file_deletion now needs the token to remove it from DB
             schedule_temp_file_deletion(
@@ -192,7 +196,9 @@ async def _prepare_downloadables_for_web(
                 delay_seconds=settings.generated_file_ttl_seconds,
             )
         else:
-            logger.warning(f"Failed to create client ZIP for web user {artefact_data.username}")
+            logger.warning(
+                "Failed to create client ZIP for web user %s", artefact_data.username
+            )
 
     return {
         "tt_download_link_token": tt_token,
@@ -206,7 +212,9 @@ async def _prepare_downloadables_for_web(
 
 @router.post("/set_lang_and_reload")
 async def set_language_and_reload(request: Request, lang_code: str = Form(...)):
-    response = RedirectResponse(url=request.url_for("register_page_get"), status_code=302)
+    response = RedirectResponse(
+        url=request.url_for("register_page_get"), status_code=302
+    )
     response.set_cookie(key="user_web_lang", value=lang_code)
     return response
 
@@ -226,10 +234,14 @@ async def register_page_get(request: Request):
             logger.info(f"Web: Language forced to {effective_lang_code} by config.")
         else:
             logger.warning(
-                f"Web: FORCE_USER_LANG set to '{settings.force_user_lang}' but seems invalid/incomplete. Falling back."
+                "Web: FORCE_USER_LANG set to '%s' but seems invalid/incomplete. "
+                "Falling back.",
+                settings.force_user_lang,
             )
             # Fallback to cookie or default
-            effective_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
+            effective_lang_code = request.cookies.get(
+                "user_web_lang", DEFAULT_LANG_CODE
+            )
     else:
         # No force, use cookie or default
         effective_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
@@ -263,7 +275,9 @@ async def register_page_post(
     password: str = Form(...),
     nickname: str | None = Form(None),
 ):
-    payload = RegistrationPayload(username=username, password=password, nickname=nickname)
+    payload = RegistrationPayload(
+        username=username, password=password, nickname=nickname
+    )
     user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     translator = get_translator(user_lang_code)
     user_ip = get_user_ip_fastapi(request)

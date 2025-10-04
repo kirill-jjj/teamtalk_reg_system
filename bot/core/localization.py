@@ -34,16 +34,25 @@ def discover_available_languages() -> list[dict[str, str]]:
                 native_name = lang_code.upper() # Default to uppercase lang_code
                 try:
                     # Load just this specific language to get its native name
-                    lang_translations = babel.support.Translations.load(str(LOCALES_DIR), [lang_code])
+                    lang_translations = babel.support.Translations.load(
+                        str(LOCALES_DIR), [lang_code]
+                    )
                     # Attempt to get the translation for "native_language_name"
                     # This msgid should be defined in each messages.po file
-                    translated_native_name = lang_translations.gettext('native_language_name')
+                    translated_native_name = lang_translations.gettext(
+                        "native_language_name"
+                    )
                     if translated_native_name and translated_native_name != 'native_language_name':
                         native_name = translated_native_name
                 except Exception as e:
-                    logger.warning(f"Could not load native name for language {lang_code} from 'native_language_name': {e}")
+                    logger.warning(
+                        f"Could not load native name for language {lang_code} "
+                        f"from 'native_language_name': {e}"
+                    )
 
-                discovered_languages.append({'code': lang_code, 'native_name': native_name})
+                discovered_languages.append(
+                    {'code': lang_code, 'native_name': native_name}
+                )
             else:
                 logger.debug("No messages.mo file in %s, skipping.", lang_code_dir)
         else:
@@ -51,14 +60,19 @@ def discover_available_languages() -> list[dict[str, str]]:
 
     # If the default language is 'en' and it hasn't been added through a .mo file,
     # add it here silently, as we assume source strings are English.
-    if DEFAULT_LANG_CODE == 'en' and not any(lang['code'] == 'en' for lang in discovered_languages):
+    if (
+        DEFAULT_LANG_CODE == 'en'
+        and not any(lang['code'] == 'en' for lang in discovered_languages)
+    ):
         discovered_languages.append({'code': 'en', 'native_name': 'English'})
         # Optionally, log at a debug level if confirmation of this path is needed.
-        # logger.debug(f"Default language '{DEFAULT_LANG_CODE}' added as a fallback (source strings).")
     elif not any(lang['code'] == DEFAULT_LANG_CODE for lang in discovered_languages):
-        # This case handles if DEFAULT_LANG_CODE is something other than 'en' and is missing
+        # This case handles if DEFAULT_LANG_CODE is something other than 'en'
+        # and is missing
         logger.info("Default language '%s' not found in discovered languages. Adding it as a fallback.", DEFAULT_LANG_CODE)
-        discovered_languages.append({'code': DEFAULT_LANG_CODE, 'native_name': DEFAULT_LANG_CODE.upper() + " (Fallback)"})
+        discovered_languages.append(
+            {'code': DEFAULT_LANG_CODE, 'native_name': DEFAULT_LANG_CODE.upper() + " (Fallback)"}
+        )
 
     logger.info("Discovered languages: %s", discovered_languages)
     return discovered_languages
@@ -75,31 +89,52 @@ def load_translations():
     for lang_info in AVAILABLE_LANGUAGES_LIST:
         lang_code = lang_info['code']
         try:
-            loaded_translation = babel.support.Translations.load(str(LOCALES_DIR), [lang_code])
+            loaded_translation = babel.support.Translations.load(
+                str(LOCALES_DIR), [lang_code]
+            )
             current_translations[lang_code] = loaded_translation
             logger.debug("Successfully loaded translation for '%s'.", lang_code)
         except Exception as e:
-            logger.warning(f"Could not load translation for language '{lang_code}': {e}. Using NullTranslations.")
+            logger.warning(
+                "Could not load translation for language '%s': %s. Using NullTranslations.",
+                lang_code,
+                e,
+            )
             current_translations[lang_code] = babel.support.NullTranslations()
 
-    # Ensure DEFAULT_LANG_CODE (especially 'en') has at least NullTranslations if not properly loaded
+    # Ensure DEFAULT_LANG_CODE (especially 'en') has at least NullTranslations
+    # if not properly loaded
     if DEFAULT_LANG_CODE not in current_translations:
-        # This block is a safeguard, typically hit if DEFAULT_LANG_CODE wasn't in AVAILABLE_LANGUAGES_LIST
-        # (e.g., discover_available_languages did not find it and its fallback also didn't run, which is unlikely for 'en').
-        # Or if it was in the list but failed loading so severely it wasn't even set to NullTranslations in the loop (also unlikely).
+        # This block is a safeguard, typically hit if DEFAULT_LANG_CODE wasn't
+        # in AVAILABLE_LANGUAGES_LIST
+        # (e.g., discover_available_languages did not find it and its fallback
+        # also didn't run, which is unlikely for 'en').
+        # Or if it was in the list but failed loading so severely it wasn't even
+        # set to NullTranslations in the loop (also unlikely).
         logger.warning(
-            f"Default language '{DEFAULT_LANG_CODE}' was not successfully processed or discovered. "
-            f"Ensuring it has a NullTranslations fallback."
+            "Default language '%s' was not successfully processed or discovered. "
+            "Ensuring it has a NullTranslations fallback.",
+            DEFAULT_LANG_CODE,
         )
         current_translations[DEFAULT_LANG_CODE] = babel.support.NullTranslations()
         # Ensure it's in AVAILABLE_LANGUAGES_LIST for display consistency.
-        if not any(lang['code'] == DEFAULT_LANG_CODE for lang in AVAILABLE_LANGUAGES_LIST):
-             logger.info("Adding default language '%s' to available languages list for display (as fallback).", DEFAULT_LANG_CODE)
-             AVAILABLE_LANGUAGES_LIST.append({'code': DEFAULT_LANG_CODE, 'native_name': f"{DEFAULT_LANG_CODE.upper()} (Default)"})
+        if not any(
+            lang['code'] == DEFAULT_LANG_CODE for lang in AVAILABLE_LANGUAGES_LIST
+        ):
+             logger.info(
+                "Adding default language '%s' to available languages list for display (as fallback).",
+                DEFAULT_LANG_CODE,
+            )
+             AVAILABLE_LANGUAGES_LIST.append(
+                {
+                    'code': DEFAULT_LANG_CODE,
+                    'native_name': f"{DEFAULT_LANG_CODE.upper()} (Default)",
+                }
+            )
 
     translations = current_translations
-    logger.info("Final available languages for display: %s", AVAILABLE_LANGUAGES_LIST)
-    logger.info("Translations initialized for language codes: %s", list(translations.keys()))
+    logger.info("Final available languages: %s", AVAILABLE_LANGUAGES_LIST)
+    logger.info("Translations initialized for codes: %s", list(translations.keys()))
 
 # Load translations at module import
 load_translations()
@@ -112,13 +147,21 @@ def get_translator(lang_code: str = None):
 
     selected_lang_code = lang_code
     if selected_lang_code not in translations:
-        logger.debug("Language '%s' not available, falling back to default '%s'.", selected_lang_code, DEFAULT_LANG_CODE)
+        logger.debug(
+            "Language '%s' not available, falling back to default '%s'.",
+            selected_lang_code,
+            DEFAULT_LANG_CODE,
+        )
         selected_lang_code = DEFAULT_LANG_CODE
 
     translator_instance = translations.get(selected_lang_code)
 
     if not translator_instance:
-        logger.error(f"No translator instance found for '{selected_lang_code}', even after fallback. Returning NullTranslations.gettext.")
+        logger.error(
+            "No translator instance found for '%s', even after fallback. "
+            "Returning NullTranslations.gettext.",
+            selected_lang_code,
+        )
         return babel.support.NullTranslations().gettext
 
     return translator_instance.gettext
@@ -134,14 +177,21 @@ def get_admin_lang_code() -> str:
     if not admin_lang_from_config: # Should not happen given default in config
         admin_lang_from_config = DEFAULT_LANG_CODE
 
-    # Normalize: take the first part of "en_US.UTF-8" -> "en", "ru_RU" -> "ru", "RU" -> "ru"
+    # Normalize: take the first part of "en_US.UTF-8" -> "en", "ru_RU" -> "ru",
+    # "RU" -> "ru"
     normalized_admin_lang = admin_lang_from_config.split('_')[0].split('.')[0].lower()
 
     if normalized_admin_lang in translations:
-        return normalized_admin_lang # Return the lowercase version
-    logger.warning(f"Admin language '{admin_lang_from_config}' (normalized to '{normalized_admin_lang}') from config is not available. "
-                   f"Falling back to default language '{DEFAULT_LANG_CODE}'. "
-                   f"Available languages: {list(translations.keys())}")
+        return normalized_admin_lang  # Return the lowercase version
+    logger.warning(
+        "Admin language '%s' (normalized to '%s') from config is not available. "
+        "Falling back to default language '%s'. "
+        "Available languages: %s",
+        admin_lang_from_config,
+        normalized_admin_lang,
+        DEFAULT_LANG_CODE,
+        list(translations.keys()),
+    )
     return DEFAULT_LANG_CODE
 
 def get_available_languages_for_display() -> list[dict[str, str]]:
