@@ -2,8 +2,8 @@ from datetime import datetime, timedelta
 import logging
 import secrets
 
-from aiogram import Bot as AiogramBot, Dispatcher
-from aiogram import F, Router, types
+from aiogram import Bot as AiogramBot
+from aiogram import Dispatcher, F, Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup
@@ -51,7 +51,7 @@ router = Router()
 async def admin_panel_handler(message: types.Message):
     # Admin check
     if message.from_user.id not in settings.admin_ids:
-        logger.warning(f"User {message.from_user.id} (not an admin) tried to use /adminpanel.")
+        logger.warning("User %s (not an admin) tried to use /adminpanel.", message.from_user.id)
         return
 
     # For now, using a simple string. Localization can be added later.
@@ -67,19 +67,21 @@ async def admin_panel_handler(message: types.Message):
 async def exit_command_handler(message: types.Message, dispatcher: "Dispatcher"):
     """Handles the /exit command to gracefully shut down the bot."""
     if message.from_user.id not in settings.admin_ids:
-        logger.warning(f"User {message.from_user.id} (not an admin) tried to use /exit.")
+        logger.warning("User %s (not an admin) tried to use /exit.", message.from_user.id)
         return
 
-    logger.info(f"Admin {message.from_user.id} initiated bot shutdown.")
+    logger.info("Admin %s initiated bot shutdown.", message.from_user.id)
     await message.reply("Shutting down...")
     await dispatcher.shutdown()
 
 
 @router.callback_query(F.data == CALLBACK_DATA_DELETE_USER)
 async def delete_user_start_handler(callback_query: types.CallbackQuery, db_session: AsyncSession): # Removed FSMContext, added db_session
+    admin_lang = get_admin_lang_code() # For localization
+    _ = get_translator(admin_lang)
     # Admin check (important for callback queries too)
     if callback_query.from_user.id not in settings.admin_ids:
-        logger.warning(f"User {callback_query.from_user.id} (not an admin) tried to use delete user callback.")
+        logger.warning("User %s (not an admin) tried to use delete user callback.", callback_query.from_user.id)
         await callback_query.answer(_("Permission denied."), show_alert=True) # Notify user
         return
 
@@ -87,8 +89,8 @@ async def delete_user_start_handler(callback_query: types.CallbackQuery, db_sess
 
     # Edit the original message (e.g., remove keyboard or show status)
     # For now, let's just edit the text. A more sophisticated approach might remove the keyboard.
-    admin_lang = get_admin_lang_code() # For localization
-    _ = get_translator(admin_lang)
+    # Removed old processing text edit, prompt, and state set.
+    # New logic:
 
     # Removed old processing text edit, prompt, and state set.
     # New logic:
@@ -98,7 +100,7 @@ async def delete_user_start_handler(callback_query: types.CallbackQuery, db_sess
         try:
             await callback_query.message.edit_text(_("No registered users found to delete."))
         except Exception as e: # Handle cases where message cannot be edited (e.g. too old)
-            logger.warning(f"Could not edit message for no users found: {e}")
+            logger.warning("Could not edit message for no users found: %s", e)
             await callback_query.message.answer(_("No registered users found to delete."))
         return
 
@@ -115,23 +117,22 @@ async def delete_user_start_handler(callback_query: types.CallbackQuery, db_sess
     try:
         await callback_query.message.edit_text(reply_text, reply_markup=builder.as_markup())
     except Exception as e: # Handle potential errors editing the message
-        logger.warning(f"Could not edit message to show user list: {e}")
+        logger.warning("Could not edit message to show user list: %s", e)
         # Fallback to sending a new message if editing fails
         await callback_query.message.answer(reply_text, reply_markup=builder.as_markup())
 
-    logger.info(f"Admin {callback_query.from_user.id} requested user list for deletion.")
+    logger.info("Admin %s requested user list for deletion.", callback_query.from_user.id)
 
 
 @router.callback_query(AdminDeleteCallback.filter()) # Changed to use AdminDeleteCallback.filter()
 async def confirm_delete_user_handler(callback_query: types.CallbackQuery, db_session: AsyncSession, callback_data: AdminDeleteCallback): # Added callback_data parameter
+    admin_lang = get_admin_lang_code()
+    _ = get_translator(admin_lang)
     # Admin check
     if callback_query.from_user.id not in settings.admin_ids:
         logger.warning(f"User {callback_query.from_user.id} (not an admin) tried to use confirm delete user callback.")
         await callback_query.answer(_("Permission denied."), show_alert=True)
         return
-
-    admin_lang = get_admin_lang_code()
-    _ = get_translator(admin_lang)
 
     # Get telegram_id directly from callback_data
     telegram_id_to_delete = callback_data.user_telegram_id
@@ -143,14 +144,14 @@ async def confirm_delete_user_handler(callback_query: types.CallbackQuery, db_se
     user_reg = user_reg_result.scalar_one_or_none()
     if user_reg:
         tt_username_for_ban = user_reg.teamtalk_username
-        logger.info(f"Found TeamTalk username '{tt_username_for_ban}' for Telegram ID {telegram_id_to_delete} before deletion.")
+        logger.info("Found TeamTalk username '%s' for Telegram ID %s before deletion.", tt_username_for_ban, telegram_id_to_delete)
     else:
-        logger.warning(f"Could not find TelegramRegistration record for Telegram ID {telegram_id_to_delete} before deletion. Will ban without TT username.")
+        logger.warning("Could not find TelegramRegistration record for Telegram ID %s before deletion. Will ban without TT username.", telegram_id_to_delete)
 
     deletion_successful = await delete_telegram_registration(db_session, telegram_id_to_delete)
 
     if deletion_successful:
-        logger.info(f"Admin {callback_query.from_user.id} successfully deleted TelegramRegistration for ID: {telegram_id_to_delete}")
+        logger.info("Admin %s successfully deleted TelegramRegistration for ID: %s", callback_query.from_user.id, telegram_id_to_delete)
 
         # Now, also ban the user
         await add_banned_user(
@@ -160,11 +161,11 @@ async def confirm_delete_user_handler(callback_query: types.CallbackQuery, db_se
             admin_id=callback_query.from_user.id,
             reason="Deleted via bot admin panel"
         )
-        logger.info(f"User {telegram_id_to_delete} (TT: {tt_username_for_ban}) also added to ban list by admin {callback_query.from_user.id}.")
+        logger.info("User %s (TT: %s) also added to ban list by admin %s.", telegram_id_to_delete, tt_username_for_ban, callback_query.from_user.id)
         reply_text = _("User with Telegram ID {telegram_id} has been deleted and banned.").format(telegram_id=telegram_id_to_delete)
     else:
         reply_text = _("Failed to delete user with Telegram ID {telegram_id}.").format(telegram_id=telegram_id_to_delete)
-        logger.warning(f"Admin {callback_query.from_user.id} failed to delete TelegramRegistration for ID: {telegram_id_to_delete} (possibly already deleted or DB error). Ban not applied.")
+        logger.warning("Admin %s failed to delete TelegramRegistration for ID: %s (possibly already deleted or DB error). Ban not applied.", callback_query.from_user.id, telegram_id_to_delete)
 
     await callback_query.answer(reply_text, show_alert=True)
 
@@ -172,7 +173,7 @@ async def confirm_delete_user_handler(callback_query: types.CallbackQuery, db_se
         # Try to edit the original message to show the final status and remove keyboard
         await callback_query.message.edit_text(reply_text, reply_markup=None)
     except Exception as e:
-        logger.debug(f"Could not edit original message after deletion confirmation: {e}. The alert was shown.")
+        logger.debug("Could not edit original message after deletion confirmation: %s. The alert was shown.", e)
         # Optionally send a new message if editing fails and it's critical to display status,
         # but an alert might be sufficient.
         # await callback_query.message.answer(reply_text)
@@ -215,7 +216,7 @@ async def view_ban_list_handler(callback_query: types.CallbackQuery, db_session:
     try:
         await callback_query.message.edit_text(message_text, reply_markup=reply_markup)
     except Exception as e: # Handle cases where message cannot be edited (e.g. too old or no change)
-        logger.debug(f"Failed to edit message for ban list view (might be no change or too old): {e}")
+        logger.debug("Failed to edit message for ban list view (might be no change or too old): %s", e)
         # If editing fails because message is not modified, it's not an error.
         # If it's too old, send a new one. For simplicity, just try answering.
         # Consider sending a new message if edit_text fails for other reasons.
@@ -236,10 +237,10 @@ async def unban_user_handler(callback_query: types.CallbackQuery, callback_data:
     alert_text = ""
     if success:
         alert_text = _("User {target_telegram_id} has been unbanned.").format(target_telegram_id=target_id)
-        logger.info(f"Admin {callback_query.from_user.id} unbanned user {target_id}.")
+        logger.info("Admin %s unbanned user %s.", callback_query.from_user.id, target_id)
     else:
         alert_text = _("Failed to unban user {target_telegram_id}.").format(target_telegram_id=target_id)
-        logger.warning(f"Admin {callback_query.from_user.id} failed to unban user {target_id}.")
+        logger.warning("Admin %s failed to unban user %s.", callback_query.from_user.id, target_id)
     await callback_query.answer(alert_text, show_alert=True)
 
     # Refresh the ban list message
@@ -247,7 +248,7 @@ async def unban_user_handler(callback_query: types.CallbackQuery, callback_data:
     try:
         await callback_query.message.edit_text(message_text, reply_markup=reply_markup)
     except Exception as e:
-        logger.warning(f"Failed to refresh ban list after unban: {e}")
+        logger.warning("Failed to refresh ban list after unban: %s", e)
         # Optionally, send a new message if editing fails
         await callback_query.message.answer(text=_("Action processed. Could not refresh list immediately."), reply_markup=None)
 
@@ -259,7 +260,7 @@ async def manual_ban_prompt_handler(callback_query: types.CallbackQuery, state: 
     try:
         await callback_query.message.edit_text(_("Please enter the Telegram ID and reason for the ban on separate lines."))
     except Exception as e:
-        logger.debug(f"Could not edit message for manual ban prompt (maybe no change): {e}")
+        logger.debug("Could not edit message for manual ban prompt (maybe no change): %s", e)
         await callback_query.message.answer(_("Please enter the Telegram ID and reason for the ban on separate lines.")) # Send as new if edit fails
     await state.set_state(AdminActions.awaiting_manual_ban_id_reason)
 
@@ -298,13 +299,13 @@ async def process_manual_ban_handler(message: types.Message, state: FSMContext, 
         # add_banned_user now typically returns the BannedUser object.
         # Success is implied if no exception was raised and banned_user is not None.
         await message.reply(_("User {telegram_id} has been manually banned.").format(telegram_id=target_telegram_id))
-        logger.info(f"Admin {message.from_user.id} manually banned user {target_telegram_id} with reason: '{reason}'. TT username: {tt_username}")
+        logger.info("Admin %s manually banned user %s with reason: '%s'. TT username: %s", message.from_user.id, target_telegram_id, reason, tt_username)
 
     except ValueError:
-        logger.warning(f"Admin {message.from_user.id} provided invalid Telegram ID for manual ban: {telegram_id_str}")
+        logger.warning("Admin %s provided invalid Telegram ID for manual ban: %s", message.from_user.id, telegram_id_str)
         await message.reply(_("Invalid Telegram ID provided."))
     except Exception as e:
-        logger.error(f"Failed to manually ban user {telegram_id_str} by admin {message.from_user.id}: {e}", exc_info=True)
+        logger.error("Failed to manually ban user %s by admin %s: %s", telegram_id_str, message.from_user.id, e, exc_info=True)
         await message.reply(_("Failed to manually ban user {telegram_id}.").format(telegram_id=telegram_id_str))
 
 # --- TeamTalk Account Listing Handler ---
@@ -324,7 +325,7 @@ async def list_all_tt_accounts_handler(callback_query: types.CallbackQuery): # R
         try:
             await callback_query.message.edit_text(_("Could not connect to the TeamTalk server to get the list of accounts."), reply_markup=None)
         except Exception as e_edit:
-            logger.debug(f"Failed to edit message for TT connection error: {e_edit}")
+            logger.debug("Failed to edit message for TT connection error: %s", e_edit)
             await callback_query.message.answer(_("Could not connect to the TeamTalk server to get the list of accounts."), reply_markup=None)
         return
 
@@ -344,16 +345,16 @@ async def list_all_tt_accounts_handler(callback_query: types.CallbackQuery): # R
                     user_accounts_display.append({"username": username_str})
                 else:
                     # This case should ideally not happen if list_user_accounts() returns standardized objects.
-                    logger.warning(f"TeamTalk UserAccount object {acc_sdk} (type: {type(acc_sdk)}) does not have 'username' attribute.")
+                    logger.warning("TeamTalk UserAccount object %s (type: %s) does not have 'username' attribute.", acc_sdk, type(acc_sdk))
 
-        logger.info(f"Fetched {len(user_accounts_display)} accounts from TeamTalk server using list_user_accounts.")
+        logger.info("Fetched %s accounts from TeamTalk server using list_user_accounts.", len(user_accounts_display))
 
     except Exception as e:
-        logger.error(f"Error fetching TeamTalk accounts using list_user_accounts: {e}", exc_info=True)
+        logger.error("Error fetching TeamTalk accounts using list_user_accounts: %s", e, exc_info=True)
         try:
             await callback_query.message.edit_text(_("Could not connect to the TeamTalk server to get the list of accounts."), reply_markup=None)
         except Exception as e_edit:
-            logger.debug(f"Failed to edit message for TT account fetching error: {e_edit}")
+            logger.debug("Failed to edit message for TT account fetching error: %s", e_edit)
             await callback_query.message.answer(_("Could not connect to the TeamTalk server to get the list of accounts."), reply_markup=None)
         return
 
@@ -376,7 +377,7 @@ async def list_all_tt_accounts_handler(callback_query: types.CallbackQuery): # R
     try:
         await callback_query.message.edit_text(message_text, reply_markup=builder.as_markup() if user_accounts_display else None)
     except Exception as e:
-        logger.warning(f"Failed to edit message for TT account list (maybe no change or too old): {e}")
+        logger.warning("Failed to edit message for TT account list (maybe no change or too old): %s", e)
         # Fallback to sending a new message if editing fails for critical reasons
         await callback_query.message.answer(message_text, reply_markup=builder.as_markup() if user_accounts_display else None)
 
@@ -395,7 +396,7 @@ async def prompt_delete_tt_account_handler(callback_query: types.CallbackQuery, 
         try:
             await callback_query.message.edit_text(error_text, reply_markup=None)
         except Exception as e_edit:
-            logger.debug(f"Failed to edit message for missing tt_username error: {e_edit}")
+            logger.debug("Failed to edit message for missing tt_username error: %s", e_edit)
             await callback_query.message.answer(error_text, reply_markup=None)
         return
 
@@ -415,7 +416,7 @@ async def prompt_delete_tt_account_handler(callback_query: types.CallbackQuery, 
     try:
         await callback_query.message.edit_text(prompt_text, reply_markup=builder.as_markup())
     except Exception as e:
-        logger.error(f"Error editing message for TT delete prompt: {e}", exc_info=True)
+        logger.error("Error editing message for TT delete prompt: %s", e, exc_info=True)
         # Fallback to sending a new message if edit fails (e.g., message too old)
         await callback_query.message.answer(prompt_text, reply_markup=builder.as_markup())
 
@@ -433,7 +434,7 @@ async def confirm_delete_tt_account_handler(callback_query: types.CallbackQuery,
         try:
             await callback_query.message.edit_text(_("Internal error: Username was not provided for deletion."), reply_markup=None)
         except Exception as e_edit:
-            logger.debug(f"Failed to edit message for missing tt_username on confirm: {e_edit}")
+            logger.debug("Failed to edit message for missing tt_username on confirm: %s", e_edit)
         return
 
     tt_instance = None
@@ -441,19 +442,19 @@ async def confirm_delete_tt_account_handler(callback_query: types.CallbackQuery,
         tt_instance = pytalk_bot.teamtalks[0] # Assuming one primary TT instance
 
     if not tt_instance or not tt_instance.connected or not hasattr(tt_instance, 'server'): # Changed is_connected() to connected
-        logger.warning(f"confirm_delete_tt_account_handler: TeamTalk instance not available or not connected for deleting {tt_username}.")
+        logger.warning("confirm_delete_tt_account_handler: TeamTalk instance not available or not connected for deleting %s.", tt_username)
         connection_error_text = _("Could not connect to the TeamTalk server to delete the account.")
         await callback_query.answer(connection_error_text, show_alert=True)
         try:
             await callback_query.message.edit_text(connection_error_text, reply_markup=None)
         except Exception as e_edit:
-            logger.debug(f"Failed to edit message for TT connection error on confirm: {e_edit}")
+            logger.debug("Failed to edit message for TT connection error on confirm: %s", e_edit)
             await callback_query.message.answer(connection_error_text, reply_markup=None) # Send as new if edit fails
         return
 
     final_message = ""
     try:
-        logger.info(f"Admin {callback_query.from_user.id} requesting deletion of TeamTalk user: {tt_username}")
+        logger.info("Admin %s requesting deletion of TeamTalk user: %s", callback_query.from_user.id, tt_username)
 
         # Call the correct pytalk method.
         # Assumed to be synchronous based on documentation (def delete_user_account(...)).
@@ -463,31 +464,31 @@ async def confirm_delete_tt_account_handler(callback_query: types.CallbackQuery,
             final_message = _("TeamTalk user '{tt_username}' was successfully deleted.").format(tt_username=tt_username)
             # Changed show_alert to True as this is the final user feedback on this action.
             await callback_query.answer(final_message, show_alert=True)
-            logger.info(f"TeamTalk user '{tt_username}' deletion command successfully processed by bot for admin {callback_query.from_user.id}. Waiting for server event for actual ban.")
+            logger.info("TeamTalk user '%s' deletion command successfully processed by bot for admin %s. Waiting for server event for actual ban.", tt_username, callback_query.from_user.id)
         else:
             # This case implies the method returned False without raising an exception,
             # which might be unexpected if the library usually raises for errors.
-            logger.warning(f"TeamTalk user '{tt_username}' deletion command returned False for admin {callback_query.from_user.id} without raising an exception.")
+            logger.warning("TeamTalk user '%s' deletion command returned False for admin %s without raising an exception.", tt_username, callback_query.from_user.id)
             final_message = _("Failed to delete TeamTalk user '{tt_username}'. Reason: {error}").format(tt_username=tt_username, error="TeamTalk command indicated failure but no specific error.")
             await callback_query.answer(final_message, show_alert=True)
 
     except PermissionError as e: # Specific exception from pytalk for permission issues
-        logger.error(f"Permission error deleting TeamTalk user '{tt_username}' by admin {callback_query.from_user.id}: {e}", exc_info=True)
+        logger.error("Permission error deleting TeamTalk user '%s' by admin %s: %s", tt_username, callback_query.from_user.id, e, exc_info=True)
         final_message = _("Failed to delete TeamTalk user '{tt_username}'. Reason: {error}").format(tt_username=tt_username, error=f"Permission denied: {e}")
         await callback_query.answer(final_message, show_alert=True)
     except ValueError as e: # Specific exception from pytalk (e.g., user not found, invalid username)
-        logger.error(f"Value error (e.g., user not found) deleting TeamTalk user '{tt_username}' by admin {callback_query.from_user.id}: {e}", exc_info=True)
+        logger.error("Value error (e.g., user not found) deleting TeamTalk user '%s' by admin %s: %s", tt_username, callback_query.from_user.id, e, exc_info=True)
         final_message = _("Failed to delete TeamTalk user '{tt_username}'. Reason: {error}").format(tt_username=tt_username, error=f"Invalid request/user not found: {e}")
         await callback_query.answer(final_message, show_alert=True)
     except Exception as e: # Catch-all for other unexpected errors from the TeamTalk library or other issues
-        logger.error(f"Generic error deleting TeamTalk user '{tt_username}' by admin {callback_query.from_user.id}: {e}", exc_info=True)
+        logger.error("Generic error deleting TeamTalk user '%s' by admin %s: %s", tt_username, callback_query.from_user.id, e, exc_info=True)
         final_message = _("Failed to delete TeamTalk user '{tt_username}'. Reason: {error}").format(tt_username=tt_username, error=f"Unexpected error: {e}")
         await callback_query.answer(final_message, show_alert=True)
 
     try:
         await callback_query.message.edit_text(final_message, reply_markup=None)
     except Exception as e_edit:
-        logger.debug(f"Failed to edit message after TT delete confirmation for user {tt_username}: {e_edit}")
+        logger.debug("Failed to edit message after TT delete confirmation for user %s: %s", tt_username, e_edit)
         # The user already received an alert, so editing is for cleanup.
         # If it fails, it's not critical to send another message.
 
@@ -496,7 +497,7 @@ async def confirm_delete_tt_account_handler(callback_query: types.CallbackQuery,
 async def generate_deeplink_handler(message: types.Message, bot: AiogramBot, db_session: AsyncSession):
     # Check if the user is an admin
     if message.from_user.id not in settings.admin_ids:
-        logger.warning(f"User {message.from_user.id} (not an admin) tried to use /generate.")
+        logger.warning("User %s (not an admin) tried to use /generate.", message.from_user.id)
         # Optionally send a "permission denied" message if desired, or just return.
         # For now, just returning to avoid notifying non-admins about admin commands.
         return
@@ -541,10 +542,10 @@ async def generate_deeplink_handler(message: types.Message, bot: AiogramBot, db_
         # Reply with only the deeplink URL formatted as code.
         reply_text = deeplink_url
         await message.reply(reply_text)
-        logger.info(f"Admin {acting_admin_id} generated deeplink: {deeplink_url}")
+        logger.info("Admin %s generated deeplink: %s", acting_admin_id, deeplink_url)
 
     except Exception as e:
-        logger.error(f"Error generating deeplink: {e}", exc_info=True)
+        logger.error("Error generating deeplink: %s", e, exc_info=True)
         admin_lang = get_admin_lang_code()
         _ = get_translator(admin_lang)
         await message.reply(_("An error occurred while generating the deeplink."))

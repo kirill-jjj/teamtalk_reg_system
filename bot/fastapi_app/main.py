@@ -32,7 +32,7 @@ def i18n_context_processor(request: Request):
         translated_string = _(original_string)
 
         if translated_string != original_string:
-            logger.debug(f"Forcing web language to '{forced_lang_code}' based on config.")
+            logger.debug("Forcing web language to '%s' based on config.", forced_lang_code)
             translator = _
             language_forced = True
             final_lang_code = forced_lang_code
@@ -116,12 +116,12 @@ async def initial_fastapi_app_setup():
     if generated_files_dir.exists():
         shutil.rmtree(generated_files_dir)
     generated_files_dir.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Cleaned and created directory: {generated_files_dir}")
+    logger.info("Cleaned and created directory: %s", generated_files_dir)
 
     if generated_zips_dir.exists():
         shutil.rmtree(generated_zips_dir)
     generated_zips_dir.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Cleaned and created directory: {generated_zips_dir}")
+    logger.info("Cleaned and created directory: %s", generated_zips_dir)
 
     # 3. Create and save base client ZIP
     if settings.teamtalk_client_template_dir:
@@ -130,7 +130,7 @@ async def initial_fastapi_app_setup():
         )
         if base_zip_path:
             app.state.base_client_zip_path_on_disk = base_zip_path
-            logger.info(f"Base client ZIP created at: {base_zip_path}")
+            logger.info("Base client ZIP created at: %s", base_zip_path)
         else:
             logger.error(
                 "Failed to create base client ZIP. Functionality requiring it may be affected."

@@ -21,7 +21,7 @@ class DbSessionMiddleware(BaseMiddleware):
         async with AsyncSessionLocal() as session:
             data["db_session"] = session
             try:
-                logger.debug(f"DbSessionMiddleware: Passing control to handler. Event type: {type(event).__name__}, Data keys: {list(data.keys())}")
+                logger.debug("DbSessionMiddleware: Passing control to handler. Event type: %s, Data keys: %s", type(event).__name__, list(data.keys()))
                 result = await handler(event, data)
                 logger.debug("DbSessionMiddleware: Handler executed successfully. Attempting to commit session.")
                 # Assuming commit is desired if handler completes without error.

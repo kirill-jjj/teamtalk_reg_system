@@ -83,7 +83,7 @@ async def _execute_tt_registration_for_web(
                 f"TeamTalk registration failed for user {username} via web, perform_teamtalk_registration returned False."
             )
             return False, None
-        logger.info(f"TeamTalk registration successful for user {username} via web.")
+        logger.info("TeamTalk registration successful for user %s via web.", username)
         return True, TeamTalkRegistrationArtefacts(**tt_artefact_data)
     except Exception as e:
         logger.error(
@@ -93,7 +93,6 @@ async def _execute_tt_registration_for_web(
         return False, None
 
 
-from bot.utils.schemas import TTConnectionInfo, TTUserInfo
 
 async def _prepare_downloadables_for_web(
     request: Request,
@@ -325,6 +324,12 @@ async def register_page_post(
     )
 
     if not registration_successful or not tt_artefact_data_from_reg:
+        message = translator("An error occurred during TeamTalk registration. Please try again later or contact an administrator.")
+        available_languages = get_available_languages_for_display()
+        return request.app.state.templates.TemplateResponse(
+            "register.html",
+            {
+                "request": request,
                 "title": translator("TeamTalk Registration"),
                 "message": message,
                 "show_form": True,
@@ -412,6 +417,9 @@ async def download_tt_file(
             await mark_fastapi_download_token_used(db, token)
             return FileResponse(
                 path=file_path,
+                media_type="application/octet-stream",
+                filename=user_download_filename,
+            )
     raise HTTPException(
         status_code=404, detail=translator("The requested file could not be found or the link has expired.")
     )
@@ -438,6 +446,7 @@ async def download_client_zip_file(
                 media_type="application/zip",
                 filename=user_download_filename,
             )
-    raise HTTPException(
-        status_code=404, detail=translator("The requested file could not be found or the link has expired.")
-    )
+    else:
+        raise HTTPException(
+            status_code=404, detail=translator("The requested file could not be found or the link has expired.")
+        )

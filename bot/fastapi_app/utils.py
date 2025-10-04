@@ -22,7 +22,7 @@ async def cleanup_temp_file_and_token_task(file_path_to_delete: Path, token_to_r
     try:
         if file_path_to_delete.exists():
             await aiofiles.os.remove(file_path_to_delete)
-            logger.info(f"Successfully deleted temporary file: {file_path_to_delete}")
+            logger.info("Successfully deleted temporary file: %s", file_path_to_delete)
         else:
             logger.warning(f"Temporary file not found for deletion: {file_path_to_delete}")
 
@@ -30,7 +30,7 @@ async def cleanup_temp_file_and_token_task(file_path_to_delete: Path, token_to_r
         async with AsyncSessionLocal() as db:
             success = await remove_fastapi_download_token(db, token_to_remove)
             if success:
-                logger.info(f"Successfully deleted token from DB: {token_to_remove}")
+                logger.info("Successfully deleted token from DB: %s", token_to_remove)
                 await db.commit() # Commit if remove_fastapi_download_token doesn't
             else:
                 logger.warning(f"Token not found in DB or failed to delete: {token_to_remove}")
@@ -68,7 +68,7 @@ def schedule_temp_file_deletion(
         await cleanup_temp_file_and_token_task(full_file_path, token_to_remove)
 
     background_tasks.add_task(delayed_cleanup)
-    logger.info(f"Scheduled cleanup for token {token_to_remove}, file {full_file_path} in {delay_seconds}s")
+    logger.info("Scheduled cleanup for token %s, file %s in %ss", token_to_remove, full_file_path, delay_seconds)
 
 
 import configparser  # For modify_teamtalk_ini_from_template
@@ -209,7 +209,7 @@ def create_and_save_base_client_zip(app: FastAPI, template_dir_str: str) -> Path
                     file_path_item = Path(root) / file_item
                     archive_path = file_path_item.relative_to(template_dir_base)
                     zipf.write(file_path_item, str(archive_path))
-        logger.info(f"Base client ZIP created and saved to: {target_zip_path}")
+        logger.info("Base client ZIP created and saved to: %s", target_zip_path)
         return target_zip_path
     except Exception as e:
         logger.error(f"Error creating and saving base client ZIP: {e}", exc_info=True)

@@ -20,7 +20,7 @@ def set_aiogram_bot_instance(bot: AiogramBot):
     global pytalk_bot
     pytalk_bot.aiogram_bot_ref = bot
     bot_id_info = getattr(bot, 'id', 'N/A') if bot else 'None'
-    logger.info(f"Aiogram bot instance (ID: {bot_id_info}) set on pytalk_bot.")
+    logger.info("Aiogram bot instance (ID: %s) set on pytalk_bot.", bot_id_info)
 
 async def initialize_teamtalk_connection(
     host_name: str, tcp_port: int, udp_port: int, user_name: str, password: str,
@@ -42,7 +42,7 @@ async def initialize_teamtalk_connection(
         await pytalk_bot.add_server(server_info_pytalk)
 
         if pytalk_bot.teamtalks and pytalk_bot.teamtalks[-1].logged_in:
-            logger.info(f"Successfully connected and logged into TeamTalk server: {host_name}")
+            logger.info("Successfully connected and logged into TeamTalk server: %s", host_name)
             active_server_instance = pytalk_bot.teamtalks[-1]
 
             # Store original parameters on the instance for potential reconnection/restart
@@ -57,10 +57,10 @@ async def initialize_teamtalk_connection(
                 join_password = join_channel_pass if join_channel_pass else ""
                 try:
                     channel_id_int = int(channel_to_join_str)
-                    logger.info(f"Attempting to join channel by ID: {channel_id_int}")
+                    logger.info("Attempting to join channel by ID: %s", channel_id_int)
                     active_server_instance.join_channel_by_id(id=channel_id_int, password=join_password)
                 except ValueError:
-                    logger.info(f"Attempting to join channel by path: '{channel_to_join_str}'")
+                    logger.info("Attempting to join channel by path: '%s'", channel_to_join_str)
                     try:
                         channel_obj = active_server_instance.get_channel_from_path(channel_to_join_str)
                         if channel_obj and channel_obj.id is not None:
@@ -75,13 +75,13 @@ async def initialize_teamtalk_connection(
             gender_map = {"male": Status.online.male, "female": Status.online.female, "neutral": Status.online.neutral}
             mapped_gender_status = gender_map.get(bot_gender.lower(), Status.online.neutral)
             active_server_instance.change_status(status_flags=mapped_gender_status, status_message=bot_status_text)
-            logger.info(f"Set TeamTalk status to '{bot_status_text}' with gender '{bot_gender}'.")
+            logger.info("Set TeamTalk status to '%s' with gender '%s'.", bot_status_text, bot_gender)
             return True
         logger.error(f"Failed to connect or login to TeamTalk server: {host_name}")
         # Attempt to remove the potentially partially added server instance
         if pytalk_bot.teamtalks and pytalk_bot.teamtalks[-1].server_info.host == host_name and pytalk_bot.teamtalks[-1].server_info.tcp_port == tcp_port:
             pytalk_bot.teamtalks.pop()
-            logger.info(f"Removed potentially failed server instance for {host_name}:{tcp_port} from list.")
+            logger.info("Removed potentially failed server instance for %s:%s from list.", host_name, tcp_port)
         return False
     except Exception as e:
         logger.error(f"Error initializing TeamTalk connection for {host_name}: {e}", exc_info=True)
@@ -92,7 +92,7 @@ async def initialize_teamtalk_connection(
             last_instance = pytalk_bot.teamtalks[-1]
             if hasattr(last_instance, 'server_info') and last_instance.server_info.host == host_name and last_instance.server_info.tcp_port == tcp_port:
                  pytalk_bot.teamtalks.pop()
-                 logger.info(f"Removed server instance for {host_name}:{tcp_port} from list due to exception during init.")
+                 logger.info("Removed server instance for %s:%s from list due to exception during init.", host_name, tcp_port)
         return False
 
 async def close_teamtalk_connection():
@@ -109,15 +109,15 @@ async def close_teamtalk_connection():
         elif hasattr(tt_instance, 'server_info') and tt_instance.server_info and hasattr(tt_instance.server_info, 'host'):
              host_display = tt_instance.server_info.host
 
-        logger.debug(f"Processing instance for host: {host_display} for shutdown.")
+        logger.debug("Processing instance for host: %s for shutdown.", host_display)
         try:
             if hasattr(tt_instance, 'logged_in') and tt_instance.logged_in: tt_instance.logout()
             if hasattr(tt_instance, 'connected') and tt_instance.connected: tt_instance.disconnect()
             if hasattr(tt_instance, 'super') and hasattr(tt_instance.super, 'closeTeamTalk'):
-                logger.info(f"Closing TeamTalk SDK for instance {host_display}...")
+                logger.info("Closing TeamTalk SDK for instance %s...", host_display)
                 tt_instance.super.closeTeamTalk()
             pytalk_bot.teamtalks.pop(i)
-            logger.info(f"Disconnected, closed SDK, and removed instance for host: {host_display}.")
+            logger.info("Disconnected, closed SDK, and removed instance for host: %s.", host_display)
         except Exception as e: logger.error(f"Error during shutdown for {host_display}: {e}", exc_info=True)
 
     # This might be redundant if all instances are closed and popped correctly
@@ -125,7 +125,7 @@ async def close_teamtalk_connection():
         pytalk_bot._close_all_sdk()
         logger.info("Called pytalk_bot._close_all_sdk() as all instances were removed.")
     elif pytalk_bot.teamtalks:
-        logger.warning(f"Not all instances removed from pytalk_bot.teamtalks list during close: {len(pytalk_bot.teamtalks)} remaining.")
+        logger.warning("Not all instances removed from pytalk_bot.teamtalks list during close: %s remaining.", len(pytalk_bot.teamtalks))
 
     logger.info("PyTalk bot shutdown process completed.")
 
@@ -163,10 +163,10 @@ async def force_restart_instance_on_event(
 ):
     server_key = f"{host_name}:{tcp_port}"
     if server_key in active_instance_restarts and not active_instance_restarts[server_key].done():
-        logger.warning(f"Instance restart for {server_key} is already in progress. Skipping.")
+        logger.warning("Instance restart for %s is already in progress. Skipping.", server_key)
         return
 
-    logger.info(f"Starting forceful instance restart process for server {server_key}...")
+    logger.info("Starting forceful instance restart process for server %s...", server_key)
 
     original_args = (host_name, tcp_port, udp_port, user_name, password, nickname, encrypted,
                      join_channel_path, join_channel_pass, bot_gender, bot_status_text)
@@ -184,18 +184,18 @@ async def force_restart_instance_on_event(
 
             if instance_matches:
                 instance_to_remove_idx = i
-                logger.info(f"Found existing instance for {server_key} at index {i} to shutdown.")
+                logger.info("Found existing instance for %s at index %s to shutdown.", server_key, i)
                 try:
                     if hasattr(tt_instance, 'logged_in') and tt_instance.logged_in:
-                        logger.info(f"Logging out instance for {server_key}...")
+                        logger.info("Logging out instance for %s...", server_key)
                         tt_instance.logout()
                     if hasattr(tt_instance, 'connected') and tt_instance.connected:
-                        logger.info(f"Disconnecting instance for {server_key}...")
+                        logger.info("Disconnecting instance for %s...", server_key)
                         tt_instance.disconnect()
                     if hasattr(tt_instance, 'super') and hasattr(tt_instance.super, 'closeTeamTalk'):
-                        logger.info(f"Closing TeamTalk SDK for instance {server_key}...")
+                        logger.info("Closing TeamTalk SDK for instance %s...", server_key)
                         tt_instance.super.closeTeamTalk()
-                    logger.info(f"Instance for {server_key} shutdown procedures called.")
+                    logger.info("Instance for %s shutdown procedures called.", server_key)
                 except Exception as e_shutdown:
                     logger.error(f"Error during shutdown of instance for {server_key}: {e_shutdown}", exc_info=True)
                 break
@@ -203,11 +203,11 @@ async def force_restart_instance_on_event(
         if instance_to_remove_idx != -1:
             try:
                 pytalk_bot.teamtalks.pop(instance_to_remove_idx)
-                logger.info(f"Old instance for {server_key} removed from pytalk_bot.teamtalks list.")
+                logger.info("Old instance for %s removed from pytalk_bot.teamtalks list.", server_key)
             except IndexError:
-                logger.warning(f"Could not pop instance at index {instance_to_remove_idx} for {server_key}, list changed?")
+                logger.warning("Could not pop instance at index %s for %s, list changed?", instance_to_remove_idx, server_key)
         else:
-            logger.info(f"No existing instance found for {server_key} in pytalk_bot.teamtalks list, or already removed.")
+            logger.info("No existing instance found for %s in pytalk_bot.teamtalks list, or already removed.", server_key)
 
         base_delay = getattr(settings, 'TT_RECONNECT_BASE_DELAY', 5)
         exponent = getattr(settings, 'TT_RECONNECT_EXPONENT', 2)
@@ -220,18 +220,18 @@ async def force_restart_instance_on_event(
         while True:
             delay = backoff_controller.delay()
             if delay is None:
-                logger.error(f"Max restart attempts reached for server {server_key}. Giving up.")
+                logger.error("Max restart attempts reached for server %s. Giving up.", server_key)
                 break
 
-            logger.info(f"Attempting to re-initialize instance for {server_key} (attempt {backoff_controller.attempts}/{max_tries_restart}). Waiting for {delay:.2f} seconds...")
+            logger.info("Attempting to re-initialize instance for %s (attempt %s/%s). Waiting for %.2f seconds...", server_key, backoff_controller.attempts, max_tries_restart, delay)
             await asyncio.sleep(delay)
 
             success = await initialize_teamtalk_connection(*original_args)
 
             if success:
-                logger.info(f"Successfully re-initialized and connected instance for server {server_key}.")
+                logger.info("Successfully re-initialized and connected instance for server %s.", server_key)
                 break
-            logger.warning(f"Failed to re-initialize instance for {server_key} on attempt {backoff_controller.attempts}.")
+            logger.warning("Failed to re-initialize instance for %s on attempt %s.", server_key, backoff_controller.attempts)
 
         active_instance_restarts.pop(server_key, None)
 

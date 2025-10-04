@@ -50,5 +50,5 @@ class UserBanMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         # If not banned, or if any error occurred above (and didn't return None)
-        logger.debug(f"UserBanMiddleware: User {user.id} is not banned or check failed. Proceeding with handler for event type: {type(event).__name__}.")
+        logger.debug("UserBanMiddleware: User %s is not banned or check failed. Proceeding with handler for event type: %s.", user.id, type(event).__name__)
         return await handler(event, data)

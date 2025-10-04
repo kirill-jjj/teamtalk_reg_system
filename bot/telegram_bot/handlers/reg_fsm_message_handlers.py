@@ -36,7 +36,7 @@ async def username_handler(message: types.Message, state: FSMContext):
         await message.reply(_("Hello! Please enter a username for registration."))
         return
 
-    logger.debug(f"Validating username from Telegram: '{username}' for user {message.from_user.id}")
+    logger.debug("Validating username from Telegram: '%s' for user %s", username, message.from_user.id)
     username_check_result = await tt_users_service.check_username_exists(username)
 
     if username_check_result is True:
@@ -47,7 +47,7 @@ async def username_handler(message: types.Message, state: FSMContext):
         await message.reply(_("Now enter a password."))
         await state.set_state(RegistrationStates.awaiting_password)
     else:
-        logger.error(f"Username check error for user {message.from_user.id} with username '{username}'.")
+        logger.error("Username check error for user %s with username '%s'.", message.from_user.id, username)
         await message.reply(_("Registration error. Please try again later or contact an administrator."))
 
 

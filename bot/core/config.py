@@ -8,6 +8,7 @@ and validated source of truth for all configuration parameters.
 import logging
 import os
 from pathlib import Path
+import sys
 import tomllib
 from typing import Any
 
@@ -23,8 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class TomlConfigSettingsSource(PydanticBaseSettingsSource):
-    """
-    A settings source that loads variables from a TOML file.
+    """A settings source that loads variables from a TOML file.
     """
 
     def __init__(self, settings_cls: type[BaseSettings]):
@@ -33,10 +33,10 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
         toml_file_path = Path(toml_file_path_str)
 
         if not toml_file_path.is_file():
-            logger.debug(f"TOML config file not found at '{toml_file_path}'.")
+            logger.debug("TOML config file not found at '%s'.", toml_file_path)
             self._toml_data = {}
         else:
-            logger.debug(f"Loading configuration from TOML file: '{toml_file_path}'")
+            logger.debug("Loading configuration from TOML file: '%s'", toml_file_path)
             try:
                 with open(toml_file_path, "rb") as f:
                     self._toml_data = tomllib.load(f)
@@ -167,4 +167,4 @@ except (ValidationError, FileNotFoundError) as e:
     else:
         logger.error(f"Configuration validation error: {e}")
     # Exit if critical configuration is missing
-    exit(1)
+    sys.exit(1)

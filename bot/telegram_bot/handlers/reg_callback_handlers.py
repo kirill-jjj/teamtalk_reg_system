@@ -54,7 +54,7 @@ async def language_selection_handler(
     try:
         await callback_query.message.delete()
     except Exception as e:
-        logger.debug(f"Could not delete language selection message: {e}")
+        logger.debug("Could not delete language selection message: %s", e)
 
     if (
         not state_data.is_admin_registrar
@@ -88,9 +88,7 @@ async def tt_account_type_choice_handler(
     state_data.tt_account_type = callback_data.account_type
     await state.set_data(state_data.model_dump())
 
-    logger.info(
-        f"Admin {callback_query.from_user.id} chose TeamTalk account type: {callback_data.account_type} for user {state_data.name}"
-    )
+    logger.info("Admin %s chose TeamTalk account type: %s for user %s", callback_query.from_user.id, callback_data.account_type, state_data.name)
 
     await callback_query.answer()
 
@@ -124,7 +122,7 @@ async def admin_verification_handler(
         try:
             await callback_query.message.delete()
         except Exception as e:
-            logger.debug(f"Error deleting admin verification message: {e}")
+            logger.debug("Error deleting admin verification message: %s", e)
         return
 
     registrant_user_tg_id = pending_reg_data_model.registrant_telegram_id
@@ -150,7 +148,7 @@ async def admin_verification_handler(
             )
         except Exception as e:
             logger.warning(
-                f"Could not notify user {registrant_user_tg_id} about being already registered: {e}"
+                "Could not notify user %s about being already registered: %s", registrant_user_tg_id, e
             )
         try:
             await callback_query.message.delete()
@@ -191,9 +189,7 @@ async def admin_verification_handler(
                     _("Your registration has been approved by the administrator. You can now use TeamTalk."),
                 )
             except Exception as e:
-                logger.warning(
-                    f"Could not send approval notification to user {registrant_user_tg_id}: {e}"
-                )
+                logger.warning("Could not send approval notification to user %s: %s", registrant_user_tg_id, e)
 
             acting_admin_id = callback_query.from_user.id
             acting_admin_name = callback_query.from_user.full_name
@@ -216,7 +212,7 @@ async def admin_verification_handler(
                 for other_admin_id in settings.admin_ids:
                     if other_admin_id != acting_admin_id:
                         logger.info(
-                            f"Notifying admin {other_admin_id} about registration approval by {acting_admin_id} for TT user {state_data_from_pending.name}"
+                            "Notifying admin %s about registration approval by %s for TT user %s", other_admin_id, acting_admin_id, state_data_from_pending.name
                         )
                         await bot.send_message(
                             chat_id=other_admin_id, text=notification_message
@@ -225,7 +221,8 @@ async def admin_verification_handler(
                 logger.info("No ADMIN_IDS configured, skipping notification to other admins.")
         else:
             logger.error(
-                f"Registration for TT user {state_data_from_pending.name} (TG ID: {registrant_user_tg_id}) was approved by admin {callback_query.from_user.id}, but _process_actual_registration failed."
+                "Registration for TT user %s (TG ID: %s) was approved by admin %s, but _process_actual_registration failed.",
+                state_data_from_pending.name, registrant_user_tg_id, callback_query.from_user.id
             )
             try:
                 await bot.send_message(
@@ -234,9 +231,7 @@ async def admin_verification_handler(
                     ).format(username=state_data_from_pending.name),
                 )
             except Exception as e_admin_crit:
-                logger.error(
-                    f"Failed to send critical failure notice to approving admin {callback_query.from_user.id}: {e_admin_crit}"
-                )
+                logger.error("Failed to send critical failure notice to approving admin %s: %s", callback_query.from_user.id, e_admin_crit)
 
     elif decision_action == "reject":
         await callback_query.answer(
@@ -250,7 +245,7 @@ async def admin_verification_handler(
             )
         except Exception as e:
             logger.warning(
-                f"Could not send decline notification to user {registrant_user_tg_id}: {e}"
+                "Could not send decline notification to user %s: %s", registrant_user_tg_id, e
             )
 
         acting_admin_id = callback_query.from_user.id
@@ -273,9 +268,7 @@ async def admin_verification_handler(
         if settings.admin_ids:
             for other_admin_id in settings.admin_ids:
                 if other_admin_id != acting_admin_id:
-                    logger.info(
-                        f"Notifying admin {other_admin_id} about registration rejection by {acting_admin_id} for TT user {state_data_from_pending.name}"
-                    )
+            logger.info("Notifying admin %s about registration rejection by %s for TT user %s", other_admin_id, acting_admin_id, state_data_from_pending.name)
                     await bot.send_message(chat_id=other_admin_id, text=notification_message)
         else:
             logger.info(
@@ -285,7 +278,7 @@ async def admin_verification_handler(
     try:
         await callback_query.message.edit_reply_markup(reply_markup=None)
     except Exception as e:
-        logger.debug(f"Could not remove buttons from admin message: {e}")
+        logger.debug("Could not remove buttons from admin message: %s", e)
 
 
 @callback_router.callback_query(
@@ -310,7 +303,7 @@ async def nickname_choice_handler(
     try:
         await callback_query.message.delete()
     except Exception as e:
-        logger.debug(f"Could not delete nickname choice message: {e}")
+        logger.debug("Could not delete nickname choice message: %s", e)
 
     if choice_action == "provide":
         await callback_query.message.answer(_("Please enter your desired nickname."))
@@ -318,7 +311,7 @@ async def nickname_choice_handler(
     elif choice_action == "generate":
         if not state_data.name:
             logger.error(
-                f"Username not found in state for nickname generation. User: {callback_query.from_user.id}"
+                "Username not found in state for nickname generation. User: %s", callback_query.from_user.id
             )
             await callback_query.message.answer(
                 _("Error: Username not found. Please start over.")
@@ -334,9 +327,7 @@ async def nickname_choice_handler(
             message_or_callback_query=callback_query,
         )
     else:
-        logger.warning(
-            f"Invalid choice action '{choice_action}' in nickname_choice_handler by user {callback_query.from_user.id}"
-        )
+        logger.warning("Invalid choice action '%s' in nickname_choice_handler by user %s", choice_action, callback_query.from_user.id)
         await callback_query.message.answer(_("Invalid choice. Please try again."))
 
 

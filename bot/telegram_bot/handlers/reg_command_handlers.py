@@ -70,7 +70,7 @@ async def start_command_handler(
     )
     _ = get_translator(initial_lang_code)
 
-    logger.info(f"User {telegram_id} initiated /start command. Args: '{args if args else None}'")
+    logger.info("User %s initiated /start command. Args: '%s'", telegram_id, args if args else None)
 
     state_data = RegistrationStateData(
         registrant_telegram_id=telegram_id, selected_language=initial_lang_code
@@ -79,7 +79,7 @@ async def start_command_handler(
     if args:  # A token is present in the /start command (deeplink)
         if not settings.telegram_deeplink_registration_enabled:
             logger.info(
-                f"User {telegram_id} attempted to use deeplink '{args}' but feature is disabled."
+                "User %s attempted to use deeplink '%s' but feature is disabled.", telegram_id, args
             )
             return
 
@@ -87,7 +87,7 @@ async def start_command_handler(
         deeplink_token = await get_valid_deeplink_token(db_session, token_str)
 
         if deeplink_token:
-            logger.info(f"User {telegram_id} used valid deeplink token: {token_str}")
+            logger.info("User %s used valid deeplink token: %s", telegram_id, token_str)
 
             if await is_telegram_id_registered(db_session, telegram_id):
                 await message.answer(
@@ -102,7 +102,7 @@ async def start_command_handler(
             await state.set_data(state_data.model_dump())
 
             logger.info(
-                f"Deeplink registration started for user {telegram_id} with token {token_str}. Language set to {initial_lang_code}."
+                "Deeplink registration started for user %s with token %s. Language set to %s.", telegram_id, token_str, initial_lang_code
             )
 
             await state.set_state(RegistrationStates.choosing_language)
@@ -112,9 +112,7 @@ async def start_command_handler(
             )
             return
 
-        logger.warning(
-            f"User {telegram_id} used invalid/expired/used deeplink token: {token_str}"
-        )
+            logger.warning("User %s used invalid/expired/used deeplink token: %s", telegram_id, token_str)
         await message.answer(
             _("This registration link is invalid, expired, or has already been used.")
         )
@@ -123,15 +121,13 @@ async def start_command_handler(
 
     if not settings.telegram_public_registration_enabled:
         logger.info(
-            f"User {telegram_id} attempted public /start but feature is disabled. Ignoring."
+            "User %s attempted public /start but feature is disabled. Ignoring.", telegram_id
         )
         return
 
     state_data.is_admin_registrar = telegram_id in settings.admin_ids
     await state.set_data(state_data.model_dump())
-    logger.info(
-        f"User {telegram_id} starting public registration. Admin registrar: {state_data.is_admin_registrar}. Language set to {initial_lang_code}."
-    )
+    logger.info("User %s starting public registration. Admin registrar: %s. Language set to %s.", telegram_id, state_data.is_admin_registrar, initial_lang_code)
 
     if not state_data.is_admin_registrar and await is_telegram_id_registered(
         db_session, telegram_id
@@ -151,9 +147,7 @@ async def start_command_handler(
         translated_prompt = _f(prompt_key)
 
         if translated_prompt != prompt_key or forced_lang_code == "en":
-            logger.info(
-                f"Forcing language to '{forced_lang_code}' for user {telegram_id} (public start) based on config."
-            )
+            logger.info("Forcing language to '%s' for user %s (public start) based on config.", forced_lang_code, telegram_id)
             state_data.selected_language = forced_lang_code
             await state.set_data(state_data.model_dump())
             _ = _f
@@ -161,7 +155,7 @@ async def start_command_handler(
             await state.set_state(RegistrationStates.awaiting_username)
             return
         logger.warning(
-            f"FORCE_USER_LANG was set to '{forced_lang_code}', but this language pack seems unavailable or incomplete. Proceeding with language selection for public start."
+            "FORCE_USER_LANG was set to '%s', but this language pack seems unavailable or incomplete. Proceeding with language selection for public start.", forced_lang_code
         )
 
     await message.reply(

@@ -18,9 +18,9 @@ async def periodic_database_cleanup(db_ready_event: asyncio.Event):
     Waits for the db_ready_event before starting its cycles.
     """
     logger.info("Starting periodic database cleanup task...")
-    logger.info(f"Cleanup interval: {settings.db_cleanup_interval_seconds} seconds.")
-    logger.info(f"Pending registration TTL: {settings.pending_reg_ttl_seconds} seconds.")
-    logger.info(f"Registered IP TTL: {settings.registered_ip_ttl_seconds} seconds.")
+    logger.info("Cleanup interval: %s seconds.", settings.db_cleanup_interval_seconds)
+    logger.info("Pending registration TTL: %s seconds.", settings.pending_reg_ttl_seconds)
+    logger.info("Registered IP TTL: %s seconds.", settings.registered_ip_ttl_seconds)
 
     logger.info("Database cleanup task waiting for database to be ready...")
     await db_ready_event.wait() # Wait for the event to be set
@@ -34,21 +34,21 @@ async def periodic_database_cleanup(db_ready_event: asyncio.Event):
                     db, older_than_seconds=settings.pending_reg_ttl_seconds
                 )
                 if deleted_pending_regs > 0:
-                    logger.info(f"Cleaned up {deleted_pending_regs} expired pending registrations.")
+                    logger.info("Cleaned up %s expired pending registrations.", deleted_pending_regs)
 
                 deleted_ips = await cleanup_expired_registered_ips(
                     db, older_than_seconds=settings.registered_ip_ttl_seconds
                 )
                 if deleted_ips > 0:
-                    logger.info(f"Cleaned up {deleted_ips} expired registered IPs.")
+                    logger.info("Cleaned up %s expired registered IPs.", deleted_ips)
 
                 deleted_tokens = await cleanup_expired_download_tokens(db)
                 if deleted_tokens > 0:
-                    logger.info(f"Cleaned up {deleted_tokens} expired or used download tokens.")
+                    logger.info("Cleaned up %s expired or used download tokens.", deleted_tokens)
 
                 deleted_deeplinks_count = await delete_expired_or_used_tokens(db)
                 if deleted_deeplinks_count > 0:
-                    logger.info(f"Periodic cleanup: Deleted {deleted_deeplinks_count} expired or used deeplink tokens.")
+                    logger.info("Periodic cleanup: Deleted %s expired or used deeplink tokens.", deleted_deeplinks_count)
                 else:
                     logger.debug("Periodic cleanup: No expired or used deeplink tokens to delete.")
 

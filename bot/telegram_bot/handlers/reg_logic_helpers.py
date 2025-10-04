@@ -1,6 +1,6 @@
 import logging
-import uuid
 from typing import Any
+import uuid
 
 from aiogram import Bot as AiogramBot
 from aiogram import types
@@ -14,8 +14,8 @@ from ...core.config import settings
 from ...core.db import add_pending_telegram_registration, add_telegram_registration
 from ...core.localization import get_admin_lang_code, get_translator
 from ...teamtalk import users as tt_users_service
-from ...utils.schemas import TTConnectionInfo, TTUserInfo
 from ...utils.file_generator import generate_tt_file_content, generate_tt_link
+from ...utils.schemas import TTConnectionInfo, TTUserInfo
 from ..schemas import RegistrationStateData
 from ..states import RegistrationStates
 from .reg_callback_data import AdminVerificationCallback, NicknameChoiceCallback
@@ -50,7 +50,7 @@ async def _ask_nickname_preference(
         try:
             await message_target.message.delete()
         except Exception as e:
-            logger.debug(f"Could not delete message before asking nickname preference: {e}")
+            logger.debug("Could not delete message before asking nickname preference: %s", e)
 
     await state.set_state(RegistrationStates.awaiting_nickname_choice)
 
@@ -167,13 +167,10 @@ async def _process_actual_registration(
                 )
                 if registration_record is None:
                     logger.info(
-                        f"Telegram registration for admin ID {registrant_user_id} (username: {state_data.name}) was intentionally skipped."
+                        "Telegram registration for admin ID %s (username: %s) was intentionally skipped.", registrant_user_id, state_data.name
                     )
             except Exception as e_db_add:
-                logger.error(
-                    f"CRITICAL DB Exception for TT user {state_data.name} (TG ID: {registrant_user_id}): {e_db_add}",
-                    exc_info=True,
-                )
+                logger.error("CRITICAL DB Exception for TT user %s (TG ID: %s): %s", state_data.name, registrant_user_id, e_db_add, exc_info=True)
                 await bot.send_message(
                     registrant_user_id,
                     _(
@@ -182,15 +179,11 @@ async def _process_actual_registration(
                 )
                 for admin_tg_id_notify in settings.admin_ids:
                     if admin_tg_id_notify != registrant_user_id:
-                        await bot.send_message(
-                            admin_tg_id_notify,
-                            f"DB SYNC ERROR (Exception): User {state_data.name} (TG ID: {registrant_user_id}) created in TeamTalk but FAILED local DB save. Exception: {e_db_add}",
-                        )
-
+                        await bot.send_message(admin_tg_id_notify, "DB SYNC ERROR (Exception): User %s (TG ID: %s) created in TeamTalk but FAILED local DB save. Exception: %s", state_data.name, registrant_user_id, e_db_add,)
         if settings.admin_ids:
             _ = get_translator(get_admin_lang_code())
             admin_notification_message = (
-                f"📢 {_('User {username} was registered.').format(username=state_data.name)}\n"
+                _("📢 User {username} was registered.\n").format(username=state_data.name)
             )
             lang_code_for_emoji = state_data.selected_language or "en"
             lang_emoji = (
@@ -224,9 +217,7 @@ async def _process_actual_registration(
                         admin_id_val_notify, admin_notification_message.strip()
                     )
                 except Exception as e_notify:
-                    logger.error(
-                        f"Failed to send admin reg notification to {admin_id_val_notify}: {e_notify}"
-                    )
+                    logger.error("Error sending admin reg notification to %s: %s", admin_id_val_notify, e_notify)
 
         if artefact_data_val:
             await _send_tt_credentials_to_user(
@@ -234,7 +225,7 @@ async def _process_actual_registration(
             )
     else:
         logger.error(
-            f"TT Registration failed for {state_data.name}. Detail: {reg_msg_key_or_detail}"
+            "TT Registration failed for %s. Detail: %s", state_data.name, reg_msg_key_or_detail
         )
         await bot.send_message(
             registrant_user_id,
@@ -270,6 +261,7 @@ async def _handle_registration_continuation(
         "tt_account_type": state_data.tt_account_type,
         "registrar_telegram_id": user_object.id,
     }
+    _ = get_translator(state_data.selected_language or settings.bot_admin_lang)
 
     if settings.verify_registration and not state_data.is_admin_registrar:
         current_request_key = uuid.uuid4().hex
@@ -284,13 +276,11 @@ async def _handle_registration_continuation(
                 source_info=source_info,
             )
             logger.info(
-                f"Reg request {current_request_key} for TG user {state_data.registrant_telegram_id} ({state_data.name}) stored in DB for admin verification."
+                "Reg request %s for TG user %s (%s) stored in DB for admin verification.",
+                current_request_key, state_data.registrant_telegram_id, state_data.name
             )
         except Exception as e_db_add_pending:
-            logger.error(
-                f"Failed to add pending registration to DB for user {state_data.registrant_telegram_id}, username {state_data.name}: {e_db_add_pending}",
-                exc_info=True,
-            )
+            logger.error("Failed to add pending registration to DB for user %s, username %s: %s", state_data.registrant_telegram_id, state_data.name, e_db_add_pending, exc_info=True)
             await bot.send_message(
                 state_data.registrant_telegram_id,
                 _(
@@ -301,12 +291,10 @@ async def _handle_registration_continuation(
                 await state.clear()
             return
 
-        _ = get_translator(get_admin_lang_code())
-        admin_msg_text = (
-            _("Registration request:") + "\n" + _("Username:") + f" {state_data.name}\n"
-        )
-        if state_data.nickname != state_data.name:
-            admin_msg_text += _("Nickname:") + f" {state_data.nickname}\n"
+        admin_lang_translator = get_translator(get_admin_lang_code())
+            admin_msg_text = admin_lang_translator("Registration request:\nUsername: {username}\n").format(username=state_data.name)
+            if state_data.nickname != state_data.name:
+                admin_msg_text += admin_lang_translator("Nickname: {nickname}\n").format(nickname=state_data.nickname)
 
         telegram_user_info_line = f" {user_full_name}"
         if telegram_username:
@@ -341,9 +329,7 @@ async def _handle_registration_continuation(
                     admin_id, admin_msg_text, reply_markup=builder.as_markup()
                 )
             except Exception as e:
-                logger.error(
-                    f"Error sending verification to admin {admin_id}: {e}", exc_info=True
-                )
+                    logger.error("Error sending verification to admin %s: %s", admin_id, e, exc_info=True)
 
         reply_text = _("Registration request sent to administrators. Please wait for approval.")
         if isinstance(message_or_callback_query, types.Message):

@@ -19,9 +19,9 @@ def _calculate_pytalk_user_rights(teamtalk_default_user_rights_list: list[str]) 
             permission_flag = getattr(PyTalkPermission, right_string.upper())
             pytalk_user_rights |= permission_flag
         except AttributeError:
-            logger.warning(f"Invalid user right string '{right_string}' in provided list. Skipping.")
+            logger.warning("Invalid user right string '%s' in provided list. Skipping.", right_string)
         except Exception as e_perm:
-            logger.error(f"Error processing permission string '{right_string}': {e_perm}")
+            logger.error("Error processing permission string '%s': %s", right_string, e_perm)
     return pytalk_user_rights
 
 async def _send_broadcast_message_directly(active_server_instance: TeamTalkInstance, content: str):
@@ -56,10 +56,10 @@ async def _send_broadcast_message_directly(active_server_instance: TeamTalkInsta
         msg.bMore = False
 
         active_server_instance.doTextMessage(msg)
-        logger.info(f"Broadcast message for user sent directly via SDK: '{content}'")
+        logger.info("Broadcast message for user sent directly via SDK: '%s'", content)
 
     except Exception as e:
-        logger.error(f"Failed to send broadcast message directly via SDK: {e}", exc_info=True)
+        logger.error("Failed to send broadcast message directly via SDK: %s", e, exc_info=True)
 
 
 async def _handle_registration_broadcast(
@@ -70,11 +70,11 @@ async def _handle_registration_broadcast(
 ):
     """Handles sending a registration broadcast message if enabled and message provided."""
     if not registration_broadcast_enabled:
-        logger.info(f"Registration broadcast is disabled by parameter. Skipping for user '{username}'.")
+        logger.info("Registration broadcast is disabled by parameter. Skipping for user '%s'.", username)
         return
 
     if not broadcast_message_text:
-        logger.info(f"No broadcast message text provided for user '{username}'. Skipping broadcast.")
+        logger.info("No broadcast message text provided for user '%s'. Skipping broadcast.", username)
         return
 
     # Instead of calling the broken library function, we call our direct SDK workaround
@@ -91,7 +91,7 @@ async def check_username_exists(username: str) -> bool | None:
     if not active_server_instance.logged_in:
         # Corrected attribute access from .info.host to .server_info.host
         host_display = active_server_instance.server_info.host if hasattr(active_server_instance, 'server_info') and active_server_instance.server_info else "Unknown Host"
-        logger.warning(f"Not logged in to TeamTalk server {host_display} in check_username_exists.")
+        logger.warning("Not logged in to TeamTalk server %s in check_username_exists.", host_display)
         return None
 
     try:
@@ -110,7 +110,7 @@ async def check_username_exists(username: str) -> bool | None:
         logger.error("No active TeamTalk server connections in check_username_exists (IndexError).")
         return None
     except Exception as e:
-        logger.error(f"Error checking username existence for '{username}': {e}", exc_info=True)
+        logger.error("Error checking username existence for '%s': %s", username, e, exc_info=True)
         return None
 
 async def perform_teamtalk_registration(
@@ -145,7 +145,7 @@ async def perform_teamtalk_registration(
 
     try:
         final_nickname = nickname_str if nickname_str and nickname_str.strip() else username_str
-        logger.info(f"Attempting to register TT User. Username: '{username_str}', Nickname for files/links: '{final_nickname}', Source: {source_info}")
+        logger.info("Attempting to register TT User. Username: '%s', Nickname for files/links: '%s', Source: %s", username_str, final_nickname, source_info)
 
         success_from_pytalk = active_server_instance.create_user_account(
             username=username_str,
@@ -156,10 +156,10 @@ async def perform_teamtalk_registration(
         )
 
         if not success_from_pytalk:
-            logger.error(f"PyTalk Registration Error for user {username_str}. create_user_account returned False.")
+            logger.error("PyTalk Registration Error for user %s. create_user_account returned False.", username_str)
             return False, "REG_FAILED_PYTALK", None
 
-        logger.info(f"User {username_str} registration successful via PyTalk.")
+        logger.info("User %s registration successful via PyTalk.", username_str)
 
         await _handle_registration_broadcast(active_server_instance, username_str, broadcast_message_text, registration_broadcast_enabled)
 
@@ -181,5 +181,5 @@ async def perform_teamtalk_registration(
         logger.error("TeamTalk bot (pytalk_bot) has no active server connections (IndexError) for registration.")
         return False, "MODULE_UNAVAILABLE", None
     except Exception as e_reg:
-        logger.exception(f"General error during SDK registration for user {username_str}: {e_reg}")
+        logger.exception("General error during SDK registration for user %s: %s", username_str, e_reg)
         return False, f"UNEXPECTED_ERROR:{e_reg!s}", None

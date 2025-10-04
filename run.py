@@ -1,8 +1,8 @@
 import asyncio
 import logging
+import os
 from pathlib import Path
 import sys
-import os
 
 # --- Argument parsing for config file ---
 # This is done before importing the settings module to ensure the environment

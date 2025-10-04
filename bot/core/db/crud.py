@@ -2,9 +2,9 @@ from datetime import datetime, timedelta
 import logging
 from typing import Any
 
-from sqlmodel import select
 from sqlalchemy.exc import IntegrityError as SQLAlchemyIntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import delete, select
 
 from bot.core.config import settings
 
@@ -27,24 +27,26 @@ async def is_telegram_id_registered(session: AsyncSession, telegram_id: int) -> 
 
 async def add_telegram_registration(session: AsyncSession, telegram_id: int, teamtalk_username: str) -> TelegramRegistration | None:
     if telegram_id in settings.admin_ids:
-        logger.warning(f"Attempt to register an admin ID ({telegram_id}) was blocked. User: {teamtalk_username}")
+        logger.warning("Attempt to register an admin ID (%s) was blocked. User: %s", telegram_id, teamtalk_username)
         return None
 
     try:
         new_registration = TelegramRegistration(telegram_id=telegram_id, teamtalk_username=teamtalk_username)
         session.add(new_registration)
         await session.flush() # Flush to get instance persisted for return or catch error
-        logger.info(f"Successfully added Telegram ID {telegram_id} with TeamTalk username {teamtalk_username} to session.")
+        logger.info("Successfully added Telegram ID %s with TeamTalk username %s to session.", telegram_id, teamtalk_username)
         return new_registration
     except SQLAlchemyIntegrityError:
         logger.warning(
-            f"SQLAlchemyIntegrityError during add operation for Telegram ID {telegram_id} "
-            f"or TeamTalk username '{teamtalk_username}'. This usually means it already exists."
+            "SQLAlchemyIntegrityError during add operation for Telegram ID %s "
+            "or TeamTalk username '%s'. This usually means it already exists.",
+            telegram_id,
+            teamtalk_username,
         )
         await session.rollback() # Rollback before re-raising for clarity, though middleware might also do it
         raise
     except Exception as e:
-        logger.error(f"Error adding Telegram registration to session for {telegram_id} (username: {teamtalk_username}): {e}", exc_info=True)
+        logger.error("Error adding Telegram registration to session for %s (username: %s): %s", telegram_id, teamtalk_username, e, exc_info=True)
         await session.rollback()
         raise
 
@@ -59,7 +61,7 @@ async def get_all_telegram_registrations(db_session: AsyncSession) -> list[Teleg
     stmt = select(TelegramRegistration)
     result = await db_session.execute(stmt)
     users = result.scalars().all()
-    logger.info(f"Retrieved {len(users)} Telegram registrations.")
+    logger.info("Retrieved %s Telegram registrations.", len(users))
     return users
 
 
@@ -71,55 +73,52 @@ async def get_user_by_identifier(db_session: AsyncSession, identifier: str) -> T
         try:
             telegram_id = int(identifier)
             stmt = select(TelegramRegistration).where(TelegramRegistration.telegram_id == telegram_id)
-            logger.info(f"Attempting to find user by Telegram ID: {telegram_id}")
+            logger.info("Attempting to find user by Telegram ID: %s", telegram_id)
         except ValueError:
             # This case should ideally not be hit if isdigit() is true, but as a safeguard.
-            logger.warning(f"Identifier '{identifier}' is all digits but failed to convert to int.")
+            logger.warning("Identifier '%s' is all digits but failed to convert to int.", identifier)
             # Fallback to searching by username if conversion failed unexpectedly.
             stmt = select(TelegramRegistration).where(TelegramRegistration.teamtalk_username == identifier)
-            logger.info(f"Attempting to find user by TeamTalk username (fallback): {identifier}")
+            logger.info("Attempting to find user by TeamTalk username (fallback): %s", identifier)
     else:
         stmt = select(TelegramRegistration).where(TelegramRegistration.teamtalk_username == identifier)
-        logger.info(f"Attempting to find user by TeamTalk username: {identifier}")
+        logger.info("Attempting to find user by TeamTalk username: %s", identifier)
 
     if stmt is not None:
         result = await db_session.execute(stmt)
         user = result.scalars().first()
         if user:
-            logger.info(f"User found: {user.telegram_id} / {user.teamtalk_username}")
+            logger.info("User found: %s / %s", user.telegram_id, user.teamtalk_username)
             return user
-        logger.info(f"User not found with identifier: {identifier}")
+        logger.info("User not found with identifier: %s", identifier)
         return None
     return None # Should not be reached if logic is correct, but as a failsafe.
 
 
 async def delete_telegram_registration(db_session: AsyncSession, telegram_id: int) -> bool:
     """Deletes a user from the TelegramRegistration table based on telegram_id and commits.
-    Returns True if deletion was successful, False otherwise.
-    """
-    logger.info(f"Attempting to delete registration for Telegram ID: {telegram_id}")
+    logger.info("Attempting to delete registration for Telegram ID: %s", telegram_id)
     stmt = delete(TelegramRegistration).where(TelegramRegistration.telegram_id == telegram_id)
     result = await db_session.execute(stmt)
     if result.rowcount > 0:
         await db_session.commit()
-        logger.info(f"Successfully deleted registration for Telegram ID: {telegram_id}. Rows affected: {result.rowcount}")
+        logger.info("Successfully deleted registration for Telegram ID: %s. Rows affected: %s", telegram_id, result.rowcount)
         return True
-    # No need to commit if nothing was deleted.
-    logger.info(f"No registration found for Telegram ID: {telegram_id} to delete.")
+    logger.info("No registration found for Telegram ID: %s to delete.", telegram_id)
     return False
 
 
 async def delete_telegram_registration_by_id(session: AsyncSession, telegram_id: int) -> bool:
     """Deletes a TelegramRegistration record by telegram_id."""
-    logger.info(f"Attempting to delete registration for Telegram ID: {telegram_id}")
+    logger.info("Attempting to delete registration for Telegram ID: %s", telegram_id)
     stmt = delete(TelegramRegistration).where(TelegramRegistration.telegram_id == telegram_id)
     result = await session.execute(stmt)
     # await session.flush() # Not strictly necessary for delete if not immediately checking, but good practice
     # This version does not commit, relying on the caller to manage the transaction.
     if result.rowcount > 0:
-        logger.info(f"Successfully marked registration for deletion for Telegram ID: {telegram_id}. Rows affected: {result.rowcount}. Commit pending.")
+        logger.info("Successfully marked registration for deletion for Telegram ID: %s. Rows affected: %s. Commit pending.", telegram_id, result.rowcount)
         return True
-    logger.info(f"No registration found for Telegram ID: {telegram_id} to delete.")
+    logger.info("No registration found for Telegram ID: %s to delete.", telegram_id)
     return False
 
 # --- PendingTelegramRegistration CRUD ---
@@ -144,7 +143,7 @@ async def add_pending_telegram_registration(
     db.add(pending_reg)
     await db.flush() # To ensure it's added and get ID, or raise error
     await db.refresh(pending_reg) # To get defaults like created_at loaded
-    logger.info(f"Added pending registration for request_key: {request_key}")
+    logger.info("Added pending registration for request_key: %s", request_key)
     return pending_reg
 
 async def get_and_remove_pending_telegram_registration(
@@ -156,9 +155,9 @@ async def get_and_remove_pending_telegram_registration(
     if pending_reg:
         await db.delete(pending_reg)
         await db.flush() # Ensure delete is processed
-        logger.info(f"Retrieved and removed pending registration for request_key: {request_key}")
+        logger.info("Retrieved and removed pending registration for request_key: %s", request_key)
         return pending_reg
-    logger.info(f"No pending registration found for request_key: {request_key}")
+    logger.info("No pending registration found for request_key: %s", request_key)
     return None
 
 async def cleanup_expired_pending_registrations(db: AsyncSession, older_than_seconds: int) -> int:
@@ -167,7 +166,7 @@ async def cleanup_expired_pending_registrations(db: AsyncSession, older_than_sec
     result = await db.execute(stmt)
     deleted_count = result.rowcount
     if deleted_count > 0:
-        logger.info(f"Cleaned up {deleted_count} expired pending registrations older than {older_than_seconds} seconds.")
+        logger.info("Cleaned up %s expired pending registrations older than %s seconds.", deleted_count, older_than_seconds)
     return deleted_count
 
 # --- FastapiRegisteredIp CRUD ---
@@ -185,11 +184,11 @@ async def add_fastapi_registered_ip(
     try:
         await db.flush()
         await db.refresh(registered_ip)
-        logger.info(f"Added registered IP: {ip_address} for user: {username if username else 'N/A'}")
+        logger.info("Added registered IP: %s for user: %s", ip_address, username if username else 'N/A')
     except SQLAlchemyIntegrityError:
         await db.rollback() # Rollback the specific failed add
         # Re-raise for now, as the current requirement is just to add.
-        logger.warning(f"IP address {ip_address} already registered.")
+        logger.warning("IP address %s already registered.", ip_address)
         raise # Or handle as an update if that's the desired behavior for duplicates.
     return registered_ip
 
@@ -205,7 +204,7 @@ async def cleanup_expired_registered_ips(db: AsyncSession, older_than_seconds: i
     result = await db.execute(stmt)
     deleted_count = result.rowcount
     if deleted_count > 0:
-        logger.info(f"Cleaned up {deleted_count} expired registered IPs older than {older_than_seconds} seconds.")
+        logger.info("Cleaned up %s expired registered IPs older than %s seconds.", deleted_count, older_than_seconds)
     return deleted_count
 
 # --- FastapiDownloadToken CRUD ---
@@ -228,7 +227,7 @@ async def add_fastapi_download_token(
     db.add(download_token)
     await db.flush()
     await db.refresh(download_token)
-    logger.info(f"Added download token: {token} for file: {original_filename}")
+    logger.info("Added download token: %s for file: %s", token, original_filename)
     return download_token
 
 async def get_fastapi_download_token(db: AsyncSession, token: str) -> FastapiDownloadToken | None:
@@ -237,14 +236,14 @@ async def get_fastapi_download_token(db: AsyncSession, token: str) -> FastapiDow
     token_entry = result.scalars().first()
     if token_entry:
         if token_entry.expires_at < datetime.utcnow():
-            logger.info(f"Download token {token} found but has expired.")
+            logger.info("Download token %s found but has expired.", token)
             return None
         if token_entry.is_used:
-            logger.info(f"Download token {token} found but has already been used.")
+            logger.info("Download token %s found but has already been used.", token)
             return None # Or handle as per requirements for used tokens
-        logger.info(f"Valid download token {token} retrieved.")
+        logger.info("Valid download token %s retrieved.", token)
         return token_entry
-    logger.info(f"Download token {token} not found.")
+    logger.info("Download token %s not found.", token)
     return None
 
 async def mark_fastapi_download_token_used(db: AsyncSession, token: str) -> bool:
@@ -254,9 +253,9 @@ async def mark_fastapi_download_token_used(db: AsyncSession, token: str) -> bool
     if token_entry and not token_entry.is_used and token_entry.expires_at >= datetime.utcnow():
         token_entry.is_used = True
         await db.flush()
-        logger.info(f"Marked download token {token} as used.")
+        logger.info("Marked download token %s as used.", token)
         return True
-    logger.info(f"Download token {token} not found, expired, or already used. Cannot mark as used.")
+    logger.info("Download token %s not found, expired, or already used. Cannot mark as used.", token)
     return False
 
 async def remove_fastapi_download_token(db: AsyncSession, token: str) -> bool:
@@ -264,9 +263,9 @@ async def remove_fastapi_download_token(db: AsyncSession, token: str) -> bool:
     result = await db.execute(stmt)
     deleted_count = result.rowcount
     if deleted_count > 0:
-        logger.info(f"Removed download token: {token}")
+        logger.info("Removed download token: %s", token)
         return True
-    logger.info(f"Download token {token} not found for removal.")
+    logger.info("Download token %s not found for removal.", token)
     return False
 
 async def cleanup_expired_download_tokens(db: AsyncSession) -> int:
@@ -278,7 +277,7 @@ async def cleanup_expired_download_tokens(db: AsyncSession) -> int:
     result = await db.execute(stmt)
     deleted_count = result.rowcount
     if deleted_count > 0:
-        logger.info(f"Cleaned up {deleted_count} expired or used download tokens.")
+        logger.info("Cleaned up %s expired or used download tokens.", deleted_count)
     return deleted_count
 
 
@@ -293,7 +292,7 @@ async def create_deeplink_token(db: AsyncSession, token_str: str, expires_at: da
     db.add(new_token)
     await db.commit() # Commit to make it available for refresh and subsequent operations
     await db.refresh(new_token)
-    logger.info(f"Created deeplink token: {token_str} expiring at {expires_at}")
+    logger.info("Created deeplink token: %s expiring at %s", token_str, expires_at)
     return new_token
 
 async def get_valid_deeplink_token(db: AsyncSession, token_str: str) -> DeeplinkToken | None:
@@ -305,11 +304,11 @@ async def get_valid_deeplink_token(db: AsyncSession, token_str: str) -> Deeplink
     result = await db.execute(stmt)
     token = result.scalar_one_or_none()
     if token:
-        logger.info(f"Valid deeplink token found: {token_str}")
+        logger.info("Valid deeplink token found: %s", token_str)
     else:
         # It's useful to know why it wasn't valid for debugging, but avoid being too verbose in standard operation.
         # A more detailed check could be added if needed, e.g., checking if it exists but is used/expired.
-        logger.info(f"No valid deeplink token found for: {token_str} (either not found, already used, or expired).")
+        logger.info("No valid deeplink token found for: %s (either not found, already used, or expired).", token_str)
     return token
 
 async def mark_deeplink_token_as_used(db: AsyncSession, token_obj: DeeplinkToken) -> DeeplinkToken:
@@ -317,7 +316,7 @@ async def mark_deeplink_token_as_used(db: AsyncSession, token_obj: DeeplinkToken
         token_obj.is_used = True
         await db.commit() # Commit the change
         await db.refresh(token_obj) # Refresh to get the updated state from DB
-        logger.info(f"Marked deeplink token as used: {token_obj.token}")
+        logger.info("Marked deeplink token as used: %s", token_obj.token)
     return token_obj
 
 async def delete_expired_or_used_tokens(db: AsyncSession) -> int:
@@ -334,7 +333,7 @@ async def delete_expired_or_used_tokens(db: AsyncSession) -> int:
     deleted_count = result_used.rowcount + result_expired.rowcount
     if deleted_count > 0:
         await db.commit() # Commit if any deletions occurred
-        logger.info(f"Deleted {deleted_count} expired or used deeplink tokens.")
+        logger.info("Deleted %s expired or used deeplink tokens.", deleted_count)
     return deleted_count
 
 
@@ -358,7 +357,7 @@ async def add_banned_user(
         banned_user.banned_at = datetime.utcnow() # Update ban time
         banned_user.banned_by_admin_id = admin_id if admin_id is not None else banned_user.banned_by_admin_id
         banned_user.reason = reason if reason is not None else banned_user.reason
-        logger.info(f"Updating existing ban for Telegram ID: {telegram_id}")
+        logger.info("Updating existing ban for Telegram ID: %s", telegram_id)
     else:
         banned_user = BannedUser(
             telegram_id=telegram_id,
@@ -368,7 +367,7 @@ async def add_banned_user(
             # banned_at is defaulted in model
         )
         db_session.add(banned_user)
-        logger.info(f"Adding new ban for Telegram ID: {telegram_id}")
+        logger.info("Adding new ban for Telegram ID: %s", telegram_id)
 
     await db_session.commit()
     await db_session.refresh(banned_user) # Refresh to get DB defaults like banned_at
@@ -379,9 +378,9 @@ async def remove_banned_user(db_session: AsyncSession, telegram_id: int) -> bool
     result = await db_session.execute(stmt)
     await db_session.commit()
     if result.rowcount > 0:
-        logger.info(f"Removed ban for Telegram ID: {telegram_id}")
+        logger.info("Removed ban for Telegram ID: %s", telegram_id)
         return True
-    logger.info(f"No ban found for Telegram ID: {telegram_id} to remove.")
+    logger.info("No ban found for Telegram ID: %s to remove.", telegram_id)
     return False
 
 async def is_user_banned(db_session: AsyncSession, telegram_id: int) -> bool:
@@ -401,7 +400,7 @@ async def get_telegram_id_by_teamtalk_username(db_session: AsyncSession, teamtal
     result = await db_session.execute(stmt)
     telegram_id = result.scalar_one_or_none()
     if telegram_id:
-        logger.debug(f"Found Telegram ID {telegram_id} for TeamTalk username '{teamtalk_username}'.")
+        logger.debug("Found Telegram ID %s for TeamTalk username '%s'.", telegram_id, teamtalk_username)
     else:
-        logger.debug(f"No Telegram ID found for TeamTalk username '{teamtalk_username}'.")
+        logger.debug("No Telegram ID found for TeamTalk username '%s'.", teamtalk_username)
     return telegram_id
