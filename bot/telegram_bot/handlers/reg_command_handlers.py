@@ -14,6 +14,7 @@ from ...core.localization import (
     get_available_languages_for_display,
     get_translator,
 )
+from ..schemas import RegistrationStateData
 from ..states import RegistrationStates
 from .reg_callback_data import LanguageCallback
 
@@ -51,22 +52,35 @@ async def determine_user_language(telegram_id: int, state: FSMContext, db_sessio
 
 
 @command_router.message(CommandStart())
-async def start_command_handler(message: types.Message, command: CommandObject, state: FSMContext, bot: AiogramBot, db_session: AsyncSession):
+async def start_command_handler(
+    message: types.Message,
+    command: CommandObject,
+    state: FSMContext,
+    bot: AiogramBot,
+    db_session: AsyncSession,
+):
     args = command.args
     user = message.from_user
     telegram_id = user.id
 
-    # Initial language determination (can be refined)
-    # Try message.from_user.language_code first if available and not empty
-    initial_lang_code = user.language_code if user.language_code and user.language_code.strip() else settings.bot_admin_lang
-    _ = get_translator(initial_lang_code) # Translator for initial messages
+    initial_lang_code = (
+        user.language_code
+        if user.language_code and user.language_code.strip()
+        else settings.bot_admin_lang
+    )
+    _ = get_translator(initial_lang_code)
 
     logger.info(f"User {telegram_id} initiated /start command. Args: '{args if args else None}'")
 
+    state_data = RegistrationStateData(
+        registrant_telegram_id=telegram_id, selected_language=initial_lang_code
+    )
+
     if args:  # A token is present in the /start command (deeplink)
         if not settings.telegram_deeplink_registration_enabled:
-            logger.info(f"User {telegram_id} attempted to use deeplink '{args}' but feature is disabled.")
-            # According to requirements, no message to user if feature is disabled.
+            logger.info(
+                f"User {telegram_id} attempted to use deeplink '{args}' but feature is disabled."
+            )
             return
 
         token_str = args
@@ -75,82 +89,85 @@ async def start_command_handler(message: types.Message, command: CommandObject, 
         if deeplink_token:
             logger.info(f"User {telegram_id} used valid deeplink token: {token_str}")
 
-            # Check if already registered (even with deeplink, policy might be no re-registration)
             if await is_telegram_id_registered(db_session, telegram_id):
-                await message.answer(_("You have already registered. This link cannot be used to register again."))
+                await message.answer(
+                    _("You have already registered. This link cannot be used to register again.")
+                )
                 await state.clear()
                 return
 
             await mark_deeplink_token_as_used(db_session, deeplink_token)
-            # Store that this is a deeplink registration and other necessary initial data
-            await state.update_data(is_deeplink_registration=True,
-                                    registrant_telegram_id=telegram_id,
-                                    selected_language=initial_lang_code, # Store initial lang
-                                    is_admin_registrar=False) # Deeplink users are not admins registering themselves
+            state_data.is_deeplink_registration = True
+            state_data.is_admin_registrar = False
+            await state.set_data(state_data.model_dump())
 
-            logger.info(f"Deeplink registration started for user {telegram_id} with token {token_str}. Language set to {initial_lang_code}.")
+            logger.info(
+                f"Deeplink registration started for user {telegram_id} with token {token_str}. Language set to {initial_lang_code}."
+            )
 
-            # Proceed to language selection or first registration step
-            # For consistency, let's present language selection, even if initial_lang_code is set.
-            # User can confirm or change.
             await state.set_state(RegistrationStates.choosing_language)
-            await message.answer(_("Welcome! Please choose your language to continue registration."),
-                                 reply_markup=get_language_keyboard_builder().as_markup())
+            await message.answer(
+                _("Welcome! Please choose your language to continue registration."),
+                reply_markup=get_language_keyboard_builder().as_markup(),
+            )
             return
-        # Invalid, expired, or used token
-        logger.warning(f"User {telegram_id} used invalid/expired/used deeplink token: {token_str}")
-        await message.answer(_("This registration link is invalid, expired, or has already been used."))
-        await state.clear()
-        return
 
-    # If no args, it's a direct /start command (public registration attempt)
-    if not settings.telegram_public_registration_enabled:
-        logger.info(f"User {telegram_id} attempted public /start but feature is disabled. Ignoring.")
-        # No response to the user, as per requirement (or a generic message if preferred)
-        return
-
-    # --- Original public /start logic follows here ---
-    await state.update_data(is_deeplink_registration=False,
-                            registrant_telegram_id=telegram_id,
-                            selected_language=initial_lang_code) # Store initial lang
-
-    # is_admin_registrar check
-    is_admin_registrar = telegram_id in settings.admin_ids # Assuming ADMIN_IDS_INT is pre-calculated list of ints
-    await state.update_data(is_admin_registrar=is_admin_registrar)
-    logger.info(f"User {telegram_id} starting public registration. Admin registrar: {is_admin_registrar}. Language set to {initial_lang_code}.")
-
-
-    if not is_admin_registrar and await is_telegram_id_registered(db_session, telegram_id):
-        await message.reply(
-            _("You have already registered one TeamTalk account from this Telegram account. Only one registration is allowed.")
+        logger.warning(
+            f"User {telegram_id} used invalid/expired/used deeplink token: {token_str}"
+        )
+        await message.answer(
+            _("This registration link is invalid, expired, or has already been used.")
         )
         await state.clear()
         return
 
-    # Language selection / forced language logic for public /start
+    if not settings.telegram_public_registration_enabled:
+        logger.info(
+            f"User {telegram_id} attempted public /start but feature is disabled. Ignoring."
+        )
+        return
+
+    state_data.is_admin_registrar = telegram_id in settings.admin_ids
+    await state.set_data(state_data.model_dump())
+    logger.info(
+        f"User {telegram_id} starting public registration. Admin registrar: {state_data.is_admin_registrar}. Language set to {initial_lang_code}."
+    )
+
+    if not state_data.is_admin_registrar and await is_telegram_id_registered(
+        db_session, telegram_id
+    ):
+        await message.reply(
+            _(
+                "You have already registered one TeamTalk account from this Telegram account. Only one registration is allowed."
+            )
+        )
+        await state.clear()
+        return
+
     if settings.force_user_lang:
         forced_lang_code = settings.force_user_lang
         _f = get_translator(forced_lang_code)
-        # Using a neutral key for the "enter username" prompt that can be translated.
         prompt_key = "Hello! Please enter a username for registration."
         translated_prompt = _f(prompt_key)
 
-        if translated_prompt != prompt_key or forced_lang_code == "en": # Check if translation occurred
-            logger.info(f"Forcing language to '{forced_lang_code}' for user {telegram_id} (public start) based on config.")
-            await state.update_data(selected_language=forced_lang_code) # Update state with forced lang
-            _ = _f # Use the forced language translator for this message
-            await message.reply(_(prompt_key)) # Send translated prompt
+        if translated_prompt != prompt_key or forced_lang_code == "en":
+            logger.info(
+                f"Forcing language to '{forced_lang_code}' for user {telegram_id} (public start) based on config."
+            )
+            state_data.selected_language = forced_lang_code
+            await state.set_data(state_data.model_dump())
+            _ = _f
+            await message.reply(_(prompt_key))
             await state.set_state(RegistrationStates.awaiting_username)
             return
         logger.warning(
             f"FORCE_USER_LANG was set to '{forced_lang_code}', but this language pack seems unavailable or incomplete. Proceeding with language selection for public start."
         )
-            # Fall through to language selection if forced lang is bad
 
-    # If language is not forced or forced language is invalid, proceed with selection (public /start)
-    # Use the initially determined language for the prompt message itself
-    await message.reply(_("Please choose your language:"),
-                        reply_markup=get_language_keyboard_builder().as_markup())
+    await message.reply(
+        _("Please choose your language:"),
+        reply_markup=get_language_keyboard_builder().as_markup(),
+    )
     await state.set_state(RegistrationStates.choosing_language)
 
 

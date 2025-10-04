@@ -9,9 +9,10 @@ import logging
 import os
 from pathlib import Path
 import tomllib
-from typing import Any, ClassVar, Tuple
+from typing import Any
 
 from pydantic import Field, ValidationError
+from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -26,42 +27,32 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
     A settings source that loads variables from a TOML file.
     """
 
-    def get_field_value(
-        self, field: Field, field_name: str
-    ) -> Tuple[Any, str, bool]:
-        """
-        Get field value from TOML file.
-        """
-        encoding = self.config.get("env_file_encoding")
-        env_file = self.config.get("toml_file")
-        if env_file:
-            file_content_toml = tomllib.loads(env_file.read_text(encoding))
-            field_value = file_content_toml.get(field_name)
-            return field_value, field_name, False
-        return None, field_name, False
+    def __init__(self, settings_cls: type[BaseSettings]):
+        super().__init__(settings_cls)
+        toml_file_path_str = os.getenv("CONFIG_FILE", "config.toml")
+        toml_file_path = Path(toml_file_path_str)
 
-    def prepare_field_value(
-        self, field_name: str, field: Field, value: Any, value_is_complex: bool
-    ) -> Any:
-        """
-        Prepare field value.
-        """
-        return value
+        if not toml_file_path.is_file():
+            logger.debug(f"TOML config file not found at '{toml_file_path}'.")
+            self._toml_data = {}
+        else:
+            logger.debug(f"Loading configuration from TOML file: '{toml_file_path}'")
+            try:
+                with open(toml_file_path, "rb") as f:
+                    self._toml_data = tomllib.load(f)
+            except Exception as e:
+                logger.error(f"Error loading TOML file '{toml_file_path}': {e}")
+                self._toml_data = {}
+
+    def get_field_value(
+        self, field: FieldInfo, field_name: str
+    ) -> tuple[Any, str, bool]:
+        """Get field value from the pre-loaded TOML data."""
+        field_value = self._toml_data.get(field_name)
+        return field_value, field_name, False
 
     def __call__(self) -> dict[str, Any]:
-        d: dict[str, Any] = {}
-
-        for field_name, field in self.settings_cls.model_fields.items():
-            field_value, field_key, value_is_complex = self.get_field_value(
-                field, field_name
-            )
-            field_value = self.prepare_field_value(
-                field_name, field, field_value, value_is_complex
-            )
-            if field_value is not None:
-                d[field_key] = field_value
-
-        return d
+        return self._toml_data
 
 
 class Settings(BaseSettings):
@@ -71,8 +62,6 @@ class Settings(BaseSettings):
         case_sensitive=False,
         env_nested_delimiter="__",
         extra="ignore",
-        # The `toml_file` setting is a custom setting that we use in our custom source.
-        toml_file=Path(os.getenv("CONFIG_FILE", "config.toml")),
     )
 
     # --- Telegram Bot Configuration ---
@@ -81,7 +70,7 @@ class Settings(BaseSettings):
 
     # --- TeamTalk Server Configuration ---
     host_name: str
-    port: int = Field(..., alias="PORT")  # Explicit alias for clarity
+    port: int
     udp_port: int | None = None
     user_name: str
     password: str
@@ -108,7 +97,7 @@ class Settings(BaseSettings):
             "CREATE_TEMPORARY_CHANNEL",
             "UPLOAD_FILES",
             "DOWNLOAD_FILES",
-instantiate            "TRANSMIT_VOICE",
+            "TRANSMIT_VOICE",
             "TRANSMIT_VIDEOCAPTURE",
             "TRANSMIT_DESKTOP",
             "TRANSMIT_DESKTOPINPUT",
@@ -157,10 +146,10 @@ instantiate            "TRANSMIT_VOICE",
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         return (
             env_settings,
+            init_settings,
             TomlConfigSettingsSource(settings_cls),
             file_secret_settings,
         )
-
 
 try:
     settings = Settings()
@@ -168,10 +157,10 @@ try:
     if settings.udp_port is None:
         settings.udp_port = settings.port
 
-    logger.info("Configuration loaded successfully using Pydantic Settings.")
+    logger.info("Configuration loaded successfully.")
 
 except (ValidationError, FileNotFoundError) as e:
-    if isinstance(e, FileNotFoundError) or "toml_file" in str(e):
+    if isinstance(e, FileNotFoundError):
         logger.error(
             f"Configuration file not found. Please create 'config.toml' or set the CONFIG_FILE environment variable. Error: {e}"
         )
