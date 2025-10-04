@@ -167,8 +167,8 @@ async def _prepare_downloadables_for_web(
             client_zip_user_download_name,
         ) = create_client_zip_for_user(
             app=request.app,
-            username=username,
-            password=password,
+            username=artefact_data.username,
+            password=artefact_data.password,
             tt_file_name_on_server=tt_file_name_for_user,
             lang_code=user_lang_code,
         )
@@ -193,7 +193,7 @@ async def _prepare_downloadables_for_web(
                 delay_seconds=settings.generated_file_ttl_seconds,
             )
         else:
-            logger.warning(f"Failed to create client ZIP for web user {username}")
+            logger.warning(f"Failed to create client ZIP for web user {artefact_data.username}")
 
     return {
         "tt_download_link_token": tt_token,
@@ -239,8 +239,7 @@ async def register_page_get(request: Request):
     available_languages = get_available_languages_for_display()
 
     context = {
-        "request": request,
-        "title": translator("registration_title"),
+        "title": _("TeamTalk Registration"),
         "message": "",
         "show_form": True,
         "current_lang": effective_lang_code,
@@ -260,9 +259,12 @@ async def register_page_get(request: Request):
 async def register_page_post(
     request: Request,
     background_tasks: BackgroundTasks,
-    payload: RegistrationPayload,
     db: AsyncSession = Depends(get_db_session),
+    username: str = Form(...),
+    password: str = Form(...),
+    nickname: str | None = Form(None),
 ):
+    payload = RegistrationPayload(username=username, password=password, nickname=nickname)
     user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     translator = get_translator(user_lang_code)
     user_ip = get_user_ip_fastapi(request)
@@ -272,7 +274,7 @@ async def register_page_post(
             f"Validation failed for IP {user_ip} (Username: {payload.username}): IP already registered."
         )
         raise HTTPException(
-            status_code=400, detail=translator("ip_already_registered_error")
+            status_code=400, detail=translator("This IP address has already been used to register an account.")
         )
 
     try:
@@ -284,14 +286,14 @@ async def register_page_post(
                 f"Validation failed for IP {user_ip} (Username: {payload.username}): Username already taken."
             )
             raise HTTPException(
-                status_code=400, detail=translator("username_taken_error")
+                status_code=400, detail=translator("Sorry, this username is already taken. Please choose another one.")
             )
         if username_exists is None:
             logger.error(
                 f"Validation failed for IP {user_ip} (Username: {payload.username}): check_username_exists returned None (error)."
             )
             raise HTTPException(
-                status_code=500, detail=translator("registration_failed_error")
+                status_code=500, detail=translator("An error occurred during registration. Please try again later or contact an administrator.")
             )
     except Exception as e:
         logger.error(
@@ -299,7 +301,7 @@ async def register_page_post(
             exc_info=True,
         )
         raise HTTPException(
-            status_code=500, detail=translator("registration_failed_error")
+            status_code=500, detail=translator("An error occurred during registration. Please try again later or contact an administrator.")
         )
 
     final_nickname = (
@@ -323,13 +325,7 @@ async def register_page_post(
     )
 
     if not registration_successful or not tt_artefact_data_from_reg:
-        message = translator("registration_failed_error")
-        available_languages = get_available_languages_for_display()
-        return request.app.state.templates.TemplateResponse(
-            "register.html",
-            {
-                "request": request,
-                "title": translator("registration_title"),
+                "title": translator("TeamTalk Registration"),
                 "message": message,
                 "show_form": True,
                 "current_lang": user_lang_code,
@@ -355,13 +351,13 @@ async def register_page_post(
     )
 
     if downloadables_context.get("file_generation_error"):
-        message = translator("registration_failed_file_error")
+        message = translator("Registration was successful, but there was an error generating the connection files. Please contact an administrator.")
         available_languages = get_available_languages_for_display()
         return request.app.state.templates.TemplateResponse(
             "register.html",
             {
                 "request": request,
-                "title": translator("registration_title"),
+                "title": translator("TeamTalk Registration"),
                 "message": message,
                 "show_form": True,
                 "current_lang": user_lang_code,
@@ -371,8 +367,8 @@ async def register_page_post(
             status_code=500,
         )
 
-    success_title = translator("registration_successful_title")
-    success_message = translator("registration_successful_message")
+    success_title = translator("Registration Successful")
+    success_message = translator("Your registration was successful. You can now connect to the server.")
     available_languages = get_available_languages_for_display()
 
     final_context = {
@@ -416,11 +412,8 @@ async def download_tt_file(
             await mark_fastapi_download_token_used(db, token)
             return FileResponse(
                 path=file_path,
-                media_type="application/octet-stream",
-                filename=user_download_filename,
-            )
     raise HTTPException(
-        status_code=404, detail=translator("file_not_found_or_expired_error")
+        status_code=404, detail=translator("The requested file could not be found or the link has expired.")
     )
 
 
@@ -446,5 +439,5 @@ async def download_client_zip_file(
                 filename=user_download_filename,
             )
     raise HTTPException(
-        status_code=404, detail=translator("file_not_found_or_expired_error")
+        status_code=404, detail=translator("The requested file could not be found or the link has expired.")
     )

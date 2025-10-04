@@ -80,7 +80,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         "register.html",
         {
             "request": request,
-            "title": translator("registration_title"),
+            "title": translator("TeamTalk Registration"),
             "message": "\n".join(error_messages),
             "show_form": True,
             "current_lang": user_lang_code,

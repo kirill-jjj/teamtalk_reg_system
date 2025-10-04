@@ -126,4 +126,3 @@ pydantic-docs/
 # Ignore all .toml files, but re-include specific ones needed for the project.
 *.toml
 !pyproject.toml
-!config.toml
