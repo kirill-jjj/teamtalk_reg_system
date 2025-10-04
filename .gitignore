@@ -129,3 +129,9 @@ users.db-journal
 
 uv cache
 .uv_cache/
+
+# Pydantic docs folder
+pydantic-docs/
+
+# Test database
+test.db
