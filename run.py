@@ -4,6 +4,39 @@ import logging
 import os
 from pathlib import Path
 import sys
+import functools
+
+from aiogram import Bot as AiogramBot
+from aiogram import Dispatcher
+import pytalk
+import uvicorn
+
+from bot.core.config import settings
+from bot.core.db import close_db_engine, init_db
+from bot.core.db.crud import (
+    delete_telegram_registration_by_id,
+    is_telegram_id_registered,
+)
+from bot.core.db.session import AsyncSessionLocal
+from bot.core.tasks import periodic_database_cleanup
+from bot.fastapi_app.main import app as fastapi_app
+from bot.teamtalk.connection import (
+    close_teamtalk_connection,
+    launch_teamtalk_service,
+)
+from bot.teamtalk.events import (
+    on_error,
+    on_message,
+    on_my_connect,
+    on_my_connection_lost,
+    on_my_disconnect,
+    on_my_kicked_from_channel,
+    on_my_login,
+    on_ready,
+    on_user_account_new,
+    on_user_account_remove,
+)
+from bot.telegram_bot.main import run_telegram_bot, start_telegram_polling
 
 # --- Argument parsing for config file ---
 # This is done before importing the settings module to ensure the environment
@@ -25,27 +58,6 @@ args = parser.parse_args()
 if args.config:
     os.environ["CONFIG_FILE"] = args.config
     print(f"INFO: Using config file specified via --config: '{args.config}'")
-
-
-from aiogram import Bot as AiogramBot
-from aiogram import Dispatcher
-import uvicorn
-
-from bot.core.config import settings
-from bot.core.db import close_db_engine, init_db
-from bot.core.db.crud import (
-    delete_telegram_registration_by_id,
-    is_telegram_id_registered,
-)
-from bot.core.db.session import AsyncSessionLocal
-from bot.core.tasks import periodic_database_cleanup
-from bot.fastapi_app.main import app as fastapi_app
-from bot.teamtalk.connection import (
-    close_teamtalk_connection,
-    launch_teamtalk_service,
-    set_aiogram_bot_instance,
-)
-from bot.telegram_bot.main import run_telegram_bot, start_telegram_polling
 
 # Configure logging AFTER .env load, as .env might contain logging settings in a real app
 logging.basicConfig(
@@ -71,6 +83,7 @@ class Application:
         self.telegram_bot: AiogramBot | None = None
         self.dispatcher: Dispatcher | None = None
         self.fastapi_server: uvicorn.Server | None = None
+        self.pytalk_bot: pytalk.TeamTalkBot | None = None # New: pytalk bot instance
         self.tasks: list[asyncio.Task] = []
         self.startup_event = asyncio.Event() # Event to signal successful startup
 
@@ -135,11 +148,29 @@ class Application:
         # 2. Run admin ID cleanup
         await self._remove_admin_ids_from_registrations()
 
-        # 3. Initialize Telegram Bot
+        # 3. Initialize PyTalk Bot (TeamTalk connection)
+        self.pytalk_bot = pytalk.TeamTalkBot(client_name=settings.client_name)
+        logger.info("PyTalk bot instance created.")
+
+        # Register PyTalk event handlers
+        self.pytalk_bot.on_event("ready", functools.partial(on_ready, self.pytalk_bot))
+        self.pytalk_bot.on_event("my_login", functools.partial(on_my_login, self.pytalk_bot))
+        self.pytalk_bot.on_event("message", functools.partial(on_message, self.pytalk_bot))
+        self.pytalk_bot.on_event("error", functools.partial(on_error, self.pytalk_bot))
+        self.pytalk_bot.on_event("my_connect", functools.partial(on_my_connect, self.pytalk_bot))
+        self.pytalk_bot.on_event("my_disconnect", functools.partial(on_my_disconnect, self.pytalk_bot))
+        self.pytalk_bot.on_event("my_connection_lost", functools.partial(on_my_connection_lost, self.pytalk_bot))
+        self.pytalk_bot.on_event("my_kicked_from_channel", functools.partial(on_my_kicked_from_channel, self.pytalk_bot))
+        self.pytalk_bot.on_event("user_account_new", functools.partial(on_user_account_new, self.pytalk_bot))
+        self.pytalk_bot.on_event("user_account_remove", functools.partial(on_user_account_remove, self.pytalk_bot))
+        logger.info("PyTalk event handlers registered.")
+
+        # 4. Initialize Telegram Bot
         self.telegram_bot, self.dispatcher = await run_telegram_bot()
         if self.telegram_bot:
-            set_aiogram_bot_instance(self.telegram_bot)
-            logger.info("Aiogram bot instance passed to TeamTalk connection module.")
+            # Pass the Aiogram bot instance to the pytalk_bot
+            self.pytalk_bot.aiogram_bot_ref = self.telegram_bot
+            logger.info("Aiogram bot instance passed to PyTalk bot.")
             try:
                 bot_info = await self.telegram_bot.get_me()
                 self.telegram_bot.username = bot_info.username
@@ -154,7 +185,7 @@ class Application:
         else:
             logger.warning("Aiogram bot instance was not available. Telegram polling will not start.")
 
-        # 4. Start FastAPI server (if enabled)
+        # 5. Start FastAPI server (if enabled)
         if settings.web_registration_enabled:
             ssl_config = {}
             if settings.web_app_ssl_enabled:
@@ -187,10 +218,11 @@ class Application:
         else:
             logger.info("WEB_REGISTRATION_ENABLED is false. FastAPI server will not be started.")
 
-        # 5. Start TeamTalk Service
+        # 6. Start TeamTalk Service
         self.tasks.append(
             asyncio.create_task(
                 launch_teamtalk_service(
+                    pytalk_bot_instance=self.pytalk_bot, # Pass the instance
                     host_name=settings.host_name,
                     tcp_port=settings.port,
                     udp_port=settings.udp_port,
@@ -251,8 +283,11 @@ class Application:
             logger.info("Aiogram bot session closed.")
 
         # 3. Close TeamTalk connection
-        await close_teamtalk_connection()
-        logger.info("PyTalk bot connection closed.")
+        if self.pytalk_bot:
+            await close_teamtalk_connection(self.pytalk_bot) # Pass the instance
+            logger.info("PyTalk bot connection closed.")
+        else:
+            logger.info("PyTalk bot instance not initialized, no need to close.")
 
         # 4. Close database engine
         await close_db_engine()

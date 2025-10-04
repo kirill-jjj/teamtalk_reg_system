@@ -32,11 +32,12 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
         toml_file_path_str = os.getenv("CONFIG_FILE", "config.toml")
         toml_file_path = Path(toml_file_path_str)
 
+        logger.debug("Attempting to load TOML config from: '%s'", toml_file_path.absolute())
         if not toml_file_path.is_file():
-            logger.debug("TOML config file not found at '%s'.", toml_file_path)
+            logger.debug("TOML config file not found at '%s'. is_file() returned False.", toml_file_path.absolute())
             self._toml_data = {}
         else:
-            logger.debug("Loading configuration from TOML file: '%s'", toml_file_path)
+            logger.debug("TOML config file found at '%s'. Loading...", toml_file_path.absolute())
             try:
                 with open(toml_file_path, "rb") as f:
                     self._toml_data = tomllib.load(f)

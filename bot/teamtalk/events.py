@@ -3,6 +3,7 @@ from asyncio import Task
 import logging
 import time
 
+import pytalk
 from pytalk import Channel as TeamTalkChannel
 from pytalk import TeamTalkInstance, UserAccount, UserType, user
 from pytalk.message import Message
@@ -13,7 +14,7 @@ from bot.core.db.crud import add_banned_user, get_telegram_id_by_teamtalk_userna
 from bot.core.db.session import AsyncSessionLocal
 
 from ..core.localization import get_admin_lang_code, get_translator
-from .connection import force_restart_instance_on_event, pytalk_bot
+from .connection import force_restart_instance_on_event
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ recently_deleted_users: dict[str, tuple[float, Task]] = {}
 DELETION_WINDOW_SECONDS = 2  # 2-second window to detect a quick delete/create as an update.
 
 
-async def _send_delayed_removal_notification(username: str):
+async def _send_delayed_removal_notification(pytalk_bot_instance: pytalk.TeamTalkBot, username: str):
     """Waits for a defined period and then sends a removal notification.
     This task is intended to be cancelled if the user is re-created quickly.
     """
@@ -35,7 +36,7 @@ async def _send_delayed_removal_notification(username: str):
         # Clean up the cache entry for this user
         recently_deleted_users.pop(username, None)
 
-        aiogram_bot = pytalk_bot.aiogram_bot_ref
+        aiogram_bot = pytalk_bot_instance.aiogram_bot_ref
         if not aiogram_bot or not settings.admin_ids:
             logger.error("_send_delayed_removal_notification: Aiogram bot or ADMIN_IDS not configured.")
             return
@@ -65,7 +66,7 @@ async def _send_delayed_removal_notification(username: str):
 
 
 # Helper function for banning
-async def _handle_banning_on_tt_account_removal(tt_username: str, server_host_info: str):
+async def _handle_banning_on_tt_account_removal(pytalk_bot_instance: pytalk.TeamTalkBot, tt_username: str, server_host_info: str):
     logger.info("Attempting to process ban for TeamTalk user '%s' deleted from server '%s'.", tt_username, server_host_info)
     async with AsyncSessionLocal() as session:
         try:
@@ -85,7 +86,7 @@ async def _handle_banning_on_tt_account_removal(tt_username: str, server_host_in
             logger.error("Error during automatic banning process for TeamTalk user '%s': %s", tt_username, e, exc_info=True)
 
 
-def get_admin_users(teamtalk_instance: TeamTalkInstance) -> list[user]:
+def get_admin_users(pytalk_bot_instance: pytalk.TeamTalkBot, teamtalk_instance: TeamTalkInstance) -> list[user]:
     """Retrieves a list of admin users from the server.
     """
     admin_users: list[user] = []
@@ -107,17 +108,15 @@ def get_admin_users(teamtalk_instance: TeamTalkInstance) -> list[user]:
             logger.error("get_admin_users: Error processing user %s: %s", getattr(user, 'id', 'UnknownID'), e)
     return admin_users
 
-@pytalk_bot.event
-async def on_ready():
+async def on_ready(pytalk_bot_instance: pytalk.TeamTalkBot):
     logger.info("PyTalk Bot is ready (on_ready event).")
 
-@pytalk_bot.event
-async def on_my_login(server: TeamTalkServer):
+async def on_my_login(pytalk_bot_instance: pytalk.TeamTalkBot, server: TeamTalkServer):
     host_info = server.info.host if server and hasattr(server, 'info') and server.info else 'Unknown Server'
     logger.info("Successfully logged in to server: %s (on_my_login event).", host_info)
     tt_instance = getattr(server, 'teamtalk_instance', None)
     if not tt_instance:
-        for inst in pytalk_bot.teamtalks:
+        for inst in pytalk_bot_instance.teamtalks:
             if inst.server is server:
                 tt_instance = inst
                 break
@@ -136,26 +135,21 @@ async def on_my_login(server: TeamTalkServer):
             tt_instance.cached_my_user_id = None
             tt_instance.cached_my_user_account = None
 
-@pytalk_bot.event
-async def on_message(message: Message):
+async def on_message(pytalk_bot_instance: pytalk.TeamTalkBot, message: Message):
     logger.info("Received message (on_message event): Type: %s, From ID: %s, Content: '%s...'", type(message).__name__, message.from_id, message.content[:50])
 
-@pytalk_bot.event
-async def on_error(event_name: str, *args, **kwargs):
+async def on_error(pytalk_bot_instance: pytalk.TeamTalkBot, event_name: str, *args, **kwargs):
     logger.error("Error in event handler '%s'. Args: %s, Kwargs: %s", event_name, args, kwargs, exc_info=True)
 
-@pytalk_bot.event
-async def on_my_connect(server: TeamTalkServer):
+async def on_my_connect(pytalk_bot_instance: pytalk.TeamTalkBot, server: TeamTalkServer):
    host_info = server.info.host if server and hasattr(server, 'info') and server.info else 'Unknown Server'
    logger.info("Successfully connected to server: %s (on_my_connect event)", host_info)
 
-@pytalk_bot.event
-async def on_my_disconnect(server: TeamTalkServer):
+async def on_my_disconnect(pytalk_bot_instance: pytalk.TeamTalkBot, server: TeamTalkServer):
     host = server.info.host if server and hasattr(server, 'info') and server.info else 'Unknown Server'
     logger.info("Bot gracefully disconnected from server: %s (on_my_disconnect event).", host)
 
-@pytalk_bot.event
-async def on_my_connection_lost(server: TeamTalkServer):
+async def on_my_connection_lost(pytalk_bot_instance: pytalk.TeamTalkBot, server: TeamTalkServer):
     host = "Unknown Server"
     tt_instance = getattr(server, 'teamtalk_instance', None)
     if tt_instance and hasattr(tt_instance, 'server_info_tuple') and tt_instance.server_info_tuple:
@@ -164,12 +158,11 @@ async def on_my_connection_lost(server: TeamTalkServer):
         host = server.info.host
     logger.warning("EVENT: on_my_connection_lost - Connection lost from server %s. Triggering forceful instance restart.", host)
     if tt_instance and hasattr(tt_instance, 'server_info_tuple') and tt_instance.server_info_tuple:
-        asyncio.create_task(force_restart_instance_on_event(*tt_instance.server_info_tuple))
+        asyncio.create_task(force_restart_instance_on_event(pytalk_bot_instance, *tt_instance.server_info_tuple))
     else:
         logger.error("Could not trigger instance restart for server %s after connection lost: server_info_tuple not found.", host)
 
-@pytalk_bot.event
-async def on_my_kicked_from_channel(channel: TeamTalkChannel):
+async def on_my_kicked_from_channel(pytalk_bot_instance: pytalk.TeamTalkBot, channel: TeamTalkChannel):
     server_host = "Unknown Server"
     channel_name = channel.name if channel and hasattr(channel, 'name') else 'Unknown Channel'
     tt_instance = getattr(channel.server, 'teamtalk_instance', None)
@@ -177,12 +170,11 @@ async def on_my_kicked_from_channel(channel: TeamTalkChannel):
         server_host = tt_instance.server_info_tuple[0]
     logger.warning("EVENT: on_my_kicked_from_channel - Kicked from '%s' on %s. Triggering forceful instance restart.", channel_name, server_host)
     if tt_instance and hasattr(tt_instance, 'server_info_tuple') and tt_instance.server_info_tuple:
-        asyncio.create_task(force_restart_instance_on_event(*tt_instance.server_info_tuple))
+        asyncio.create_task(force_restart_instance_on_event(pytalk_bot_instance, *tt_instance.server_info_tuple))
     else:
         logger.error("Could not trigger instance restart for server %s after kick: server_info_tuple not found.", server_host)
 
-@pytalk_bot.event
-async def on_user_account_new(account: UserAccount):
+async def on_user_account_new(pytalk_bot_instance: pytalk.TeamTalkBot, account: UserAccount):
     """Handles new user account creation, detecting if it's an update to a recently deleted account.
     """
     raw_account_username = getattr(account, 'username', 'UnknownUser')
@@ -191,7 +183,7 @@ async def on_user_account_new(account: UserAccount):
     logger.info("User account '%s' created (on_user_account_new event).", account_username_str)
     print(f"User account '{account_username_str}' created.")
 
-    aiogram_bot = pytalk_bot.aiogram_bot_ref
+    aiogram_bot = pytalk_bot_instance.aiogram_bot_ref
     if not aiogram_bot or not settings.admin_ids:
         logger.error("on_user_account_new: Aiogram bot or ADMIN_IDS not configured. Cannot send notifications.")
         return
@@ -223,8 +215,7 @@ async def on_user_account_new(account: UserAccount):
         except Exception as e:
             logger.error("Failed to send TeamTalk %s notification to Telegram admin ID %s for user '%s'. Error: %s", log_prefix, admin_id, account_username_str, e)
 
-@pytalk_bot.event
-async def on_user_account_remove(account: UserAccount):
+async def on_user_account_remove(pytalk_bot_instance: pytalk.TeamTalkBot, account: UserAccount):
     """Handles user account removal, scheduling a delayed notification to detect updates.
     """
     raw_account_username = getattr(account, 'username', 'UnknownUser')
@@ -234,15 +225,15 @@ async def on_user_account_remove(account: UserAccount):
     print(f"User account '{account_username_str}' removed.")
 
     server_host_info = "Unknown Server"
-    if pytalk_bot.teamtalks:
-        first_instance = pytalk_bot.teamtalks[0]
+    if pytalk_bot_instance.teamtalks:
+        first_instance = pytalk_bot_instance.teamtalks[0]
         if hasattr(first_instance, 'server_info_tuple') and first_instance.server_info_tuple:
             server_host_info = first_instance.server_info_tuple[0]
         elif first_instance.server and hasattr(first_instance.server, 'info') and first_instance.server.info:
              server_host_info = first_instance.server.info.host
     logger.info("Using server host info: %s for banning context.", server_host_info)
 
-    asyncio.create_task(_handle_banning_on_tt_account_removal(account_username_str, server_host_info))
+    asyncio.create_task(_handle_banning_on_tt_account_removal(pytalk_bot_instance, account_username_str, server_host_info))
 
     if account_username_str in recently_deleted_users:
         __, old_task = recently_deleted_users[account_username_str]

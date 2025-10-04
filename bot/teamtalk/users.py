@@ -1,12 +1,11 @@
 import logging
 from typing import Any  # Added List
 
+import pytalk
 from pytalk.enums import UserType as PyTalkUserType
 from pytalk.implementation.TeamTalkPy import TeamTalk5 as sdk
 from pytalk.instance import TeamTalkInstance
 from pytalk.permission import Permission as PyTalkPermission
-
-from .connection import pytalk_bot
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,7 @@ def _calculate_pytalk_user_rights(teamtalk_default_user_rights_list: list[str]) 
             logger.error("Error processing permission string '%s': %s", right_string, e_perm)
     return pytalk_user_rights
 
-async def _send_broadcast_message_directly(active_server_instance: TeamTalkInstance, content: str):
+async def _send_broadcast_message_directly(pytalk_bot_instance: pytalk.TeamTalkBot, active_server_instance: TeamTalkInstance, content: str):
     """Workaround function to send a broadcast message by calling the SDK directly.
     This fixes the issue on Linux where the string is not correctly encoded.
     """
@@ -81,12 +80,12 @@ async def _handle_registration_broadcast(
     await _send_broadcast_message_directly(active_server_instance, broadcast_message_text)
 
 # --- Main Functions ---
-async def check_username_exists(username: str) -> bool | None:
-    if not pytalk_bot.teamtalks:
+async def check_username_exists(pytalk_bot_instance: pytalk.TeamTalkBot, username: str) -> bool | None:
+    if not pytalk_bot_instance.teamtalks:
         logger.warning("No active TeamTalk server connections in check_username_exists.")
         return None
 
-    active_server_instance = pytalk_bot.teamtalks[0]
+    active_server_instance = pytalk_bot_instance.teamtalks[0]
 
     if not active_server_instance.logged_in:
         # Corrected attribute access from .info.host to .server_info.host
@@ -114,6 +113,7 @@ async def check_username_exists(username: str) -> bool | None:
         return None
 
 async def perform_teamtalk_registration(
+    pytalk_bot_instance: pytalk.TeamTalkBot, # New argument
     username_str: str,
     password_str: str,
     usertype_to_create: PyTalkUserType,
@@ -130,15 +130,15 @@ async def perform_teamtalk_registration(
     broadcast_message_text: str | None = None
 ) -> tuple[bool, str | None, dict[str, Any] | None]:
 
-    if not pytalk_bot.teamtalks:
+    if not pytalk_bot_instance.teamtalks:
         logger.error("TeamTalk bot (pytalk_bot) has no active server connections for registration.")
         return False, "MODULE_UNAVAILABLE", None
 
-    active_server_instance = pytalk_bot.teamtalks[0]
+    active_server_instance = pytalk_bot_instance.teamtalks[0]
 
     if not active_server_instance.logged_in:
         host_display = active_server_instance.server_info.host if hasattr(active_server_instance, 'server_info') and active_server_instance.server_info else "Unknown Host"
-        logger.error(f"TeamTalk bot (pytalk_bot) is not logged in to server {host_display} for registration.")
+        logger.error(f"TeamTalk bot (pytalk_bot_instance) is not logged in to server {host_display} for registration.")
         return False, "MODULE_UNAVAILABLE", None
 
     pytalk_user_rights = _calculate_pytalk_user_rights(teamtalk_default_user_rights)
@@ -178,7 +178,7 @@ async def perform_teamtalk_registration(
         return True, "REG_SUCCESS", artefact_data
 
     except IndexError: # Should be caught by the initial check, but as a safeguard
-        logger.error("TeamTalk bot (pytalk_bot) has no active server connections (IndexError) for registration.")
+        logger.error("TeamTalk bot (pytalk_bot_instance) has no active server connections (IndexError) for registration.")
         return False, "MODULE_UNAVAILABLE", None
     except Exception as e_reg:
         logger.exception("General error during SDK registration for user %s: %s", username_str, e_reg)

@@ -1,7 +1,6 @@
 import asyncio
 import logging
 
-from aiogram import Bot as AiogramBot
 import pytalk
 from pytalk.enums import Status, TeamTalkServerInfo
 
@@ -11,18 +10,10 @@ from .backoff import Backoff
 
 logger = logging.getLogger(__name__)
 
-pytalk_bot = pytalk.TeamTalkBot(client_name=settings.client_name)
-pytalk_bot.aiogram_bot_ref: AiogramBot | None = None # Holds the Aiogram Bot instance
 active_instance_restarts = {} # Key: server_host_port, Value: asyncio.Task
 
-def set_aiogram_bot_instance(bot: AiogramBot):
-    """Sets the Aiogram Bot instance on the global pytalk_bot."""
-    global pytalk_bot
-    pytalk_bot.aiogram_bot_ref = bot
-    bot_id_info = getattr(bot, 'id', 'N/A') if bot else 'None'
-    logger.info("Aiogram bot instance (ID: %s) set on pytalk_bot.", bot_id_info)
-
 async def initialize_teamtalk_connection(
+    pytalk_bot_instance: pytalk.TeamTalkBot, # New argument
     host_name: str, tcp_port: int, udp_port: int, user_name: str, password: str,
     nickname: str, encrypted: bool, join_channel_path: str | None,
     join_channel_pass: str, bot_gender: str, bot_status_text: str
@@ -39,11 +30,11 @@ async def initialize_teamtalk_connection(
             join_channel_path, join_channel_pass, bot_gender, bot_status_text
         )
 
-        await pytalk_bot.add_server(server_info_pytalk)
+        await pytalk_bot_instance.add_server(server_info_pytalk)
 
-        if pytalk_bot.teamtalks and pytalk_bot.teamtalks[-1].logged_in:
+        if pytalk_bot_instance.teamtalks and pytalk_bot_instance.teamtalks[-1].logged_in:
             logger.info("Successfully connected and logged into TeamTalk server: %s", host_name)
-            active_server_instance = pytalk_bot.teamtalks[-1]
+            active_server_instance = pytalk_bot_instance.teamtalks[-1]
 
             # Store original parameters on the instance for potential reconnection/restart
             active_server_instance.server_info_tuple = current_server_info_tuple
@@ -79,28 +70,28 @@ async def initialize_teamtalk_connection(
             return True
         logger.error(f"Failed to connect or login to TeamTalk server: {host_name}")
         # Attempt to remove the potentially partially added server instance
-        if pytalk_bot.teamtalks and pytalk_bot.teamtalks[-1].server_info.host == host_name and pytalk_bot.teamtalks[-1].server_info.tcp_port == tcp_port:
-            pytalk_bot.teamtalks.pop()
+        if pytalk_bot_instance.teamtalks and pytalk_bot_instance.teamtalks[-1].server_info.host == host_name and pytalk_bot_instance.teamtalks[-1].server_info.tcp_port == tcp_port:
+            pytalk_bot_instance.teamtalks.pop()
             logger.info("Removed potentially failed server instance for %s:%s from list.", host_name, tcp_port)
         return False
     except Exception as e:
         logger.error(f"Error initializing TeamTalk connection for {host_name}: {e}", exc_info=True)
         # Attempt to remove the potentially partially added server instance on general exception too
-        if pytalk_bot.teamtalks:
+        if pytalk_bot_instance.teamtalks:
             # This removal logic might be too aggressive or could target wrong instance if multiple servers in list
             # A more robust way would be to find the specific instance if possible
-            last_instance = pytalk_bot.teamtalks[-1]
+            last_instance = pytalk_bot_instance.teamtalks[-1]
             if hasattr(last_instance, 'server_info') and last_instance.server_info.host == host_name and last_instance.server_info.tcp_port == tcp_port:
-                 pytalk_bot.teamtalks.pop()
+                 pytalk_bot_instance.teamtalks.pop()
                  logger.info("Removed server instance for %s:%s from list due to exception during init.", host_name, tcp_port)
         return False
 
-async def close_teamtalk_connection():
+async def close_teamtalk_connection(pytalk_bot_instance: pytalk.TeamTalkBot): # New argument
     logger.info("Attempting to shut down PyTalk bot connections...")
-    if not pytalk_bot.teamtalks:
+    if not pytalk_bot_instance.teamtalks:
         logger.info("No active TeamTalk instances to close.")
         return
-    for i in range(len(pytalk_bot.teamtalks) -1, -1, -1): # Iterate backwards for safe removal
+    for i in range(len(pytalk_bot_instance.teamtalks) -1, -1, -1): # Iterate backwards for safe removal
         tt_instance = pytalk_bot.teamtalks[i]
         host_display = "Unknown Host"
         # Check server_info_tuple first as it's set by our code
@@ -116,39 +107,41 @@ async def close_teamtalk_connection():
             if hasattr(tt_instance, 'super') and hasattr(tt_instance.super, 'closeTeamTalk'):
                 logger.info("Closing TeamTalk SDK for instance %s...", host_display)
                 tt_instance.super.closeTeamTalk()
-            pytalk_bot.teamtalks.pop(i)
+            pytalk_bot_instance.teamtalks.pop(i)
             logger.info("Disconnected, closed SDK, and removed instance for host: %s.", host_display)
         except Exception as e: logger.error(f"Error during shutdown for {host_display}: {e}", exc_info=True)
 
     # This might be redundant if all instances are closed and popped correctly
-    if hasattr(pytalk_bot, '_close_all_sdk') and not pytalk_bot.teamtalks:
-        pytalk_bot._close_all_sdk()
-        logger.info("Called pytalk_bot._close_all_sdk() as all instances were removed.")
-    elif pytalk_bot.teamtalks:
-        logger.warning("Not all instances removed from pytalk_bot.teamtalks list during close: %s remaining.", len(pytalk_bot.teamtalks))
+    if hasattr(pytalk_bot_instance, '_close_all_sdk') and not pytalk_bot_instance.teamtalks:
+        pytalk_bot_instance._close_all_sdk()
+        logger.info("Called pytalk_bot_instance._close_all_sdk() as all instances were removed.")
+    elif pytalk_bot_instance.teamtalks:
+        logger.warning("Not all instances removed from pytalk_bot_instance.teamtalks list during close: %s remaining.", len(pytalk_bot_instance.teamtalks))
 
     logger.info("PyTalk bot shutdown process completed.")
 
 async def launch_teamtalk_service(
+    pytalk_bot_instance: pytalk.TeamTalkBot, # New argument
     host_name: str, tcp_port: int, udp_port: int, user_name: str, password: str,
     nickname: str, encrypted: bool, join_channel_path: str | None,
     join_channel_pass: str, bot_gender: str, bot_status_text: str
 ):
     logger.info("Starting PyTalk bot service...")
     try:
-        async with pytalk_bot:
+        async with pytalk_bot_instance:
             if not await initialize_teamtalk_connection(
                 host_name, tcp_port, udp_port, user_name, password, nickname,
                 encrypted, join_channel_path, join_channel_pass, bot_gender, bot_status_text
             ):
                 logger.error("Failed to initialize main TeamTalk connection. Service may not work as expected.")
-            await pytalk_bot._start()
+            await pytalk_bot_instance._start()
     except Exception:
         logger.exception("Exception in PyTalk bot service loop:", exc_info=True)
     finally:
         logger.info("PyTalk bot service stopped.")
 
 async def force_restart_instance_on_event(
+    pytalk_bot_instance: pytalk.TeamTalkBot, # New argument
     host_name: str,
     tcp_port: int,
     udp_port: int,
@@ -173,7 +166,7 @@ async def force_restart_instance_on_event(
 
     async def restart_task():
         instance_to_remove_idx = -1
-        for i, tt_instance in enumerate(list(pytalk_bot.teamtalks)):
+        for i, tt_instance in enumerate(list(pytalk_bot_instance.teamtalks)):
             instance_matches = False
             if hasattr(tt_instance, 'server_info_tuple'): # Primary check
                 if tt_instance.server_info_tuple[0] == host_name and tt_instance.server_info_tuple[1] == tcp_port:
@@ -202,13 +195,12 @@ async def force_restart_instance_on_event(
 
         if instance_to_remove_idx != -1:
             try:
-                pytalk_bot.teamtalks.pop(instance_to_remove_idx)
-                logger.info("Old instance for %s removed from pytalk_bot.teamtalks list.", server_key)
+                pytalk_bot_instance.teamtalks.pop(instance_to_remove_idx)
+                logger.info("Old instance for %s removed from pytalk_bot_instance.teamtalks list.", server_key)
             except IndexError:
                 logger.warning("Could not pop instance at index %s for %s, list changed?", instance_to_remove_idx, server_key)
-        else:
-            logger.info("No existing instance found for %s in pytalk_bot.teamtalks list, or already removed.", server_key)
-
+            else:
+                logger.info("No existing instance found for %s in pytalk_bot_instance.teamtalks list, or already removed.", server_key)
         base_delay = getattr(settings, 'TT_RECONNECT_BASE_DELAY', 5)
         exponent = getattr(settings, 'TT_RECONNECT_EXPONENT', 2)
         max_delay = getattr(settings, 'TT_RECONNECT_MAX_DELAY', 60)
