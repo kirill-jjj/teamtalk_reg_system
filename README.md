@@ -96,31 +96,25 @@ These instructions assume you have Python 3.11+ installed.
     *After updating the `.po` files with translations, re-run the `compile` command.*
 
 5.  **Configure the bot:**
-    *   Rename `.env.example` to `.env`.
-    *   Open the `.env` file with a text editor and fill in your specific details (see `.env.example` for required fields and descriptions). Key settings include:
+    *   The project now uses a `config.toml` file for configuration. A `config.toml` file is created by default. You should review it and fill in your specific details.
+    *   Open `config.toml` with a text editor and fill in your details. Key settings include:
         *   `TG_BOT_TOKEN`: Your Telegram Bot Token.
-        *   `ADMIN_IDS`: Telegram User IDs for bot administrators.
+        *   `ADMIN_IDS`: A list of Telegram User IDs for bot administrators (e.g., `[12345, 67890]`).
         *   TeamTalk server connection details (`HOST_NAME`, `PORT`, `USER_NAME`, `PASSWORD`).
-        *   Web registration settings (if enabled, using variables like `WEB_APP_HOST`, `WEB_APP_PORT` which are now used by Uvicorn).
-        *   The `FLASK_SECRET_KEY` (now removed/commented in `.env.example`) is not directly used by FastAPI for session management in the same way. Secure practices for any session/cookie management in FastAPI should be ensured if custom session logic is added.
-        *   **New Configuration Variables (Optional):**
-            *   `TT_PUBLIC_HOSTNAME`: Public hostname to be used in generated .tt files and links. If not specified, `HOST_NAME` is used. (Optional)
-            *   `TT_JOIN_CHANNEL`: Channel ID (integer) or channel path (string, e.g., "/" for root, or "/My Channel/Sub Channel") for the bot to join on startup. If not specified, the bot will not automatically join a channel. (Optional)
-            *   `TT_JOIN_CHANNEL_PASSWORD`: Password for the channel specified in `TT_JOIN_CHANNEL`. (Optional, if the channel is not password-protected)
-            *   `TT_STATUS_TEXT`: Status message for the bot in TeamTalk. (Optional, defaults to empty)
-            *   `TT_GENDER`: Gender for the bot in TeamTalk. Possible values: `male`, `female`, `neutral`. Defaults to `neutral`. (Optional)
+        *   Web registration settings (if enabled, using variables like `WEB_APP_HOST`, `WEB_APP_PORT`).
+    *   You can use a different configuration file by setting the `CONFIG_FILE` environment variable (e.g., `CONFIG_FILE=test.config.toml uv run python run.py`).
 
 6.  **Run the application using `uv`:**
     This command will run the `run.py` script within the `uv`-managed virtual environment. `run.py` now starts both the Telegram bot and the FastAPI web application (using Uvicorn).
     ```bash
     uv run python run.py
     ```
-    The FastAPI application will be available at the host and port configured in your `.env` file (e.g., `http://127.0.0.1:5000`).
+    The FastAPI application will be available at the host and port configured in your `config.toml` file (e.g., `http://127.0.0.1:5000`).
 
 ## Usage
 
 *   **Telegram Bot:** Start a chat with your bot and send the `/start` command.
-*   **Web Registration:** If enabled (`WEB_REGISTRATION_ENABLED=true` in `.env`), navigate to `http://<your_host>:<your_port>/register` (e.g., `http://127.0.0.1:5000/register`) in your web browser. The host and port are determined by `WEB_APP_HOST` and `WEB_APP_PORT` in your `.env` file.
+*   **Web Registration:** If enabled (`WEB_REGISTRATION_ENABLED=true` in your config), navigate to `http://<your_host>:<your_port>/register` (e.g., `http://127.0.0.1:5000/register`) in your web browser. The host and port are determined by `WEB_APP_HOST` and `WEB_APP_PORT` in your configuration file.
 
 ## Localization Management
 

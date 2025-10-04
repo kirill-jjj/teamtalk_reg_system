@@ -13,7 +13,6 @@ readme = "README.md"
 dependencies = [
     "aiogram ~=3.20.0",
     "py-talk-ex ~=1.6.0",
-    "python-dotenv ~=1.1.0",
     "pydantic-settings ~= 2.11.0",
     "pydantic ==2.11.9",
     "SQLAlchemy ~=2.0.41",

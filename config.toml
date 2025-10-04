@@ -1,0 +1,128 @@
+# config.toml - Configuration for TeamTalk Registration Bot
+
+# -------------------------------------------
+# Telegram Bot Configuration
+# -------------------------------------------
+# Your Telegram Bot Token from BotFather
+TG_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_HERE"
+# List of Telegram User IDs who are administrators for this bot
+# Example: ADMIN_IDS = [12345678, 87654321]
+ADMIN_IDS = []
+
+# -------------------------------------------
+# TeamTalk Server Configuration
+# -------------------------------------------
+# Hostname or IP address of your TeamTalk server
+HOST_NAME = "your.teamtalk.server.com"
+# TCP port of your TeamTalk server
+PORT = 10333
+# UDP port of your TeamTalk server (Optional: if same as PORT, can be left blank or same value. If different, specify)
+UDP_PORT = 10333
+# Username for the bot to login to the TeamTalk server
+USER_NAME = "bot_username"
+# Password for the bot's TeamTalk account
+PASSWORD = "bot_password"
+# Nickname for the bot on the TeamTalk server
+NICK_NAME = "RegisterBot"
+# Client name string reported by the bot to the TeamTalk server
+CLIENT_NAME = "PyTalkRegisterBot"
+# Whether the connection to TeamTalk server should be encrypted
+ENCRYPTED = false
+# Name of the TeamTalk server, used in generated .tt files
+SERVER_NAME = "My TeamTalk Server"
+
+# --- TeamTalk Bot Account Specific Configuration ---
+# Public hostname for .tt files and links (optional, defaults to HOST_NAME if not set)
+# Use this if your server is behind a NAT/firewall and the public IP/hostname differs from the internal one.
+# TT_PUBLIC_HOSTNAME = "your.public.hostname.com"
+
+# Channel ID (integer, e.g., 1) or full path (string, e.g., "/My Channel/Sub" or "/" for root)
+# for the bot to automatically join upon successful login.
+# If left empty or commented out, the bot will not automatically join any channel.
+# TT_JOIN_CHANNEL = "/My Channel/Lobby"
+
+# Password for the channel specified in TT_JOIN_CHANNEL (if it's password-protected).
+# Leave empty if the channel has no password.
+# TT_JOIN_CHANNEL_PASSWORD = "channel_secret"
+
+# Status text that the bot will display in TeamTalk.
+# If left empty or commented out, no status text will be set initially beyond default.
+# TT_STATUS_TEXT = "Online and ready to help!"
+
+# Gender for the bot's appearance in TeamTalk.
+# Valid options are "male", "female", "neutral". Case-insensitive.
+# If left empty, commented out, or an invalid value is provided, it defaults to "neutral".
+# TT_GENDER = "female"
+
+
+# -------------------------------------------
+# Registration Settings
+# -------------------------------------------
+# For Telegram registration: false for auto-approval, true for admin verification before TeamTalk account creation
+VERIFY_REGISTRATION = false
+# Default language for admin/internal messages (e.g., "en" for English, "ru" for Russian)
+BOT_ADMIN_LANG = "en"
+
+# Optional: Force a specific language for all users, bypassing language selection.
+# If set to a valid language code (e.g., "en", "ru"), that language will be used.
+# If empty or not set, users will be able to choose their language.
+# FORCE_USER_LANG = ""
+
+# Default User Rights for new TeamTalk accounts created by the bot.
+TEAMTALK_DEFAULT_USER_RIGHTS = [
+    "MULTI_LOGIN", "VIEW_ALL_USERS", "CREATE_TEMPORARY_CHANNEL", "MODIFY_CHANNELS",
+    "TEXTMESSAGE_BROADCAST", "KICK_USERS", "BAN_USERS", "MOVE_USERS", "OPERATOR_ENABLE",
+    "UPLOAD_FILES", "DOWNLOAD_FILES", "UPDATE_SERVERPROPERTIES", "TRANSMIT_VOICE",
+    "TRANSMIT_VIDEOCAPTURE", "TRANSMIT_DESKTOP", "TRANSMIT_DESKTOPINPUT",
+    "TRANSMIT_MEDIAFILE", "LOCKED_NICKNAME", "LOCKED_STATUS", "RECORD_VOICE",
+    "VIEW_HIDDEN_CHANNELS", "TEXTMESSAGE_USER", "TEXTMESSAGE_CHANNEL"
+]
+
+# Enable/Disable Broadcast Message on User Registration
+TEAMTALK_REGISTRATION_BROADCAST_ENABLED = true
+
+# -------------------------------------------
+# Web Application (FastAPI) Configuration (Optional)
+# -------------------------------------------
+# Enable the web registration interface
+WEB_REGISTRATION_ENABLED = false
+# Host for the web application (e.g., 0.0.0.0 to listen on all interfaces, or 127.0.0.1 for local only)
+WEB_APP_HOST = "0.0.0.0"
+# Port for the web application
+WEB_APP_PORT = 5000
+
+# ROOT_PATH for the FastAPI application (e.g., if running behind a reverse proxy at /api/v1)
+ROOT_PATH = ""
+
+# Web Application SSL (Optional - Only if WEB_REGISTRATION_ENABLED=true)
+WEB_APP_SSL_ENABLED = false
+# Path to your SSL certificate file (e.g., "/path/to/your/cert.pem")
+# WEB_APP_SSL_CERT_PATH = ""
+# Path to your SSL private key file (e.g., "/path/to/your/key.pem")
+# WEB_APP_SSL_KEY_PATH = ""
+
+# -------------------------------------------
+# Advanced/Optional Settings
+# -------------------------------------------
+# Path to a directory containing the unzipped TeamTalk client files.
+# TEAMTALK_CLIENT_TEMPLATE_DIR = "path/to/your/TeamTalkClientDirectory"
+
+# How long (in seconds) generated files should be available for download.
+GENERATED_FILE_TTL_SECONDS = 600
+
+# --- Uvicorn Proxy Headers Configuration ---
+# Comma-separated list of IPs to trust as forwarding proxies, or "*" to trust all.
+WEB_APP_FORWARDED_ALLOW_IPS = "*"
+
+# Whether to trust proxy headers like X-Forwarded-For and X-Forwarded-Proto.
+WEB_APP_PROXY_HEADERS = true
+
+# Database file name
+DB_NAME = "users.db"
+
+# --- Telegram Bot Registration Modes ---
+# Enable or disable the deeplink registration feature for the Telegram bot.
+TELEGRAM_DEEPLINK_REGISTRATION_ENABLED = false
+
+# Enable or disable public registration via the /start command for the Telegram bot.
+TELEGRAM_PUBLIC_REGISTRATION_ENABLED = true
