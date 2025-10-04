@@ -92,7 +92,7 @@ async def close_teamtalk_connection(pytalk_bot_instance: pytalk.TeamTalkBot): # 
         logger.info("No active TeamTalk instances to close.")
         return
     for i in range(len(pytalk_bot_instance.teamtalks) -1, -1, -1): # Iterate backwards for safe removal
-        tt_instance = pytalk_bot.teamtalks[i]
+        tt_instance = pytalk_bot_instance.teamtalks[i]
         host_display = "Unknown Host"
         # Check server_info_tuple first as it's set by our code
         if hasattr(tt_instance, 'server_info_tuple') and tt_instance.server_info_tuple:

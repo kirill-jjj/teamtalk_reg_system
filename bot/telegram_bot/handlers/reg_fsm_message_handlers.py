@@ -23,9 +23,10 @@ logger = logging.getLogger(__name__)
 fsm_router = Router()
 
 
-@fsm_router.message(RegistrationStates.awaiting_username)
-import pytalk # New import
+import pytalk  # New import
 
+
+@fsm_router.message(RegistrationStates.awaiting_username)
 async def username_handler(pytalk_bot_instance: pytalk.TeamTalkBot, message: types.Message, state: FSMContext):
     fsm_data = await state.get_data()
     state_data = RegistrationStateData.model_validate(fsm_data or {})

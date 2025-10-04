@@ -13,7 +13,6 @@ import tomllib
 from typing import Any
 
 from pydantic import Field, ValidationError
-from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -24,10 +23,10 @@ logger = logging.getLogger(__name__)
 
 
 class TomlConfigSettingsSource(PydanticBaseSettingsSource):
-    """A settings source that loads variables from a TOML file.
-    """
+    """A settings source that loads variables from a TOML file."""
 
-    def __init__(self, settings_cls: type[BaseSettings]):
+    def __init__(self, settings_cls: type[BaseSettings]) -> None:
+        """Initializes the TOML config settings source."""
         super().__init__(settings_cls)
         toml_file_path_str = os.getenv("CONFIG_FILE", "config.toml")
         toml_file_path = Path(toml_file_path_str)
@@ -39,20 +38,21 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
         else:
             logger.debug("TOML config file found at '%s'. Loading...", toml_file_path.absolute())
             try:
-                with open(toml_file_path, "rb") as f:
+                with toml_file_path.open("rb") as f:
                     self._toml_data = tomllib.load(f)
-            except Exception as e:
-                logger.error(f"Error loading TOML file '{toml_file_path}': {e}")
+            except Exception:
+                logger.exception("Error loading TOML file '%s'.", toml_file_path)
                 self._toml_data = {}
 
     def get_field_value(
-        self, field: FieldInfo, field_name: str
+        self, field_name: str
     ) -> tuple[Any, str, bool]:
         """Get field value from the pre-loaded TOML data."""
         field_value = self._toml_data.get(field_name)
         return field_value, field_name, False
 
     def __call__(self) -> dict[str, Any]:
+        """Returns the TOML data as a dictionary."""
         return self._toml_data
 
 
@@ -142,9 +142,9 @@ class Settings(BaseSettings):
         settings_cls: type[BaseSettings],
         init_settings: PydanticBaseSettingsSource,
         env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Customizes the order and inclusion of settings sources."""
         return (
             init_settings,
             TomlConfigSettingsSource(settings_cls),
@@ -162,10 +162,8 @@ try:
 
 except (ValidationError, FileNotFoundError) as e:
     if isinstance(e, FileNotFoundError):
-        logger.error(
-            f"Configuration file not found. Please create 'config.toml' or set the CONFIG_FILE environment variable. Error: {e}"
-        )
+        logger.exception("Configuration file not found. Please create 'config.toml' or set the CONFIG_FILE environment variable.")
     else:
-        logger.error(f"Configuration validation error: {e}")
+        logger.exception("Configuration validation error.")
     # Exit if critical configuration is missing
     sys.exit(1)
