@@ -268,7 +268,7 @@ async def admin_verification_handler(
         if settings.admin_ids:
             for other_admin_id in settings.admin_ids:
                 if other_admin_id != acting_admin_id:
-            logger.info("Notifying admin %s about registration rejection by %s for TT user %s", other_admin_id, acting_admin_id, state_data_from_pending.name)
+                    logger.info("Notifying admin %s about registration rejection by %s for TT user %s", other_admin_id, acting_admin_id, state_data_from_pending.name)
                     await bot.send_message(chat_id=other_admin_id, text=notification_message)
         else:
             logger.info(

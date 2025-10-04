@@ -292,9 +292,9 @@ async def _handle_registration_continuation(
             return
 
         admin_lang_translator = get_translator(get_admin_lang_code())
-            admin_msg_text = admin_lang_translator("Registration request:\nUsername: {username}\n").format(username=state_data.name)
-            if state_data.nickname != state_data.name:
-                admin_msg_text += admin_lang_translator("Nickname: {nickname}\n").format(nickname=state_data.nickname)
+        admin_msg_text = admin_lang_translator("Registration request:\nUsername: {username}\n").format(username=state_data.name)
+        if state_data.nickname != state_data.name:
+            admin_msg_text += admin_lang_translator("Nickname: {nickname}\n").format(nickname=state_data.nickname)
 
         telegram_user_info_line = f" {user_full_name}"
         if telegram_username:

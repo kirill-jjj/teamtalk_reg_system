@@ -96,7 +96,7 @@ async def get_user_by_identifier(db_session: AsyncSession, identifier: str) -> T
 
 
 async def delete_telegram_registration(db_session: AsyncSession, telegram_id: int) -> bool:
-    """Deletes a user from the TelegramRegistration table based on telegram_id and commits.
+    """Deletes a user from the TelegramRegistration table based on telegram_id and commits."""
     logger.info("Attempting to delete registration for Telegram ID: %s", telegram_id)
     stmt = delete(TelegramRegistration).where(TelegramRegistration.telegram_id == telegram_id)
     result = await db_session.execute(stmt)
