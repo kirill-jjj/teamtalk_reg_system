@@ -239,7 +239,7 @@ async def _process_actual_registration(
     state: FSMContext | None,
     bot: AiogramBot,
 ) -> tuple[bool, str | None, dict[str, Any] | None]:
-    """Processes the actual registration with TeamTalk and notifies the user """
+    """Processes the actual registration with TeamTalk and notifies the user"""
     """and admins."""
     user_lang_code = state_data.selected_language or settings.bot_admin_lang
     _ = get_translator(user_lang_code)
@@ -437,5 +437,44 @@ async def _handle_registration_continuation(
             bot=bot,
         )
 
+
+async def _notify_admins_about_decision(
+    bot: AiogramBot,
+    acting_admin_id: int,
+    acting_admin_name: str,
+    registrant_telegram_id: int,
+    registrant_tg_username: str | None,
+    teamtalk_username: str,
+    decision: str,  # "approved" or "rejected"
+) -> None:
+    """Notifies all administrators about a registration decision."""
+    _ = get_translator(get_admin_lang_code())
+
+    decision_text = _("approved") if decision == "approved" else _("rejected")
+    notification_message = _(
+        "Admin {admin_name} ({admin_id}) has {decision_text} the registration "
+        "request for TeamTalk user '{teamtalk_username}' (Telegram ID: {registrant_telegram_id})."
+    ).format(
+        admin_name=acting_admin_name,
+        admin_id=acting_admin_id,
+        decision_text=decision_text,
+        teamtalk_username=teamtalk_username,
+        registrant_telegram_id=registrant_telegram_id,
+    )
+
+    if registrant_tg_username:
+        notification_message += _(" Telegram Username: @{registrant_tg_username}").format(
+            registrant_tg_username=registrant_tg_username
+        )
+
+    for admin_id in settings.admin_ids:
+        if admin_id != acting_admin_id:  # Don't send to the admin who made the decision
+            try:
+                await bot.send_message(admin_id, notification_message)
+            except Exception:
+                logger.exception(
+                    "Failed to send admin notification to %s about registration decision:",
+                    admin_id,
+                )
 
 logger.info("Registration logic helpers configured.")

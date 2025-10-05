@@ -225,7 +225,8 @@ async def start_command_handler(
     )
 
     if args and await _handle_deeplink_registration(
-        message, args, state, bot, db_session, telegram_id, initial_lang_code, state_data
+        message, args, state, bot, db_session, telegram_id,
+        initial_lang_code, state_data
     ):
         return
 

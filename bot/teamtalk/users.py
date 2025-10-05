@@ -152,8 +152,7 @@ async def check_username_exists(
                 # or if 'username' is not a direct attribute in some cases with
                 # pytalk. As per user feedback, no warning log is needed here.
                 pass
-        else:
-            return False
+        return False
     except IndexError:
         logger.exception(
             "No active TeamTalk server connections in check_username_exists "
