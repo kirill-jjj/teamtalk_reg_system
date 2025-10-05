@@ -89,9 +89,10 @@ async def _handle_registration_broadcast(
     active_server_instance: TeamTalkInstance,
     username: str,
     broadcast_message_text: str | None,
+    *,
     registration_broadcast_enabled: bool,
 ) -> None:
-    """Handles sending a registration broadcast message if enabled and message provided."""
+    """Handles sending a registration broadcast message if enabled."""
     if not registration_broadcast_enabled:
         logger.info(
             "Registration broadcast is disabled by parameter. Skipping for user '%s'.",
@@ -119,7 +120,9 @@ async def check_username_exists(
 ) -> bool | None:
     """Checks if a username exists on the TeamTalk server."""
     if not pytalk_bot_instance.teamtalks:
-        logger.warning("No active TeamTalk server connections in check_username_exists.")
+        logger.warning(
+            "No active TeamTalk server connections in check_username_exists."
+        )
         return None
 
     active_server_instance = pytalk_bot_instance.teamtalks[0]
@@ -151,7 +154,7 @@ async def check_username_exists(
                 pass
         return False
     except IndexError:
-        logger.error(
+        logger.exception(
             "No active TeamTalk server connections in check_username_exists "
             "(IndexError)."
         )
@@ -170,6 +173,7 @@ async def perform_teamtalk_registration(
     password_str: str,
     usertype_to_create: PyTalkUserType,
     teamtalk_default_user_rights: list[str],
+    *,
     registration_broadcast_enabled: bool,
     host_name: str,  # For artefact_data
     tcp_port: int,  # For artefact_data
@@ -242,7 +246,7 @@ async def perform_teamtalk_registration(
             active_server_instance,
             username_str,
             broadcast_message_text,
-            registration_broadcast_enabled,
+            registration_broadcast_enabled=registration_broadcast_enabled,
         )
 
         effective_hostname = (
@@ -259,10 +263,8 @@ async def perform_teamtalk_registration(
             "encrypted": encrypted,
         }
 
-        return True, "REG_SUCCESS", artefact_data
-
     except IndexError:  # Should be caught by the initial check, but as a safeguard
-        logger.error(
+        logger.exception(
             "TeamTalk bot (pytalk_bot_instance) has no active server connections "
             "(IndexError) for registration."
         )
@@ -273,3 +275,5 @@ async def perform_teamtalk_registration(
             username_str,
         )
         return False, "UNEXPECTED_ERROR", None
+    else:
+        return True, "REG_SUCCESS", artefact_data

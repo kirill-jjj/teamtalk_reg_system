@@ -65,13 +65,12 @@ async def _send_delayed_removal_notification(
                 await aiogram_bot.send_message(
                     chat_id=chat_id_int, text=message_to_send
                 )
-            except Exception as e:
+            except Exception:
                 logger.exception(
                     "Failed to send delayed removal notification to admin %s for user "
-                    "'%s': %s",
+                    "'%s':",
                     admin_id,
                     username,
-                    e,
                 )
 
     except asyncio.CancelledError:
@@ -165,7 +164,7 @@ def get_admin_users(teamtalk_instance: TeamTalkInstance) -> list["user"]:
             )
     return admin_users
 
-async def on_ready() -> None:
+async def on_ready(pytalk_bot_instance: pytalk.TeamTalkBot) -> None:
     """Handles the on_ready event."""
     logger.info("PyTalk Bot is ready (on_ready event).")
 
@@ -204,7 +203,7 @@ async def on_my_login(
             tt_instance.cached_my_user_id = None
             tt_instance.cached_my_user_account = None
 
-async def on_message(message: Message) -> None:
+async def on_message(pytalk_bot_instance: pytalk.TeamTalkBot, message: Message) -> None:
     """Handles the on_message event."""
     logger.info(
         "Received message (on_message event): Type: %s, From ID: %s, Content: '%s...'",
@@ -213,7 +212,7 @@ async def on_message(message: Message) -> None:
         message.content[:50],
     )
 
-async def on_error(event_name: str, *args: object, **kwargs: object) -> None:
+async def on_error(pytalk_bot_instance: pytalk.TeamTalkBot, event_name: str, *args: object, **kwargs: object) -> None:
     """Handles the on_error event."""
     logger.error(
         "Error in event handler '%s'. Args: %s, Kwargs: %s",
@@ -223,7 +222,7 @@ async def on_error(event_name: str, *args: object, **kwargs: object) -> None:
         exc_info=True,
     )
 
-async def on_my_connect(server: TeamTalkServer) -> None:
+async def on_my_connect(pytalk_bot_instance: pytalk.TeamTalkBot, server: TeamTalkServer) -> None:
     """Handles the on_my_connect event."""
     host_info = (
         server.info.host
@@ -232,7 +231,7 @@ async def on_my_connect(server: TeamTalkServer) -> None:
     )
     logger.info("Successfully connected to server: %s (on_my_connect event)", host_info)
 
-async def on_my_disconnect(server: TeamTalkServer) -> None:
+async def on_my_disconnect(pytalk_bot_instance: pytalk.TeamTalkBot, server: TeamTalkServer) -> None:
     """Handles the on_my_disconnect event."""
     host = (
         server.info.host
@@ -247,6 +246,7 @@ async def on_my_connection_lost(
     pytalk_bot_instance: pytalk.TeamTalkBot, server: TeamTalkServer
 ) -> None:
     """Handles the on_my_connection_lost event."""
+    tt_instance = getattr(server, "teamtalk_instance", None)
     host = "Unknown Server"
     if (
         tt_instance
@@ -323,9 +323,7 @@ async def on_my_kicked_from_channel(
 async def on_user_account_new(
     pytalk_bot_instance: pytalk.TeamTalkBot, account: UserAccount
 ) -> None:
-    """Handles new user account creation, detecting if it's an update to a recently
-    deleted account.
-    """
+    """Handles new user account creation, detecting if it's an update to a recently deleted account."""
     raw_account_username = getattr(account, "username", "UnknownUser")
     account_username_str = (
         raw_account_username.decode("utf-8")
@@ -402,9 +400,7 @@ async def on_user_account_new(
 async def on_user_account_remove(
     pytalk_bot_instance: pytalk.TeamTalkBot, account: UserAccount
 ) -> None:
-    """Handles user account removal, scheduling a delayed notification to detect
-    updates.
-    """
+    """Handles user account removal, scheduling a delayed notification to detect updates."""
     raw_account_username = getattr(account, "username", "UnknownUser")
     account_username_str = (
         raw_account_username.decode("utf-8")

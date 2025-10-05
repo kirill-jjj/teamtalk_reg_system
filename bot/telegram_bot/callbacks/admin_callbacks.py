@@ -1,3 +1,4 @@
+"""Admin callback data models."""
 from aiogram.filters.callback_data import CallbackData
 
 

@@ -318,7 +318,7 @@ class Application:
 
         # 2. Close Aiogram dispatcher and bot session
         if self.dispatcher:
-            await self.dispatcher.shutdown()
+            self.dispatcher.shutdown()
             logger.info("Aiogram dispatcher shut down.")
         if self.telegram_bot:
             await self.telegram_bot.session.close()

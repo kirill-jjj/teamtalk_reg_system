@@ -2,7 +2,7 @@
 import logging
 
 from aiogram import Bot as AiogramBot
-from aiogram import F, Router, types
+from aiogram import Dispatcher, F, Router, types
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -224,6 +224,7 @@ async def nickname_choice_handler(
     state: FSMContext,
     bot: AiogramBot,
     db_session: AsyncSession,
+    dispatcher: Dispatcher,
 ) -> None:
     """Handles the nickname choice callback."""
     choice_action = callback_data.action
@@ -255,7 +256,19 @@ async def nickname_choice_handler(
             return
         state_data.nickname = state_data.name
         await state.set_data(state_data.model_dump())
+
+        # Retrieve pytalk_bot_instance from dispatcher's context
+        pytalk_bot_instance = dispatcher["pytalk_bot_instance"]
+        if not pytalk_bot_instance:
+            logger.error("pytalk_bot_instance not found in dispatcher context.")
+            await callback_query.message.answer(
+                _("Internal error: TeamTalk bot instance not available. Please contact an administrator.")
+            )
+            await state.clear()
+            return
+
         await _handle_registration_continuation(
+            pytalk_bot_instance=pytalk_bot_instance,
             db_session=db_session,
             state=state,
             bot=bot,
