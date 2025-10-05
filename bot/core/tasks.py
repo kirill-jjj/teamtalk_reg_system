@@ -62,8 +62,8 @@ async def periodic_database_cleanup() -> None:
         except asyncio.CancelledError:
             logger.info("Periodic database cleanup task was cancelled. Exiting.")
             break  # Exit the loop if cancelled
-        except Exception as e:
-            logger.exception("Error during database cleanup cycle: %s", e)
+        except Exception:
+            logger.exception("Error during database cleanup cycle:")
 
         try:
             await asyncio.sleep(settings.db_cleanup_interval_seconds)

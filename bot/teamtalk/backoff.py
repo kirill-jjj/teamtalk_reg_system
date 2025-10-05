@@ -5,7 +5,8 @@ import random
 class Backoff:
     """Implements an exponential backoff strategy with jitter for retries."""
     def __init__(
-        self, base: int = 1, exponent: float = 2, max_value: float = 60, max_tries: int | None = None
+        self, base: int = 1, exponent: float = 2, max_value: float = 60,
+        max_tries: int | None = None
     ) -> None:
         """Initializes the Backoff strategy."""
         self.base = base

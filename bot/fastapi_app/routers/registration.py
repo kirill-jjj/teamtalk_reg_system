@@ -90,10 +90,10 @@ async def _execute_tt_registration_for_web(
             return False, None
         logger.info("TeamTalk registration successful for user %s via web.", username)
         return True, TeamTalkRegistrationArtefacts(**tt_artefact_data)
-    except Exception as e:
+    except Exception:
         logger.exception(
-            "Exception during TeamTalk registration for web user %s: %s",
-            username, e
+            "Exception during TeamTalk registration for web user %s:",
+            username,
         )
         return False, None
 
@@ -126,8 +126,8 @@ async def _prepare_downloadables_for_web(
     try:
         async with aiofiles.open(tt_file_path, mode="w", encoding="utf-8") as f:
             await f.write(tt_content)
-    except OSError as e:
-        logger.exception("Failed to write .tt file %s: %s", tt_file_path, e)
+    except OSError:
+        logger.exception("Failed to write .tt file %s:", tt_file_path)
         return {
             "tt_download_link_token": None,
             "tt_file_name_for_user": None,
@@ -226,7 +226,7 @@ async def set_language_and_reload(
 async def register_page_get(request: Request) -> Response:
     """Displays the registration page."""
     effective_lang_code = DEFAULT_LANG_CODE
-    language_is_forced = False
+
 
     if settings.force_user_lang:
         _ = get_translator(settings.force_user_lang)
@@ -278,6 +278,7 @@ async def register_page_post(
     password: str = Form(...),
     nickname: str | None = Form(None),
 ) -> Response:
+    """Handles the POST request for user registration via the web interface."""
     payload = RegistrationPayload(
         username=username, password=password, nickname=nickname
     )
@@ -325,10 +326,10 @@ async def register_page_post(
                     "Please try again later or contact an administrator."
                 ),
             )
-    except Exception as e:
+    except Exception:
         logger.exception(
-            "Exception during username existence check for %s (IP: %s): %s",
-            payload.username, user_ip, e,
+            "Exception during username existence check for %s (IP: %s):",
+            payload.username, user_ip,
         )
         raise HTTPException(  # noqa: B904
             status_code=500,
@@ -384,10 +385,10 @@ async def register_page_post(
         await add_fastapi_registered_ip(
             db, ip_address=user_ip, username=payload.username
         )
-    except Exception as e_ip_add:
+    except Exception:
         logger.exception(
-            "Failed to add/update registered IP %s for user %s to DB: %s",
-            user_ip, payload.username, e_ip_add,
+            "Failed to add/update registered IP %s for user %s to DB:",
+            user_ip, payload.username,
         )
 
     downloadables_context = await _prepare_downloadables_for_web(
@@ -450,6 +451,7 @@ async def register_page_post(
 async def download_tt_file(
     request: Request, token: str, db: AsyncSession = Depends(get_db_session),  # noqa: B008  # noqa: B008
 ) -> FileResponse:
+    """Handles the download of a .tt configuration file using a token."""
     user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     translator = get_translator(user_lang_code)
 
@@ -469,7 +471,9 @@ async def download_tt_file(
             )
     raise HTTPException(
         status_code=404,
-        detail=translator("The requested file could not be found or the link has expired."),
+        detail=translator(
+            "The requested file could not be found or the link has expired."
+        ),
     )
 
 
@@ -477,6 +481,7 @@ async def download_tt_file(
 async def download_client_zip_file(
     request: Request, token: str, db: AsyncSession = Depends(get_db_session)  # noqa: B008
 ) -> FileResponse:
+    """Handles the download of a pre-configured client ZIP file using a token."""
     user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     translator = get_translator(user_lang_code)
 
@@ -496,5 +501,7 @@ async def download_client_zip_file(
             )
     return HTTPException(
         status_code=404,
-        detail=translator("The requested file could not be found or the link has expired."),
+        detail=translator(
+            "The requested file could not be found or the link has expired."
+        ),
     )

@@ -59,7 +59,9 @@ def get_ini_path_from_template_dir_fastapi(template_dir_base: Path) -> Path | No
         return ini_path_candidate_lower
     logger.warning(
         "TeamTalk5.ini not found in %s at %s or %s",
-        template_dir_base, TEAMTALK_INI_FILENAME_IN_ZIP, TEAMTALK_INI_FILENAME_LOWER_IN_ZIP,
+        template_dir_base,
+        TEAMTALK_INI_FILENAME_IN_ZIP,
+        TEAMTALK_INI_FILENAME_LOWER_IN_ZIP,
     )
     return None
 
@@ -86,8 +88,8 @@ def modify_teamtalk_ini_from_template(
     try:
         with ini_template_path.open(encoding='utf-8-sig') as f:
             config.read_file(f)
-    except Exception as e:
-        logger.exception("Error reading INI template %s: %s", ini_template_path, e)
+    except Exception:
+        logger.exception("Error reading INI template %s:", ini_template_path)
         return None
 
     # Ensure sections exist
@@ -131,8 +133,8 @@ def modify_teamtalk_ini_from_template(
     try:
         config.write(string_io_buffer, space_around_delimiters=False)
         return string_io_buffer.getvalue()
-    except Exception as e:
-        logger.exception("Error writing INI to string: %s", e)
+    except Exception:
+        logger.exception("Error writing INI to string:")
         return None
     finally:
         string_io_buffer.close()
@@ -147,7 +149,8 @@ def create_and_save_base_client_zip(app: FastAPI, template_dir_str: str) -> Path
     template_dir_base = Path(template_dir_str)
     if not template_dir_base.is_dir():
         logger.error(
-            "Error: TEAMTALK_CLIENT_TEMPLATE_DIR '%s' not configured or not a directory.",
+            "Error: TEAMTALK_CLIENT_TEMPLATE_DIR '%s' not configured or not a "
+            "directory.",
             template_dir_str,
         )
         return None
@@ -170,13 +173,13 @@ def create_and_save_base_client_zip(app: FastAPI, template_dir_str: str) -> Path
                     archive_path = file_path_item.relative_to(template_dir_base)
                     zipf.write(file_path_item, str(archive_path))
         logger.info("Base client ZIP created and saved to: %s", target_zip_path)
-        return target_zip_path
-    except Exception as e:
-        logger.exception("Error creating and saving base client ZIP: %s", e)
+    except Exception:
+        logger.exception("Error creating and saving base client ZIP:")
         if target_zip_path.exists():
             with contextlib.suppress(OSError):
                 target_zip_path.unlink()
         return None
+    return target_zip_path
 
 def create_client_zip_for_user(
     app: FastAPI,
@@ -185,7 +188,7 @@ def create_client_zip_for_user(
     tt_file_name_on_server: str,
     lang_code: str = "en",
 ) -> tuple[Path | None, str]:
-    """Creates a customized client ZIP file for the user by modifying the INI file
+    """Creates a customized client ZIP file for the user by modifying the INI file.
 
     within the base client ZIP and adding the user's .tt file.
     Returns the path to the new ZIP file and its name, or (None, "") on error.
@@ -251,7 +254,8 @@ def create_client_zip_for_user(
                 ):
                     # Replace original INI with modified content
                     final_zip_out.writestr(
-                        item.filename, modified_ini_content.encode('utf-8-sig')
+                        item.filename,
+                        modified_ini_content.encode('utf-8-sig'),
                     )
                     ini_replaced = True
                 else:
@@ -277,17 +281,16 @@ def create_client_zip_for_user(
         # Write the new ZIP to its final location
         with user_zip_path_final_location.open('wb') as f:
             f.write(temp_zip_io_buffer.getvalue())
-
-        return (
-            user_zip_path_final_location, user_zip_filename_for_download
-        )  # Return server path and user-facing name
-
-    except Exception as e:
-        logger.exception("Error creating client ZIP for user %s: %s", username, e)
+    except Exception:
+        logger.exception("Error creating client ZIP for user %s:", username)
         if user_zip_path_final_location.exists():
             with contextlib.suppress(OSError):
                 user_zip_path_final_location.unlink()
         return None, ""
+    else: # This else is associated with the try block
+        return (
+            user_zip_path_final_location, user_zip_filename_for_download
+        )  # Return server path and user-facing name
     finally:
         temp_zip_io_buffer.close()
 

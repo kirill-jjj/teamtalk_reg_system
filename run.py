@@ -153,16 +153,16 @@ class Application:
         logger.info("PyTalk bot instance created.")
 
         # Register PyTalk event handlers
-        self.pytalk_bot.on_event("ready", functools.partial(on_ready, self.pytalk_bot))
-        self.pytalk_bot.on_event("my_login", functools.partial(on_my_login, self.pytalk_bot))
-        self.pytalk_bot.on_event("message", functools.partial(on_message, self.pytalk_bot))
-        self.pytalk_bot.on_event("error", functools.partial(on_error, self.pytalk_bot))
-        self.pytalk_bot.on_event("my_connect", functools.partial(on_my_connect, self.pytalk_bot))
-        self.pytalk_bot.on_event("my_disconnect", functools.partial(on_my_disconnect, self.pytalk_bot))
-        self.pytalk_bot.on_event("my_connection_lost", functools.partial(on_my_connection_lost, self.pytalk_bot))
-        self.pytalk_bot.on_event("my_kicked_from_channel", functools.partial(on_my_kicked_from_channel, self.pytalk_bot))
-        self.pytalk_bot.on_event("user_account_new", functools.partial(on_user_account_new, self.pytalk_bot))
-        self.pytalk_bot.on_event("user_account_remove", functools.partial(on_user_account_remove, self.pytalk_bot))
+        self.pytalk_bot.on_ready = functools.partial(on_ready, self.pytalk_bot)
+        self.pytalk_bot.on_my_login = functools.partial(on_my_login, self.pytalk_bot)
+        self.pytalk_bot.on_message = functools.partial(on_message, self.pytalk_bot)
+        self.pytalk_bot.on_error = functools.partial(on_error, self.pytalk_bot)
+        self.pytalk_bot.on_my_connect = functools.partial(on_my_connect, self.pytalk_bot)
+        self.pytalk_bot.on_my_disconnect = functools.partial(on_my_disconnect, self.pytalk_bot)
+        self.pytalk_bot.on_my_connection_lost = functools.partial(on_my_connection_lost, self.pytalk_bot)
+        self.pytalk_bot.on_my_kicked_from_channel = functools.partial(on_my_kicked_from_channel, self.pytalk_bot)
+        self.pytalk_bot.on_user_account_new = functools.partial(on_user_account_new, self.pytalk_bot)
+        self.pytalk_bot.on_user_account_remove = functools.partial(on_user_account_remove, self.pytalk_bot)
         logger.info("PyTalk event handlers registered.")
 
         # 4. Initialize Telegram Bot

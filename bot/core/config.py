@@ -142,6 +142,7 @@ class Settings(BaseSettings):
         settings_cls: type[BaseSettings],
         init_settings: PydanticBaseSettingsSource,
         env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         """Customizes the order and inclusion of settings sources."""
@@ -149,6 +150,7 @@ class Settings(BaseSettings):
             init_settings,
             TomlConfigSettingsSource(settings_cls),
             env_settings,
+            dotenv_settings,
             file_secret_settings,
         )
 

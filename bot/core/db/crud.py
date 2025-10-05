@@ -90,7 +90,7 @@ async def get_all_telegram_registrations(
 async def get_user_by_identifier(
     db_session: AsyncSession, identifier: str
 ) -> TelegramRegistration | None:
-    """Retrieves a user by Telegram ID (if identifier is numeric)
+    """Retrieves a user by Telegram ID (if identifier is numeric).
 
     or TeamTalk username.
     """
@@ -137,7 +137,7 @@ async def get_user_by_identifier(
 async def delete_telegram_registration(
     db_session: AsyncSession, telegram_id: int
 ) -> bool:
-    """Deletes a user from the TelegramRegistration table based on
+    """Deletes a user from the TelegramRegistration table based on.
 
     telegram_id and commits.
     """

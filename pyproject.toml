@@ -41,7 +41,7 @@ dev = [
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
-backend-path = "."
+backend-path = [""]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["bot*"]

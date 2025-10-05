@@ -68,7 +68,7 @@ class DeeplinkToken(SQLModel, table=True):
 
 
 class BannedUser(SQLModel, table=True):
-    """Represents a user who has been banned from using the bot's
+    """Represents a user who has been banned from using the bot's.
 
     registration features.
     """
