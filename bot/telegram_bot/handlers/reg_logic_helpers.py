@@ -221,26 +221,23 @@ async def _process_actual_registration(
                 if lang_code_for_emoji == "en"
                 else ("🇷🇺" if lang_code_for_emoji == "ru" else "❓")
             )
-            admin_notification_message += (
-                _("👤 Client language: {lang_emoji}").format(lang_emoji=lang_emoji)
-                + "\n"
+            admin_notification_message += _("👤 Client language: {lang_emoji}\n").format(
+                lang_emoji=lang_emoji
             )
             tg_full_name = source_info.get("telegram_full_name", "N/A")
             admin_notification_message += _(
-                "📱 Via Telegram: {telegram_full_name} (ID: {registrant_telegram_id})"
+                "📱 Via Telegram: {telegram_full_name} (ID: {registrant_telegram_id})\n"
             ).format(
                 telegram_full_name=tg_full_name,
                 registrant_telegram_id=registrant_user_id,
             )
-            + "\n"
             if (
                 state_data.is_admin_registrar
                 and initiator_telegram_id != registrant_user_id
             ):
                 admin_notification_message += _(
-                    "🔑 Registered by Admin ID: {initiator_telegram_id}"
+                    "🔑 Registered by Admin ID: {initiator_telegram_id}\n"
                 ).format(initiator_telegram_id=initiator_telegram_id)
-                + "\n"
 
             for admin_id_val_notify in settings.admin_ids:
                 try:
@@ -272,9 +269,6 @@ async def _process_actual_registration(
     if state:
         await state.clear()
     return success, reg_msg_key_or_detail, artefact_data_val
-
-
-import pytalk  # New import
 
 
 async def _handle_registration_continuation(

@@ -1,8 +1,6 @@
 """This module handles callbacks for the registration flow."""
 import logging
 
-import contextlib
-
 from aiogram import Bot as AiogramBot
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
@@ -10,14 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.config import settings
 from ...core.db import (
-    get_and_remove_pending_telegram_registration,
     is_telegram_id_registered,
 )
-from ...core.localization import get_admin_lang_code, get_translator
+from ...core.localization import get_translator
 from ..schemas import RegistrationStateData
 from ..states import RegistrationStates
 from .reg_callback_data import (
-    AdminVerificationCallback,
     LanguageCallback,
     NicknameChoiceCallback,
     TTAccountTypeCallback,

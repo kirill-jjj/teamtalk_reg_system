@@ -37,7 +37,8 @@ async def _send_delayed_removal_notification(
         await asyncio.sleep(DELETION_WINDOW_SECONDS)
         # If we reach here, the task was not cancelled.
         logger.info(
-            "Sending delayed removal notification for '%s' as no re-creation was detected.",
+            "Sending delayed removal notification for '%s' as no re-creation was "
+            "detected.",
             username,
         )
 
@@ -47,7 +48,8 @@ async def _send_delayed_removal_notification(
         aiogram_bot = pytalk_bot_instance.aiogram_bot_ref
         if not aiogram_bot or not settings.admin_ids:
             logger.error(
-                "_send_delayed_removal_notification: Aiogram bot or ADMIN_IDS not configured."
+                "_send_delayed_removal_notification: Aiogram bot or ADMIN_IDS not "
+                "configured."
             )
             return
 
@@ -65,7 +67,8 @@ async def _send_delayed_removal_notification(
                 )
             except Exception as e:
                 logger.exception(
-                    "Failed to send delayed removal notification to admin %s for user '%s': %s",
+                    "Failed to send delayed removal notification to admin %s for user "
+                    "'%s': %s",
                     admin_id,
                     username,
                     e,
@@ -77,10 +80,12 @@ async def _send_delayed_removal_notification(
             "Delayed removal notification for '%s' was cancelled due to re-creation.",
             username,
         )
-        # The cache cleanup is handled by the 'on_user_account_new' event which caused the cancellation.
+        # The cache cleanup is handled by the 'on_user_account_new' event which caused
+        # the cancellation.
     finally:
         if username in recently_deleted_users:
-            # This is a safeguard. The entry should be removed either by the successful run of this task
+            # This is a safeguard. The entry should be removed either by the successful
+            # run of this task
             # or by the 'on_user_account_new' task that cancels it.
             # If it's still here, it might be a logic gap, so we log it.
             logger.warning(
@@ -91,7 +96,9 @@ async def _send_delayed_removal_notification(
 
 
 # Helper function for banning
-async def _handle_banning_on_tt_account_removal(tt_username: str, server_host_info: str) -> None:
+async def _handle_banning_on_tt_account_removal(
+    tt_username: str, server_host_info: str
+) -> None:
     logger.info(
         "Attempting to process ban for TeamTalk user '%s' deleted from server '%s'.",
         tt_username,
@@ -121,7 +128,8 @@ async def _handle_banning_on_tt_account_removal(tt_username: str, server_host_in
                 )
             else:
                 logger.warning(
-                    "No Telegram ID found for TeamTalk user '%s'. Cannot add to bot's ban list.",
+                    "No Telegram ID found for TeamTalk user '%s'. Cannot add to bot's "
+                    "ban list.",
                     tt_username,
                 )
         except Exception:
@@ -161,7 +169,9 @@ async def on_ready() -> None:
     """Handles the on_ready event."""
     logger.info("PyTalk Bot is ready (on_ready event).")
 
-async def on_my_login(pytalk_bot_instance: pytalk.TeamTalkBot, server: TeamTalkServer) -> None:
+async def on_my_login(
+    pytalk_bot_instance: pytalk.TeamTalkBot, server: TeamTalkServer
+) -> None:
     """Handles the on_my_login event."""
     host_info = (
         server.info.host
@@ -238,16 +248,24 @@ async def on_my_connection_lost(
 ) -> None:
     """Handles the on_my_connection_lost event."""
     host = "Unknown Server"
-    tt_instance = getattr(server, "teamtalk_instance", None)
-    if tt_instance and hasattr(tt_instance, "server_info_tuple") and tt_instance.server_info_tuple:
+    if (
+        tt_instance
+        and hasattr(tt_instance, "server_info_tuple")
+        and tt_instance.server_info_tuple
+    ):
         host = tt_instance.server_info_tuple[0]
     elif server and hasattr(server, "info") and server.info:
         host = server.info.host
     logger.warning(
-        "EVENT: on_my_connection_lost - Connection lost from server %s. Triggering forceful instance restart.",
+        "EVENT: on_my_connection_lost - Connection lost from server %s. "
+        "Triggering forceful instance restart.",
         host,
     )
-    if tt_instance and hasattr(tt_instance, "server_info_tuple") and tt_instance.server_info_tuple:
+    if (
+        tt_instance
+        and hasattr(tt_instance, "server_info_tuple")
+        and tt_instance.server_info_tuple
+    ):
         task = asyncio.create_task(
             force_restart_instance_on_event(
                 pytalk_bot_instance, *tt_instance.server_info_tuple
@@ -258,7 +276,8 @@ async def on_my_connection_lost(
         _ = task
     else:
         logger.error(
-            "Could not trigger instance restart for server %s after connection lost: server_info_tuple not found.",
+            "Could not trigger instance restart for server %s after connection lost: "
+            "server_info_tuple not found.",
             host,
         )
 
@@ -278,7 +297,8 @@ async def on_my_kicked_from_channel(
     ):
         server_host = tt_instance.server_info_tuple[0]
     logger.warning(
-        "EVENT: on_my_kicked_from_channel - Kicked from '%s' on %s. Triggering forceful instance restart.",
+        "EVENT: on_my_kicked_from_channel - Kicked from '%s' on %s. "
+        "Triggering forceful instance restart.",
         channel_name,
         server_host,
     )
@@ -295,14 +315,17 @@ async def on_my_kicked_from_channel(
         _ = task
     else:
         logger.error(
-            "Could not trigger instance restart for server %s after kick: server_info_tuple not found.",
+            "Could not trigger instance restart for server %s after kick: "
+            "server_info_tuple not found.",
             server_host,
         )
 
 async def on_user_account_new(
     pytalk_bot_instance: pytalk.TeamTalkBot, account: UserAccount
 ) -> None:
-    """Handles new user account creation, detecting if it's an update to a recently deleted account."""
+    """Handles new user account creation, detecting if it's an update to a recently
+    deleted account.
+    """
     raw_account_username = getattr(account, "username", "UnknownUser")
     account_username_str = (
         raw_account_username.decode("utf-8")
@@ -317,7 +340,8 @@ async def on_user_account_new(
     aiogram_bot = pytalk_bot_instance.aiogram_bot_ref
     if not aiogram_bot or not settings.admin_ids:
         logger.error(
-            "on_user_account_new: Aiogram bot or ADMIN_IDS not configured. Cannot send notifications."
+            "on_user_account_new: Aiogram bot or ADMIN_IDS not configured. Cannot "
+            "send notifications."
         )
         return
 
@@ -344,7 +368,8 @@ async def on_user_account_new(
             log_prefix = "changed"
         else:
             logger.info(
-                "User '%s' was deleted but re-created outside the time window. Treating as NEW.",
+                "User '%s' was deleted but re-created outside the time window. "
+                "Treating as NEW.",
                 account_username_str,
             )
             # The removal task for the old deletion will proceed as normal.
@@ -353,7 +378,8 @@ async def on_user_account_new(
         try:
             chat_id_int = int(admin_id)
             logger.info(
-                "Attempting to send TeamTalk %s notification for '%s' to Telegram admin ID: %s",
+                "Attempting to send TeamTalk %s notification for '%s' to Telegram "
+                "admin ID: %s",
                 log_prefix,
                 account_username_str,
                 chat_id_int,
@@ -366,7 +392,8 @@ async def on_user_account_new(
             )
         except Exception:
             logger.exception(
-                "Failed to send TeamTalk %s notification to Telegram admin ID %s for user '%s'.",
+                "Failed to send TeamTalk %s notification to Telegram admin ID %s for "
+                "user '%s'.",
                 log_prefix,
                 admin_id,
                 account_username_str,
@@ -375,7 +402,9 @@ async def on_user_account_new(
 async def on_user_account_remove(
     pytalk_bot_instance: pytalk.TeamTalkBot, account: UserAccount
 ) -> None:
-    """Handles user account removal, scheduling a delayed notification to detect updates."""
+    """Handles user account removal, scheduling a delayed notification to detect
+    updates.
+    """
     raw_account_username = getattr(account, "username", "UnknownUser")
     account_username_str = (
         raw_account_username.decode("utf-8")
@@ -384,7 +413,8 @@ async def on_user_account_remove(
     )
 
     logger.info(
-        "User account '%s' removed. Scheduling delayed notification.", account_username_str
+        "User account '%s' removed. Scheduling delayed notification.",
+        account_username_str,
     )
 
     server_host_info = "Unknown Server"

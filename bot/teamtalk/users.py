@@ -10,8 +10,11 @@ from pytalk.permission import Permission as PyTalkPermission
 
 logger = logging.getLogger(__name__)
 
+
 # --- Helper Functions ---
-def _calculate_pytalk_user_rights(teamtalk_default_user_rights_list: list[str]) -> int:
+def _calculate_pytalk_user_rights(
+    teamtalk_default_user_rights_list: list[str],
+) -> int:
     """Calculates the PyTalk user rights bitmask from the provided list."""
     pytalk_user_rights = 0
     for right_string in teamtalk_default_user_rights_list:
@@ -20,13 +23,13 @@ def _calculate_pytalk_user_rights(teamtalk_default_user_rights_list: list[str]) 
             pytalk_user_rights |= permission_flag
         except AttributeError:
             logger.warning(
-                "Invalid user right string '%s' in provided list. Skipping.", right_string
+                "Invalid user right string '%s' in provided list. Skipping.",
+                right_string,
             )
         except Exception:
-            logger.exception(
-                "Error processing permission string '%s':", right_string
-            )
+            logger.exception("Error processing permission string '%s':", right_string)
     return pytalk_user_rights
+
 
 async def _send_broadcast_message_directly(
     active_server_instance: TeamTalkInstance, content: str
@@ -65,7 +68,8 @@ async def _send_broadcast_message_directly(
                 msg.szFromUsername = my_account.szUsername
             else:
                 logger.error(
-                    "Could not retrieve own user account for broadcast message (cache and fallback failed). Using default 'Bot'."
+                    "Could not retrieve own user account for broadcast message (cache "
+                    "and fallback failed). Using default 'Bot'."
                 )
                 msg.szFromUsername = TeamTalk5.ttstr("Bot")
 
@@ -85,22 +89,35 @@ async def _handle_registration_broadcast(
     active_server_instance: TeamTalkInstance,
     username: str,
     broadcast_message_text: str | None,
-    registration_broadcast_enabled: bool
-):
+    registration_broadcast_enabled: bool,
+) -> None:
     """Handles sending a registration broadcast message if enabled and message provided."""
     if not registration_broadcast_enabled:
-        logger.info("Registration broadcast is disabled by parameter. Skipping for user '%s'.", username)
+        logger.info(
+            "Registration broadcast is disabled by parameter. Skipping for user '%s'.",
+            username,
+        )
         return
 
     if not broadcast_message_text:
-        logger.info("No broadcast message text provided for user '%s'. Skipping broadcast.", username)
+        logger.info(
+            "No broadcast message text provided for user '%s'. Skipping broadcast.",
+            username,
+        )
         return
 
-    # Instead of calling the broken library function, we call our direct SDK workaround
-    await _send_broadcast_message_directly(active_server_instance, broadcast_message_text)
+    # Instead of calling the broken library function, we call our direct SDK
+    # workaround
+    await _send_broadcast_message_directly(
+        active_server_instance, broadcast_message_text
+    )
+
 
 # --- Main Functions ---
-async def check_username_exists(pytalk_bot_instance: pytalk.TeamTalkBot, username: str) -> bool | None:
+async def check_username_exists(
+    pytalk_bot_instance: pytalk.TeamTalkBot, username: str
+) -> bool | None:
+    """Checks if a username exists on the TeamTalk server."""
     if not pytalk_bot_instance.teamtalks:
         logger.warning("No active TeamTalk server connections in check_username_exists.")
         return None
@@ -109,8 +126,16 @@ async def check_username_exists(pytalk_bot_instance: pytalk.TeamTalkBot, usernam
 
     if not active_server_instance.logged_in:
         # Corrected attribute access from .info.host to .server_info.host
-        host_display = active_server_instance.server_info.host if hasattr(active_server_instance, 'server_info') and active_server_instance.server_info else "Unknown Host"
-        logger.warning("Not logged in to TeamTalk server %s in check_username_exists.", host_display)
+        host_display = (
+            active_server_instance.server_info.host
+            if hasattr(active_server_instance, "server_info")
+            and active_server_instance.server_info
+            else "Unknown Host"
+        )
+        logger.warning(
+            "Not logged in to TeamTalk server %s in check_username_exists.",
+            host_display,
+        )
         return None
 
     try:
@@ -121,69 +146,108 @@ async def check_username_exists(pytalk_bot_instance: pytalk.TeamTalkBot, usernam
                     return True
             except AttributeError:
                 # This is expected if an object in the list doesn't conform,
-                # or if 'username' is not a direct attribute in some cases with pytalk.
-                # As per user feedback, no warning log is needed here.
+                # or if 'username' is not a direct attribute in some cases with
+                # pytalk. As per user feedback, no warning log is needed here.
                 pass
         return False
     except IndexError:
-        logger.error("No active TeamTalk server connections in check_username_exists (IndexError).")
+        logger.error(
+            "No active TeamTalk server connections in check_username_exists "
+            "(IndexError)."
+        )
         return None
-    except Exception as e:
-        logger.error("Error checking username existence for '%s': %s", username, e, exc_info=True)
+    except Exception:
+        logger.exception(
+            "Error checking username existence for '%s':",
+            username,
+        )
         return None
 
+
 async def perform_teamtalk_registration(
-    pytalk_bot_instance: pytalk.TeamTalkBot, # New argument
+    pytalk_bot_instance: pytalk.TeamTalkBot,  # New argument
     username_str: str,
     password_str: str,
     usertype_to_create: PyTalkUserType,
     teamtalk_default_user_rights: list[str],
     registration_broadcast_enabled: bool,
-    host_name: str, # For artefact_data
+    host_name: str,  # For artefact_data
     tcp_port: int,  # For artefact_data
     udp_port: int,  # For artefact_data
-    encrypted: bool,# For artefact_data
-    server_name: str,# For artefact_data
-    teamtalk_public_hostname: str | None,# For artefact_data
+    encrypted: bool,  # For artefact_data
+    server_name: str,  # For artefact_data
+    teamtalk_public_hostname: str | None,  # For artefact_data
     nickname_str: str | None = None,
     source_info: dict | None = None,
-    broadcast_message_text: str | None = None
+    broadcast_message_text: str | None = None,
 ) -> tuple[bool, str | None, dict[str, Any] | None]:
-
+    """Performs the TeamTalk registration."""
     if not pytalk_bot_instance.teamtalks:
-        logger.error("TeamTalk bot (pytalk_bot) has no active server connections for registration.")
+        logger.error(
+            "TeamTalk bot (pytalk_bot) has no active server connections for "
+            "registration."
+        )
         return False, "MODULE_UNAVAILABLE", None
 
     active_server_instance = pytalk_bot_instance.teamtalks[0]
 
     if not active_server_instance.logged_in:
-        host_display = active_server_instance.server_info.host if hasattr(active_server_instance, 'server_info') and active_server_instance.server_info else "Unknown Host"
-        logger.error(f"TeamTalk bot (pytalk_bot_instance) is not logged in to server {host_display} for registration.")
+        host_display = (
+            active_server_instance.server_info.host
+            if hasattr(active_server_instance, "server_info")
+            and active_server_instance.server_info
+            else "Unknown Host"
+        )
+        logger.error(
+            "TeamTalk bot (pytalk_bot_instance) is not logged in to server %s for "
+            "registration.",
+            host_display,
+        )
         return False, "MODULE_UNAVAILABLE", None
 
     pytalk_user_rights = _calculate_pytalk_user_rights(teamtalk_default_user_rights)
 
     try:
-        final_nickname = nickname_str if nickname_str and nickname_str.strip() else username_str
-        logger.info("Attempting to register TT User. Username: '%s', Nickname for files/links: '%s', Source: %s", username_str, final_nickname, source_info)
+        final_nickname = (
+            nickname_str if nickname_str and nickname_str.strip() else username_str
+        )
+        logger.info(
+            "Attempting to register TT User. Username: '%s', Nickname for "
+            "files/links: '%s', Source: %s",
+            username_str,
+            final_nickname,
+            source_info,
+        )
 
         success_from_pytalk = active_server_instance.create_user_account(
             username=username_str,
             password=password_str,
             usertype=usertype_to_create,
             user_rights=pytalk_user_rights,
-            note="" # Note field is available, can be populated from source_info if needed
+            note="",  # Note field is available, can be populated from source_info if
+            # needed
         )
 
         if not success_from_pytalk:
-            logger.error("PyTalk Registration Error for user %s. create_user_account returned False.", username_str)
+            logger.error(
+                "PyTalk Registration Error for user %s. create_user_account "
+                "returned False.",
+                username_str,
+            )
             return False, "REG_FAILED_PYTALK", None
 
         logger.info("User %s registration successful via PyTalk.", username_str)
 
-        await _handle_registration_broadcast(active_server_instance, username_str, broadcast_message_text, registration_broadcast_enabled)
+        await _handle_registration_broadcast(
+            active_server_instance,
+            username_str,
+            broadcast_message_text,
+            registration_broadcast_enabled,
+        )
 
-        effective_hostname = teamtalk_public_hostname if teamtalk_public_hostname else host_name
+        effective_hostname = (
+            teamtalk_public_hostname if teamtalk_public_hostname else host_name
+        )
         artefact_data = {
             "username": username_str,
             "password": password_str,
@@ -192,14 +256,20 @@ async def perform_teamtalk_registration(
             "server_name": server_name,
             "tcp_port": tcp_port,
             "udp_port": udp_port,
-            "encrypted": encrypted
+            "encrypted": encrypted,
         }
 
         return True, "REG_SUCCESS", artefact_data
 
-    except IndexError: # Should be caught by the initial check, but as a safeguard
-        logger.error("TeamTalk bot (pytalk_bot_instance) has no active server connections (IndexError) for registration.")
+    except IndexError:  # Should be caught by the initial check, but as a safeguard
+        logger.error(
+            "TeamTalk bot (pytalk_bot_instance) has no active server connections "
+            "(IndexError) for registration."
+        )
         return False, "MODULE_UNAVAILABLE", None
-    except Exception as e_reg:
-        logger.exception("General error during SDK registration for user %s: %s", username_str, e_reg)
-        return False, f"UNEXPECTED_ERROR:{e_reg!s}", None
+    except Exception:
+        logger.exception(
+            "General error during SDK registration for user %s:",
+            username_str,
+        )
+        return False, "UNEXPECTED_ERROR", None
