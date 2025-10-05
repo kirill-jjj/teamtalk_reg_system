@@ -1,3 +1,4 @@
+"""FastAPI routes for user registration."""
 from datetime import datetime, timedelta
 import logging
 from typing import Any
@@ -89,9 +90,9 @@ async def _execute_tt_registration_for_web(
         logger.info("TeamTalk registration successful for user %s via web.", username)
         return True, TeamTalkRegistrationArtefacts(**tt_artefact_data)
     except Exception as e:
-        logger.error(
-            f"Exception during TeamTalk registration for web user {username}: {e}",
-            exc_info=True,
+        logger.exception(
+            "Exception during TeamTalk registration for web user %s: %s",
+            username, e
         )
         return False, None
 
@@ -103,9 +104,7 @@ async def _prepare_downloadables_for_web(
     artefact_data: TeamTalkRegistrationArtefacts,
     db: AsyncSession,
 ) -> dict[str, Any]:
-    user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
-    translator = get_translator(user_lang_code)
-
+        user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     connection_info = TTConnectionInfo(
         server_name=artefact_data.server_name,
         host=artefact_data.effective_hostname,
@@ -124,10 +123,10 @@ async def _prepare_downloadables_for_web(
     tt_file_path = get_generated_files_path(request.app) / tt_file_name_for_user
 
     try:
-        with open(tt_file_path, "w", encoding="utf-8") as f:
-            f.write(tt_content)
+        async with aiofiles.open(tt_file_path, mode="w", encoding="utf-8") as f:
+            await f.write(tt_content)
     except OSError as e:
-        logger.error(f"Failed to write .tt file {tt_file_path}: {e}", exc_info=True)
+        logger.exception("Failed to write .tt file %s: %s", tt_file_path, e)
         return {
             "tt_download_link_token": None,
             "tt_file_name_for_user": None,
@@ -138,7 +137,7 @@ async def _prepare_downloadables_for_web(
         }
 
     tt_token = generate_random_token()
-    expires_at_dt = datetime.utcnow() + timedelta(
+    expires_at_dt = datetime.now(UTC) + timedelta(
         seconds=settings.generated_file_ttl_seconds
     )
     await add_fastapi_download_token(
@@ -146,7 +145,7 @@ async def _prepare_downloadables_for_web(
         token=tt_token,
         filepath_on_server=tt_file_path.name,  # Store only filename
         original_filename=tt_file_name_for_user,
-        token_type="tt_config",
+        token_type="tt_config",  # noqa: S106
         expires_at=expires_at_dt,
     )
     # schedule_temp_file_deletion now needs the token to remove it from DB
@@ -182,7 +181,7 @@ async def _prepare_downloadables_for_web(
                 token=zip_token,
                 filepath_on_server=zip_file_path_on_server.name,  # Store only filename
                 original_filename=actual_client_zip_filename_for_user,
-                token_type="client_zip",
+                token_type="client_zip",  # noqa: S106
                 expires_at=expires_at_dt,
                 # Use same expiry for both tokens from one request
             )
@@ -211,7 +210,10 @@ async def _prepare_downloadables_for_web(
 
 
 @router.post("/set_lang_and_reload")
-async def set_language_and_reload(request: Request, lang_code: str = Form(...)):
+async def set_language_and_reload(
+    request: Request, lang_code: str = Form(...)
+) -> RedirectResponse:
+    """Sets the user's language preference and reloads the registration page."""
     response = RedirectResponse(
         url=request.url_for("register_page_get"), status_code=302
     )
@@ -220,7 +222,8 @@ async def set_language_and_reload(request: Request, lang_code: str = Form(...)):
 
 
 @router.get("/register")
-async def register_page_get(request: Request):
+async def register_page_get(request: Request) -> templates.TemplateResponse:
+    """Displays the registration page."""
     effective_lang_code = DEFAULT_LANG_CODE
     language_is_forced = False
 
@@ -230,8 +233,8 @@ async def register_page_get(request: Request):
         translated_string = _(original_string)
         if translated_string != original_string:
             effective_lang_code = settings.force_user_lang
-            language_is_forced = True  # Used to decide if we should even check cookies
-            logger.info(f"Web: Language forced to {effective_lang_code} by config.")
+
+            logger.info("Web: Language forced to %s by config.", effective_lang_code)
         else:
             logger.warning(
                 "Web: FORCE_USER_LANG set to '%s' but seems invalid/incomplete. "
@@ -246,7 +249,6 @@ async def register_page_get(request: Request):
         # No force, use cookie or default
         effective_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
 
-    translator = get_translator(effective_lang_code)
     available_languages = get_available_languages_for_display()
 
     context = {
@@ -270,11 +272,11 @@ async def register_page_get(request: Request):
 async def register_page_post(
     request: Request,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db_session),
+    db: AsyncSession = Depends(get_db_session),  # noqa: B008
     username: str = Form(...),
     password: str = Form(...),
     nickname: str | None = Form(None),
-):
+) -> templates.TemplateResponse:
     payload = RegistrationPayload(
         username=username, password=password, nickname=nickname
     )
@@ -284,10 +286,14 @@ async def register_page_post(
 
     if await is_fastapi_ip_registered(db, user_ip):
         logger.warning(
-            f"Validation failed for IP {user_ip} (Username: {payload.username}): IP already registered."
+            "Validation failed for IP %s (Username: %s): IP already registered.",
+            user_ip, payload.username
         )
         raise HTTPException(
-            status_code=400, detail=translator("This IP address has already been used to register an account.")
+            status_code=400,
+            detail=translator(
+                "This IP address has already been used to register an account."
+            ),
         )
 
     try:
@@ -296,29 +302,45 @@ async def register_page_post(
         )
         if username_exists is True:
             logger.warning(
-                f"Validation failed for IP {user_ip} (Username: {payload.username}): Username already taken."
+                "Validation failed for IP %s (Username: %s): Username already taken.",
+                user_ip, payload.username
             )
-            raise HTTPException(
-                status_code=400, detail=translator("Sorry, this username is already taken. Please choose another one.")
+            raise HTTPException(  # noqa: TRY301
+                status_code=400,
+                detail=translator(
+                    "Sorry, this username is already taken. Please choose another one."
+                ),
             )
         if username_exists is None:
             logger.error(
-                f"Validation failed for IP {user_ip} (Username: {payload.username}): check_username_exists returned None (error)."
+                "Validation failed for IP %s (Username: %s): "
+                "check_username_exists returned None (error).",
+                user_ip, payload.username,
             )
-            raise HTTPException(
-                status_code=500, detail=translator("An error occurred during registration. Please try again later or contact an administrator.")
+            raise HTTPException(  # noqa: TRY301
+                status_code=500,
+                detail=translator(
+                    "An error occurred during registration. "
+                    "Please try again later or contact an administrator."
+                ),
             )
     except Exception as e:
-        logger.error(
-            f"Exception during username existence check for {payload.username} (IP: {user_ip}): {e}",
-            exc_info=True,
+        logger.exception(
+            "Exception during username existence check for %s (IP: %s): %s",
+            payload.username, user_ip, e,
         )
-        raise HTTPException(
-            status_code=500, detail=translator("An error occurred during registration. Please try again later or contact an administrator.")
+        raise HTTPException(  # noqa: B904
+            status_code=500,
+            detail=translator(
+                "An error occurred during registration. "
+                "Please try again later or contact an administrator."
+            ),
         )
 
     final_nickname = (
-        payload.nickname if payload.nickname and payload.nickname.strip() else payload.username
+        payload.nickname
+        if payload.nickname and payload.nickname.strip()
+        else payload.username
     )
     source_info_data = {
         "type": "web",
@@ -338,7 +360,10 @@ async def register_page_post(
     )
 
     if not registration_successful or not tt_artefact_data_from_reg:
-        message = translator("An error occurred during TeamTalk registration. Please try again later or contact an administrator.")
+        message = translator(
+            "An error occurred during TeamTalk registration. "
+            "Please try again later or contact an administrator."
+        )
         available_languages = get_available_languages_for_display()
         return request.app.state.templates.TemplateResponse(
             "register.html",
@@ -355,11 +380,13 @@ async def register_page_post(
         )
 
     try:
-        await add_fastapi_registered_ip(db, ip_address=user_ip, username=payload.username)
+        await add_fastapi_registered_ip(
+            db, ip_address=user_ip, username=payload.username
+        )
     except Exception as e_ip_add:
-        logger.error(
-            f"Failed to add/update registered IP {user_ip} for user {payload.username} to DB: {e_ip_add}",
-            exc_info=True,
+        logger.exception(
+            "Failed to add/update registered IP %s for user %s to DB: %s",
+            user_ip, payload.username, e_ip_add,
         )
 
     downloadables_context = await _prepare_downloadables_for_web(
@@ -370,7 +397,10 @@ async def register_page_post(
     )
 
     if downloadables_context.get("file_generation_error"):
-        message = translator("Registration was successful, but there was an error generating the connection files. Please contact an administrator.")
+        message = translator(
+            "Registration was successful, but there was an error generating "
+            "the connection files. Please contact an administrator."
+        )
         available_languages = get_available_languages_for_display()
         return request.app.state.templates.TemplateResponse(
             "register.html",
@@ -387,7 +417,9 @@ async def register_page_post(
         )
 
     success_title = translator("Registration Successful")
-    success_message = translator("Your registration was successful. You can now connect to the server.")
+    success_message = translator(
+        "Your registration was successful. You can now connect to the server."
+    )
     available_languages = get_available_languages_for_display()
 
     final_context = {
@@ -415,14 +447,14 @@ async def register_page_post(
 
 @router.get("/download_tt/{token}")
 async def download_tt_file(
-    request: Request, token: str, db: AsyncSession = Depends(get_db_session)
-):
+    request: Request, token: str, db: AsyncSession = Depends(get_db_session),  # noqa: B008  # noqa: B008
+) -> FileResponse:
     user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     translator = get_translator(user_lang_code)
 
     token_info_model = await get_fastapi_download_token(db, token)
 
-    if token_info_model and token_info_model.token_type == "tt_config":
+    if token_info_model and token_info_model.token_type == "tt_config":  # noqa: S105
         server_filename = token_info_model.filepath_on_server
         user_download_filename = token_info_model.original_filename
         file_path = get_generated_files_path(request.app) / server_filename
@@ -435,20 +467,21 @@ async def download_tt_file(
                 filename=user_download_filename,
             )
     raise HTTPException(
-        status_code=404, detail=translator("The requested file could not be found or the link has expired.")
+        status_code=404,
+        detail=translator("The requested file could not be found or the link has expired."),
     )
 
 
 @router.get("/download_client_zip/{token}")
 async def download_client_zip_file(
-    request: Request, token: str, db: AsyncSession = Depends(get_db_session)
-):
+    request: Request, token: str, db: AsyncSession = Depends(get_db_session)  # noqa: B008
+) -> FileResponse:
     user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     translator = get_translator(user_lang_code)
 
     token_info_model = await get_fastapi_download_token(db, token)
 
-    if token_info_model and token_info_model.token_type == "client_zip":
+    if token_info_model and token_info_model.token_type == "client_zip":  # noqa: S105
         server_filename = token_info_model.filepath_on_server
         user_download_filename = token_info_model.original_filename
         file_path = get_generated_zips_path(request.app) / server_filename
@@ -460,7 +493,7 @@ async def download_client_zip_file(
                 media_type="application/zip",
                 filename=user_download_filename,
             )
-    else:
-        raise HTTPException(
-            status_code=404, detail=translator("The requested file could not be found or the link has expired.")
-        )
+    return HTTPException(
+        status_code=404,
+        detail=translator("The requested file could not be found or the link has expired."),
+    )

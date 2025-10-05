@@ -50,7 +50,6 @@ async def add_telegram_registration(
             "Successfully added Telegram ID %s with TeamTalk username %s to session.",
             telegram_id, teamtalk_username
         )
-        return new_registration
     except SQLAlchemyIntegrityError:
         logger.warning(
             "SQLAlchemyIntegrityError during add operation for Telegram ID %s "
@@ -62,11 +61,12 @@ async def add_telegram_registration(
         raise
     except Exception as e:
         logger.exception(
-            "Error adding Telegram registration to session for %s (username: %s): %s",
-            telegram_id, teamtalk_username, e
+            "Error adding Telegram registration to session for %s (username: %s):",
+            telegram_id, teamtalk_username
         )
         await session.rollback()
         raise
+    return new_registration
 
 async def get_teamtalk_username_by_telegram_id(
     session: AsyncSession, telegram_id: int
@@ -91,6 +91,7 @@ async def get_user_by_identifier(
     db_session: AsyncSession, identifier: str
 ) -> TelegramRegistration | None:
     """Retrieves a user by Telegram ID (if identifier is numeric)
+
     or TeamTalk username.
     """
     stmt = None
@@ -137,6 +138,7 @@ async def delete_telegram_registration(
     db_session: AsyncSession, telegram_id: int
 ) -> bool:
     """Deletes a user from the TelegramRegistration table based on
+
     telegram_id and commits.
     """
     logger.info("Attempting to delete registration for Telegram ID: %s", telegram_id)
@@ -521,6 +523,7 @@ async def is_user_banned(db_session: AsyncSession, telegram_id: int) -> bool:
     return result.scalar_one()
 
 async def get_banned_users(db_session: AsyncSession) -> list[BannedUser]:
+    """Retrieves all banned users from the database."""
     stmt = select(BannedUser).order_by(BannedUser.banned_at.desc())
     result = await db_session.execute(stmt)
     return list(result.scalars().all()) # Ensure it's a list, not just an iterable
@@ -528,6 +531,7 @@ async def get_banned_users(db_session: AsyncSession) -> list[BannedUser]:
 async def get_telegram_id_by_teamtalk_username(
     db_session: AsyncSession, teamtalk_username: str
 ) -> int | None:
+    """Retrieves the Telegram ID associated with a given TeamTalk username."""
     # This function assumes TelegramRegistration table links TT usernames and TG IDs
     stmt = select(TelegramRegistration.telegram_id).where(
         TelegramRegistration.teamtalk_username == teamtalk_username

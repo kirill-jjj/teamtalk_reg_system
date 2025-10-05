@@ -1,3 +1,4 @@
+"""Main FastAPI application setup."""
 import logging
 import os
 

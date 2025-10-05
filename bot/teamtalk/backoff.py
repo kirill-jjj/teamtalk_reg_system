@@ -1,8 +1,13 @@
+"""Exponential backoff utility for retrying operations."""
 import random
 
 
 class Backoff:
-    def __init__(self, base: int = 1, exponent: float = 2, max_value: float = 60, max_tries: int = None):
+    """Implements an exponential backoff strategy with jitter for retries."""
+    def __init__(
+        self, base: int = 1, exponent: float = 2, max_value: float = 60, max_tries: int | None = None
+    ) -> None:
+        """Initializes the Backoff strategy."""
         self.base = base
         self.exponent = exponent
         self.max_value = max_value
@@ -17,14 +22,14 @@ class Backoff:
         calculated_delay = self.base * (self.exponent ** self._attempts)
 
         # Apply jitter (e.g., up to 50% of current calculated delay)
-        jitter = random.uniform(0, calculated_delay * 0.5)
+        jitter = random.uniform(0, calculated_delay * 0.5)  # noqa: S311
 
         actual_delay = min(calculated_delay + jitter, self.max_value)
 
         self._attempts += 1
         return actual_delay
 
-    def reset(self):
+    def reset(self) -> None:
         """Resets the attempt counter."""
         self._attempts = 0
 

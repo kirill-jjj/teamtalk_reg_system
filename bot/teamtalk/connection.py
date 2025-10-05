@@ -1,3 +1,4 @@
+"""Manages the TeamTalk bot's connection and reconnection logic."""
 import asyncio
 import logging
 
@@ -18,13 +19,15 @@ async def initialize_teamtalk_connection(
     nickname: str, encrypted: bool, join_channel_path: str | None,
     join_channel_pass: str, bot_gender: str, bot_status_text: str
 ) -> bool:
+    """Initializes the TeamTalk connection for the bot."""
     server_info_pytalk = TeamTalkServerInfo(
         host=host_name, tcp_port=tcp_port, udp_port=udp_port,
         username=user_name, password=password, nickname=nickname,
         encrypted=encrypted, join_channel_id=-1, join_channel_password=""
     )
     try:
-        # Store parameters before add_server in case add_server fails but still adds to teamtalks list partially
+        # Store parameters before add_server in case add_server fails but
+        # still adds to teamtalks list partially
         current_server_info_tuple = (
             host_name, tcp_port, udp_port, user_name, password, nickname, encrypted,
             join_channel_path, join_channel_pass, bot_gender, bot_status_text
@@ -32,16 +35,26 @@ async def initialize_teamtalk_connection(
 
         await pytalk_bot_instance.add_server(server_info_pytalk)
 
-        if pytalk_bot_instance.teamtalks and pytalk_bot_instance.teamtalks[-1].logged_in:
-            logger.info("Successfully connected and logged into TeamTalk server: %s", host_name)
+        if (
+            pytalk_bot_instance.teamtalks
+            and pytalk_bot_instance.teamtalks[-1].logged_in
+        ):
+            logger.info(
+                "Successfully connected and logged into TeamTalk server: %s",
+                host_name,
+            )
             active_server_instance = pytalk_bot_instance.teamtalks[-1]
 
-            # Store original parameters on the instance for potential reconnection/restart
+            # Store original parameters on the instance for potential
+            # reconnection/restart
             active_server_instance.server_info_tuple = current_server_info_tuple
 
-            # Associate the TeamTalkInstance with the server object for easy access in events
+            # Associate the TeamTalkInstance with the server object for easy
+            # access in events
             if active_server_instance.server:
-                 active_server_instance.server.teamtalk_instance = active_server_instance
+                 active_server_instance.server.teamtalk_instance = (
+                    active_server_instance
+                )
 
             if join_channel_path and join_channel_path.strip():
                 channel_to_join_str = join_channel_path.strip()
@@ -49,74 +62,134 @@ async def initialize_teamtalk_connection(
                 try:
                     channel_id_int = int(channel_to_join_str)
                     logger.info("Attempting to join channel by ID: %s", channel_id_int)
-                    active_server_instance.join_channel_by_id(id=channel_id_int, password=join_password)
+                    active_server_instance.join_channel_by_id(
+                        id=channel_id_int, password=join_password
+                    )
                 except ValueError:
-                    logger.info("Attempting to join channel by path: '%s'", channel_to_join_str)
+                    logger.info(
+                        "Attempting to join channel by path: '%s'", channel_to_join_str
+                    )
                     try:
-                        channel_obj = active_server_instance.get_channel_from_path(channel_to_join_str)
+                        channel_obj = (
+                            active_server_instance.get_channel_from_path(
+                                channel_to_join_str
+                            )
+                        )
                         if channel_obj and channel_obj.id is not None:
-                            active_server_instance.join_channel_by_id(id=channel_obj.id, password=join_password)
+                            active_server_instance.join_channel_by_id(
+                                id=channel_obj.id, password=join_password
+                            )
                         else:
-                            logger.warning(f"Channel path '{channel_to_join_str}' not found.")
+                            logger.warning("Channel path '%s' not found.", channel_to_join_str)
                     except Exception as e_path:
-                        logger.error(f"Error joining by path '{channel_to_join_str}': {e_path}")
+                        logger.exception("Error joining by path '%s': %s", channel_to_join_str, e_path)
                 except Exception as e_join:
-                     logger.error(f"Error joining channel '{channel_to_join_str}': {e_join}")
+                    logger.exception("Error joining channel '%s': %s", channel_to_join_str, e_join)
 
-            gender_map = {"male": Status.online.male, "female": Status.online.female, "neutral": Status.online.neutral}
-            mapped_gender_status = gender_map.get(bot_gender.lower(), Status.online.neutral)
-            active_server_instance.change_status(status_flags=mapped_gender_status, status_message=bot_status_text)
-            logger.info("Set TeamTalk status to '%s' with gender '%s'.", bot_status_text, bot_gender)
+            gender_map = {
+                "male": Status.online.male,
+                "female": Status.online.female,
+                "neutral": Status.online.neutral,
+            }
+            mapped_gender_status = gender_map.get(
+                bot_gender.lower(), Status.online.neutral
+            )
+            active_server_instance.change_status(
+                status_flags=mapped_gender_status, status_message=bot_status_text
+            )
+            logger.info(
+                "Set TeamTalk status to '%s' with gender '%s'.",
+                bot_status_text, bot_gender,
+            )
             return True
-        logger.error(f"Failed to connect or login to TeamTalk server: {host_name}")
+        logger.error("Failed to connect or login to TeamTalk server: %s", host_name)
         # Attempt to remove the potentially partially added server instance
-        if pytalk_bot_instance.teamtalks and pytalk_bot_instance.teamtalks[-1].server_info.host == host_name and pytalk_bot_instance.teamtalks[-1].server_info.tcp_port == tcp_port:
+        if (
+            pytalk_bot_instance.teamtalks
+            and pytalk_bot_instance.teamtalks[-1].server_info.host == host_name
+            and pytalk_bot_instance.teamtalks[-1].server_info.tcp_port == tcp_port
+        ):
             pytalk_bot_instance.teamtalks.pop()
-            logger.info("Removed potentially failed server instance for %s:%s from list.", host_name, tcp_port)
+            logger.info(
+                "Removed potentially failed server instance for %s:%s from list.",
+                host_name, tcp_port,
+            )
         return False
     except Exception as e:
-        logger.error(f"Error initializing TeamTalk connection for {host_name}: {e}", exc_info=True)
-        # Attempt to remove the potentially partially added server instance on general exception too
+        logger.exception(
+            "Error initializing TeamTalk connection for %s: %s", host_name, e
+        )
+        # Attempt to remove the potentially partially added server instance
+        # on general exception too
         if pytalk_bot_instance.teamtalks:
-            # This removal logic might be too aggressive or could target wrong instance if multiple servers in list
+            # This removal logic might be too aggressive or could target wrong
+            # instance if multiple servers in list
             # A more robust way would be to find the specific instance if possible
             last_instance = pytalk_bot_instance.teamtalks[-1]
-            if hasattr(last_instance, 'server_info') and last_instance.server_info.host == host_name and last_instance.server_info.tcp_port == tcp_port:
+            if (
+                hasattr(last_instance, 'server_info')
+                and last_instance.server_info.host == host_name
+                and last_instance.server_info.tcp_port == tcp_port
+            ):
                  pytalk_bot_instance.teamtalks.pop()
-                 logger.info("Removed server instance for %s:%s from list due to exception during init.", host_name, tcp_port)
+                 logger.info(
+                    "Removed server instance for %s:%s from list due to exception during init.",
+                    host_name, tcp_port,
+                )
         return False
 
-async def close_teamtalk_connection(pytalk_bot_instance: pytalk.TeamTalkBot): # New argument
+async def close_teamtalk_connection(pytalk_bot_instance: pytalk.TeamTalkBot) -> None:
+    """Closes all active TeamTalk connections for the bot."""
     logger.info("Attempting to shut down PyTalk bot connections...")
     if not pytalk_bot_instance.teamtalks:
         logger.info("No active TeamTalk instances to close.")
         return
-    for i in range(len(pytalk_bot_instance.teamtalks) -1, -1, -1): # Iterate backwards for safe removal
+    for i in range(len(pytalk_bot_instance.teamtalks) - 1, -1, -1):  # Iterate backwards for safe removal
         tt_instance = pytalk_bot_instance.teamtalks[i]
         host_display = "Unknown Host"
         # Check server_info_tuple first as it's set by our code
         if hasattr(tt_instance, 'server_info_tuple') and tt_instance.server_info_tuple:
             host_display = tt_instance.server_info_tuple[0]
-        elif hasattr(tt_instance, 'server_info') and tt_instance.server_info and hasattr(tt_instance.server_info, 'host'):
+        elif (
+            hasattr(tt_instance, 'server_info')
+            and tt_instance.server_info
+            and hasattr(tt_instance.server_info, 'host')
+        ):
              host_display = tt_instance.server_info.host
 
         logger.debug("Processing instance for host: %s for shutdown.", host_display)
         try:
-            if hasattr(tt_instance, 'logged_in') and tt_instance.logged_in: tt_instance.logout()
-            if hasattr(tt_instance, 'connected') and tt_instance.connected: tt_instance.disconnect()
+            if hasattr(tt_instance, 'logged_in') and tt_instance.logged_in:
+                tt_instance.logout()
+            if hasattr(tt_instance, 'connected') and tt_instance.connected:
+                tt_instance.disconnect()
             if hasattr(tt_instance, 'super') and hasattr(tt_instance.super, 'closeTeamTalk'):
                 logger.info("Closing TeamTalk SDK for instance %s...", host_display)
                 tt_instance.super.closeTeamTalk()
             pytalk_bot_instance.teamtalks.pop(i)
-            logger.info("Disconnected, closed SDK, and removed instance for host: %s.", host_display)
-        except Exception as e: logger.error(f"Error during shutdown for {host_display}: {e}", exc_info=True)
+            logger.info(
+                "Disconnected, closed SDK, and removed instance for host: %s.",
+                host_display,
+            )
+        except Exception as e:
+            logger.error(
+                f"Error during shutdown for {host_display}: {e}", exc_info=True
+            )
 
     # This might be redundant if all instances are closed and popped correctly
-    if hasattr(pytalk_bot_instance, '_close_all_sdk') and not pytalk_bot_instance.teamtalks:
+    if hasattr(pytalk_bot_instance, '_close_all_sdk') and not (
+        pytalk_bot_instance.teamtalks
+    ):
         pytalk_bot_instance._close_all_sdk()
-        logger.info("Called pytalk_bot_instance._close_all_sdk() as all instances were removed.")
+        logger.info(
+            "Called pytalk_bot_instance._close_all_sdk() as all instances were removed."
+        )
     elif pytalk_bot_instance.teamtalks:
-        logger.warning("Not all instances removed from pytalk_bot_instance.teamtalks list during close: %s remaining.", len(pytalk_bot_instance.teamtalks))
+        logger.warning(
+            "Not all instances removed from pytalk_bot_instance.teamtalks list "
+            "during close: %s remaining.",
+            len(pytalk_bot_instance.teamtalks),
+        )
 
     logger.info("PyTalk bot shutdown process completed.")
 
@@ -125,7 +198,8 @@ async def launch_teamtalk_service(
     host_name: str, tcp_port: int, udp_port: int, user_name: str, password: str,
     nickname: str, encrypted: bool, join_channel_path: str | None,
     join_channel_pass: str, bot_gender: str, bot_status_text: str
-):
+) -> None:
+    """Launches the TeamTalk bot service, connecting to the server and starting event processing."""
     logger.info("Starting PyTalk bot service...")
     try:
         async with pytalk_bot_instance:

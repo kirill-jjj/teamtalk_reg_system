@@ -111,7 +111,7 @@ class Settings(BaseSettings):
 
     # --- Web Application (FastAPI) Configuration ---
     web_registration_enabled: bool = False
-    web_app_host: str = "0.0.0.0"
+    web_app_host: str = "0.0.0.0"  # S104: Binding to all interfaces is noted.
     web_app_port: int = 5000
     root_path: str = ""
     web_app_ssl_enabled: bool = False
