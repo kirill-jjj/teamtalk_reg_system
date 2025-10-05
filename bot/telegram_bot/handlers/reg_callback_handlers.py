@@ -10,6 +10,7 @@ from ...core.config import settings
 from ...core.db import (
     is_telegram_id_registered,
 )
+from ...core.db.models import PendingTelegramRegistration
 from ...core.localization import get_translator
 from ..schemas import RegistrationStateData
 from ..states import RegistrationStates
@@ -21,6 +22,7 @@ from .reg_callback_data import (
 from .reg_logic_helpers import (
     _ask_nickname_preference,
     _handle_registration_continuation,
+    _notify_admins_about_decision,
     _process_actual_registration,
 )
 
@@ -64,7 +66,8 @@ async def language_selection_handler(
         await bot.send_message(
             user.id,
             _(
-                "You have already registered one TeamTalk account from this Telegram account. Only one registration is allowed."
+                "You have already registered one TeamTalk account from this "
+                "Telegram account. Only one registration is allowed."
             ),
         )
         await state.clear()
@@ -117,6 +120,10 @@ async def _handle_verification_approve(
     state_data_from_pending: "RegistrationStateData",
     source_info_from_request: dict
 ) -> None:
+    user_lang_code = state_data_from_pending.selected_language or \
+        settings.bot_admin_lang
+    _ = get_translator(user_lang_code)
+
     await callback_query.answer(
         _("User {username} registration approved.").format(
             username=state_data_from_pending.name
@@ -138,7 +145,8 @@ async def _handle_verification_approve(
             await bot.send_message(
                 pending_reg_data_model.registrant_telegram_id,
                 _(
-                    "Your registration has been approved by the administrator. You can now use TeamTalk."
+                    "Your registration has been approved by the administrator. "
+                    "You can now use TeamTalk."
                 ),
             )
         except Exception as e:
@@ -153,13 +161,16 @@ async def _handle_verification_approve(
             acting_admin_id=callback_query.from_user.id,
             acting_admin_name=callback_query.from_user.full_name,
             registrant_telegram_id=pending_reg_data_model.registrant_telegram_id,
-            registrant_tg_username=source_info_from_request.get("telegram_username"),
+            registrant_tg_username=source_info_from_request.get(
+                "telegram_username"
+            ),
             teamtalk_username=state_data_from_pending.name,
             decision="approved",
         )
     else:
         logger.error(
-            "Registration for TT user %s (TG ID: %s) was approved by admin %s, but _process_actual_registration failed.",
+            "Registration for TT user %s (TG ID: %s) was approved by admin %s, "
+            "but _process_actual_registration failed.",
             state_data_from_pending.name,
             pending_reg_data_model.registrant_telegram_id,
             callback_query.from_user.id,
@@ -168,7 +179,8 @@ async def _handle_verification_approve(
             await bot.send_message(
                 callback_query.from_user.id,
                 _(
-                    "CRITICAL: Registration for {username} was approved, but the final registration step failed. Please check logs."
+                    "CRITICAL: Registration for {username} was approved, but the "
+                    "final registration step failed. Please check logs."
                 ).format(username=state_data_from_pending.name),
             )
         except Exception:
@@ -181,10 +193,14 @@ async def _handle_verification_approve(
 async def _handle_verification_reject(
     callback_query: types.CallbackQuery,
     bot: AiogramBot,
-    pending_reg_data_model: "PendingTelegramRegistration",
-    state_data_from_pending: "RegistrationStateData",
+    pending_reg_data_model: PendingTelegramRegistration,
+    state_data_from_pending: RegistrationStateData,
     source_info_from_request: dict
 ) -> None:
+    user_lang_code = state_data_from_pending.selected_language or \
+        settings.bot_admin_lang
+    _ = get_translator(user_lang_code)
+
     await callback_query.answer(
         _("User {username} registration declined.").format(
             username=state_data_from_pending.name
@@ -208,7 +224,9 @@ async def _handle_verification_reject(
         acting_admin_id=callback_query.from_user.id,
         acting_admin_name=callback_query.from_user.full_name,
         registrant_telegram_id=pending_reg_data_model.registrant_telegram_id,
-        registrant_tg_username=source_info_from_request.get("telegram_username"),
+        registrant_tg_username=source_info_from_request.get(
+            "telegram_username"
+        ),
         teamtalk_username=state_data_from_pending.name,
         decision="rejected",
     )
@@ -260,9 +278,14 @@ async def nickname_choice_handler(
         # Retrieve pytalk_bot_instance from dispatcher's context
         pytalk_bot_instance = dispatcher["pytalk_bot_instance"]
         if not pytalk_bot_instance:
-            logger.error("pytalk_bot_instance not found in dispatcher context.")
+            logger.error(
+                "pytalk_bot_instance not found in dispatcher context."
+            )
             await callback_query.message.answer(
-                _("Internal error: TeamTalk bot instance not available. Please contact an administrator.")
+                _(
+                    "Internal error: TeamTalk bot instance not available. "
+                    "Please contact an administrator."
+                )
             )
             await state.clear()
             return

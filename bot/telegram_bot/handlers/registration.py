@@ -20,5 +20,6 @@ router.include_router(callback_router)
 router.include_router(fsm_router)
 
 logger.info(
-    "Main registration router configured with sub-routers from reg_command_handlers, reg_callback_handlers, and reg_fsm_message_handlers."
+    "Main registration router configured with sub-routers from "
+    "reg_command_handlers, reg_callback_handlers, and reg_fsm_message_handlers."
 )

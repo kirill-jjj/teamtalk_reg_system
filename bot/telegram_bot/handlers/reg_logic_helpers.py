@@ -45,7 +45,8 @@ async def _ask_nickname_preference(
     builder.adjust(1)
 
     prompt_message = _(
-        "Your username will be '{username}'. Would you like to set a different nickname? If not, your nickname will be the same as your username."
+        "Your username will be '{username}'. Would you like to set a different "
+        "nickname? If not, your nickname will be the same as your username."
     ).format(username=username_value)
 
     if isinstance(message_target, types.Message):
@@ -69,7 +70,8 @@ async def _send_tt_credentials_to_user(
     bot: AiogramBot,
     user_id_val: int,
     user_lang_code: str,
-    artefact_data: dict[str, Any],  # This comes from teamtalk_service, can be refactored later
+    artefact_data: dict[str, Any],  # This comes from teamtalk_service,
+    # can be refactored later
 ) -> None:
     """Sends the .tt file and connection link to the user."""
     _ = get_translator(user_lang_code)
@@ -115,7 +117,117 @@ async def _send_tt_credentials_to_user(
             user_id_val,
         )
         await bot.send_message(
-            user_id_val, _("Could not send the .tt file or link. Please contact an admin.")
+            user_id_val,
+            _("Could not send the .tt file or link. Please contact an admin."),
+        )
+
+
+async def _handle_successful_registration_actions(
+    bot: AiogramBot,
+    db_session: AsyncSession,
+    state_data: RegistrationStateData,
+    source_info: dict,
+    artefact_data_val: dict[str, Any],
+    user_lang_code: str,
+) -> None:
+    """Handles actions after a successful TeamTalk registration."""
+    _ = get_translator(user_lang_code)
+    registrant_user_id = state_data.registrant_telegram_id
+
+    await bot.send_message(
+        registrant_user_id,
+        _("User {username} successfully registered.").format(
+            username=state_data.name
+        ),
+    )
+
+    initiator_telegram_id = source_info.get("registrar_telegram_id")
+    if not state_data.is_admin_registrar or (
+        state_data.is_admin_registrar
+        and initiator_telegram_id == registrant_user_id
+    ):
+        try:
+            registration_record = await add_telegram_registration(
+                db_session, registrant_user_id, state_data.name
+            )
+            if registration_record is None:
+                logger.info(
+                    "Telegram registration for admin ID %s (username: %s) "
+                    "was intentionally skipped.",
+                    registrant_user_id,
+                    state_data.name,
+                )
+        except Exception as e_db_add:
+            logger.exception(
+                "CRITICAL DB Exception for TT user %s (TG ID: %s):",
+                state_data.name,
+                registrant_user_id,
+                exc_info=e_db_add,
+            )
+            await bot.send_message(
+                registrant_user_id,
+                _(
+                    "Your TeamTalk account is ready, but there was an issue "
+                    "syncing your registration locally. Please contact an "
+                    "administrator if you experience issues."
+                ),
+            )
+            for admin_tg_id_notify in settings.admin_ids:
+                if admin_tg_id_notify != registrant_user_id:
+                    await bot.send_message(
+                        admin_tg_id_notify,
+                        "DB SYNC ERROR (Exception): User %s (TG ID: %s) "
+                        "created in TeamTalk but FAILED local DB save. "
+                        "Exception: %s",
+                        state_data.name,
+                        registrant_user_id,
+                        exc_info=e_db_add,
+                    )
+
+    if settings.admin_ids:
+        _ = get_translator(get_admin_lang_code())
+        admin_notification_message = _(
+            "📢 User {username} was registered.\n"
+        ).format(username=state_data.name)
+        lang_code_for_emoji = state_data.selected_language or "en"
+        lang_emoji = (
+            "🇬🇧"
+            if lang_code_for_emoji == "en"
+            else ("🇷🇺" if lang_code_for_emoji == "ru" else "❓")
+        )
+        admin_notification_message += _("👤 Client language: {lang_emoji}\n").format(
+            lang_emoji=lang_emoji
+        )
+        tg_full_name = source_info.get("telegram_full_name", "N/A")
+        admin_notification_message += _(
+            "📱 Via Telegram: {telegram_full_name} (ID: {registrant_telegram_id})\n"
+        ).format(
+            telegram_full_name=tg_full_name,
+            registrant_telegram_id=registrant_user_id,
+        )
+        if (
+            state_data.is_admin_registrar
+            and initiator_telegram_id != registrant_user_id
+        ):
+            admin_notification_message += _(
+                "🔑 Registered by Admin ID: {initiator_telegram_id}\n"
+            ).format(initiator_telegram_id=initiator_telegram_id)
+
+        for admin_id_val_notify in settings.admin_ids:
+            try:
+                await bot.send_message(
+                    admin_id_val_notify, admin_notification_message.strip()
+                )
+            except Exception as e_notify:
+                logger.exception(
+                    "Error sending admin reg notification to %s:",
+                    admin_id_val_notify,
+                    exc_info=e_notify,
+                )
+
+    if artefact_data_val:
+        await _send_tt_credentials_to_user(
+            bot, registrant_user_id, user_lang_code, artefact_data_val
         )
 
 
@@ -127,7 +239,8 @@ async def _process_actual_registration(
     state: FSMContext | None,
     bot: AiogramBot,
 ) -> tuple[bool, str | None, dict[str, Any] | None]:
-    """Processes the actual registration with TeamTalk and notifies the user and admins."""
+    """Processes the actual registration with TeamTalk and notifies the user """
+    """and admins."""
     user_lang_code = state_data.selected_language or settings.bot_admin_lang
     _ = get_translator(user_lang_code)
 
@@ -164,98 +277,12 @@ async def _process_actual_registration(
         teamtalk_public_hostname=settings.tt_public_hostname,
     )
 
-    registrant_user_id = state_data.registrant_telegram_id
     if success:
-        await bot.send_message(
-            registrant_user_id,
-            _("User {username} successfully registered.").format(
-                username=state_data.name
-            ),
+        await _handle_successful_registration_actions(
+            bot, db_session, state_data, source_info, artefact_data_val, user_lang_code
         )
-
-        initiator_telegram_id = source_info.get("registrar_telegram_id")
-        if not state_data.is_admin_registrar or (
-            state_data.is_admin_registrar
-            and initiator_telegram_id == registrant_user_id
-        ):
-            try:
-                registration_record = await add_telegram_registration(
-                    db_session, registrant_user_id, state_data.name
-                )
-                if registration_record is None:
-                    logger.info(
-                        "Telegram registration for admin ID %s (username: %s) was intentionally skipped.",
-                        registrant_user_id,
-                        state_data.name,
-                    )
-            except Exception as e_db_add:
-                logger.exception(
-                    "CRITICAL DB Exception for TT user %s (TG ID: %s): %s",
-                    state_data.name,
-                    registrant_user_id,
-                    e_db_add,
-                )
-                await bot.send_message(
-                    registrant_user_id,
-                    _(
-                        "Your TeamTalk account is ready, but there was an issue syncing your registration locally. Please contact an administrator if you experience issues."
-                    ),
-                )
-                for admin_tg_id_notify in settings.admin_ids:
-                    if admin_tg_id_notify != registrant_user_id:
-                        await bot.send_message(
-                            admin_tg_id_notify,
-                            "DB SYNC ERROR (Exception): User %s (TG ID: %s) created in TeamTalk but FAILED local DB save. Exception: %s",
-                            state_data.name,
-                            registrant_user_id,
-                            e_db_add,
-                        )
-        if settings.admin_ids:
-            _ = get_translator(get_admin_lang_code())
-            admin_notification_message = _(
-                "📢 User {username} was registered.\n"
-            ).format(username=state_data.name)
-            lang_code_for_emoji = state_data.selected_language or "en"
-            lang_emoji = (
-                "🇬🇧"
-                if lang_code_for_emoji == "en"
-                else ("🇷🇺" if lang_code_for_emoji == "ru" else "❓")
-            )
-            admin_notification_message += _("👤 Client language: {lang_emoji}\n").format(
-                lang_emoji=lang_emoji
-            )
-            tg_full_name = source_info.get("telegram_full_name", "N/A")
-            admin_notification_message += _(
-                "📱 Via Telegram: {telegram_full_name} (ID: {registrant_telegram_id})\n"
-            ).format(
-                telegram_full_name=tg_full_name,
-                registrant_telegram_id=registrant_user_id,
-            )
-            if (
-                state_data.is_admin_registrar
-                and initiator_telegram_id != registrant_user_id
-            ):
-                admin_notification_message += _(
-                    "🔑 Registered by Admin ID: {initiator_telegram_id}\n"
-                ).format(initiator_telegram_id=initiator_telegram_id)
-
-            for admin_id_val_notify in settings.admin_ids:
-                try:
-                    await bot.send_message(
-                        admin_id_val_notify, admin_notification_message.strip()
-                    )
-                except Exception as e_notify:
-                    logger.exception(
-                        "Error sending admin reg notification to %s: %s",
-                        admin_id_val_notify,
-                        e_notify,
-                    )
-
-        if artefact_data_val:
-            await _send_tt_credentials_to_user(
-                bot, registrant_user_id, user_lang_code, artefact_data_val
-            )
     else:
+        registrant_user_id = state_data.registrant_telegram_id
         logger.error(
             "TT Registration failed for %s. Detail: %s",
             state_data.name,
@@ -312,7 +339,8 @@ async def _handle_registration_continuation(
                 source_info=source_info,
             )
             logger.info(
-                "Reg request %s for TG user %s (%s) stored in DB for admin verification.",
+                "Reg request %s for TG user %s (%s) stored in DB for admin "
+                "verification.",
                 current_request_key,
                 state_data.registrant_telegram_id,
                 state_data.name,
@@ -326,7 +354,9 @@ async def _handle_registration_continuation(
             await bot.send_message(
                 state_data.registrant_telegram_id,
                 _(
-                    "An error occurred while submitting your registration for approval. Please try again later or contact an administrator."
+                    "An error occurred while submitting your registration for "
+                    "approval. Please try again later or contact an "
+                    "administrator."
                 ),
             )
             if state:
@@ -391,7 +421,8 @@ async def _handle_registration_continuation(
     else:
         if state_data.is_admin_registrar:
             logger.info(
-                "Admin %s bypassing admin verification for user %s (registrant_id: %s).",
+                "Admin %s bypassing admin verification for user %s "
+                "(registrant_id: %s).",
                 user_object.id,
                 state_data.name,
                 state_data.registrant_telegram_id,

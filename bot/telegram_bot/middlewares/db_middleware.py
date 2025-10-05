@@ -20,29 +20,33 @@ class DbSessionMiddleware(BaseMiddleware):
         handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
         event: TelegramObject,
         data: dict[str, Any],
-    ) -> Any:
+    ) -> Any:  # noqa: ANN401
         """Provides a database session to the handler."""
         logger.debug("DbSessionMiddleware: Entered __call__")
         async with AsyncSessionLocal() as session:
             data["db_session"] = session
             try:
                 logger.debug(
-                    "DbSessionMiddleware: Passing control to handler. Event type: %s, Data keys: %s",
+                    "DbSessionMiddleware: Passing control to handler. "
+                    "Event type: %s, Data keys: %s",
                     type(event).__name__,
                     list(data.keys()),
                 )
                 result = await handler(event, data)
                 logger.debug(
-                    "DbSessionMiddleware: Handler executed successfully. Attempting to commit session."
+                    "DbSessionMiddleware: Handler executed successfully. "
+                    "Attempting to commit session."
                 )
                 await session.commit()
                 logger.debug("DbSessionMiddleware: Session committed successfully.")
-                return result
             except Exception:
                 logger.exception("Exception in handler, rolling back session:")
                 await session.rollback()
                 raise  # Re-raise the exception after rollback
+            else:
+                return result
             finally:
                 logger.debug(
-                    "DbSessionMiddleware: Exiting __call__ (session will be closed by context manager)."
+                    "DbSessionMiddleware: Exiting __call__ (session will be closed "
+                    "by context manager)."
                 )

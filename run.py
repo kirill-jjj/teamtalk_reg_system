@@ -90,17 +90,16 @@ class Application:
         self.startup_event = asyncio.Event() # Event to signal successful startup
 
     async def _remove_admin_ids_from_registrations(self) -> None:
-        """Checks for any admin IDs in the TelegramRegistration table on startup
-
-        and removes them.
-        """
+        """Checks for any admin IDs in the TelegramRegistration table on startup and removes them."""
         logger.info(
-            "Performing startup check: Verifying admin IDs are not in TelegramRegistration table..."
+            "Performing startup check: Verifying admin IDs are not in "
+            "TelegramRegistration table..."
         )
 
         if not settings.admin_ids:
             logger.info(
-                "No ADMIN_IDS configured. Skipping startup check for admin registrations."
+                "No ADMIN_IDS configured. Skipping startup check for admin "
+                "registrations."
             )
             return
 
@@ -110,7 +109,8 @@ class Application:
                 for admin_id in settings.admin_ids:
                     if await is_telegram_id_registered(session, admin_id):
                         logger.info(
-                            "Admin ID %s found in TelegramRegistration table. Attempting removal.",
+                            "Admin ID %s found in TelegramRegistration table. "
+                            "Attempting removal.",
                             admin_id,
                         )
                         deleted = await delete_telegram_registration_by_id(
@@ -118,25 +118,29 @@ class Application:
                         )
                         if deleted:
                             logger.info(
-                                "Admin ID %s successfully removed from TelegramRegistration table.",
+                                "Admin ID %s successfully removed from "
+                                "TelegramRegistration table.",
                                 admin_id,
                             )
                             removed_count += 1
                         else:
                             logger.warning(
-                                "Admin ID %s was reported as registered, but removal failed or found no rows to delete.",
+                                "Admin ID %s was reported as registered, but "
+                                "removal failed or found no rows to delete.",
                                 admin_id,
                             )
 
                 if removed_count > 0:
                     logger.info(
-                        "Startup check completed. Removed %s admin ID(s) from TelegramRegistration table.",
+                        "Startup check completed. Removed %s admin ID(s) from "
+                        "TelegramRegistration table.",
                         removed_count,
                     )
                     await session.commit()
                 else:
                     logger.info(
-                        "Startup check completed. No admin IDs found/removed from TelegramRegistration table."
+                        "Startup check completed. No admin IDs found/removed "
+                        "from TelegramRegistration table."
                     )
             except Exception:
                 logger.exception(
@@ -144,18 +148,7 @@ class Application:
                 )
                 await session.rollback()
 
-    async def startup(self) -> None:
-        """Starts up the application."""
-        logger.info("Starting application components...")
-
-        # 1. Initialize Database
-        await init_db()
-        logger.info("Database initialized.")
-
-        # 2. Run admin ID cleanup
-        await self._remove_admin_ids_from_registrations()
-
-        # 3. Initialize PyTalk Bot (TeamTalk connection)
+    async def _init_pytalk_bot(self) -> None:
         self.pytalk_bot = pytalk.TeamTalkBot(client_name=settings.client_name)
         logger.info("PyTalk bot instance created.")
 
@@ -186,7 +179,7 @@ class Application:
         )
         logger.info("PyTalk event handlers registered.")
 
-        # 4. Initialize Telegram Bot
+    async def _init_telegram_bot(self) -> None:
         self.telegram_bot, self.dispatcher = await run_telegram_bot(self.pytalk_bot)
         if self.telegram_bot:
             # Pass the Aiogram bot instance to the pytalk_bot
@@ -201,15 +194,17 @@ class Application:
                 )
             except Exception:
                 logger.exception(
-                    "Could not get Telegram bot info on startup. Deeplinks may not work."
+                    "Could not get Telegram bot info on startup. "
+                    "Deeplinks may not work."
                 )
                 self.telegram_bot.username = None
         else:
             logger.warning(
-                "Aiogram bot instance was not available. Telegram polling will not start."
+                "Aiogram bot instance was not available. "
+                "Telegram polling will not start."
             )
 
-        # 5. Start FastAPI server (if enabled)
+    async def _start_fastapi_server(self) -> None:
         if settings.web_registration_enabled:
             ssl_config = {}
             if settings.web_app_ssl_enabled:
@@ -225,7 +220,8 @@ class Application:
                     )
                 else:
                     logger.warning(
-                        "SSL enabled in config, but key/cert files not found. Key: %s, Cert: %s. FastAPI will run without SSL.",
+                        "SSL enabled in config, but key/cert files not found. "
+                        "Key: %s, Cert: %s. FastAPI will run without SSL.",
                         key_path,
                         cert_path,
                     )
@@ -257,7 +253,7 @@ class Application:
                 "WEB_REGISTRATION_ENABLED is false. FastAPI server will not be started."
             )
 
-        # 6. Start TeamTalk Service
+    async def _start_teamtalk_service(self) -> None:
         self.tasks.append(
             asyncio.create_task(
                 launch_teamtalk_service(
@@ -278,7 +274,7 @@ class Application:
             )
         )
 
-        # 6. Start Telegram Polling
+    async def _start_telegram_polling(self) -> None:
         if self.telegram_bot and self.dispatcher:
             self.tasks.append(
                 asyncio.create_task(
@@ -288,17 +284,47 @@ class Application:
             )
         else:
             logger.error(
-                "Telegram Bot or Dispatcher not initialized. Telegram polling will not start."
+                "Telegram Bot or Dispatcher not initialized. "
+                "Telegram polling will not start."
             )
 
-        # 7. Start periodic database cleanup task
+    async def _start_periodic_database_cleanup(self) -> None:
         self.tasks.append(
             asyncio.create_task(
-                periodic_database_cleanup(),  # No db_ready_event needed now
+                periodic_database_cleanup(),
                 name="DatabaseCleanupTask",
             )
         )
         logger.info("Periodic database cleanup task created.")
+
+    async def startup(self) -> None:
+        """Starts up the application."""
+        logger.info("Starting application components...")
+
+        # 1. Initialize Database
+        await init_db()
+        logger.info("Database initialized.")
+
+        # 2. Run admin ID cleanup
+        await self._remove_admin_ids_from_registrations()
+
+        # 3. Initialize PyTalk Bot
+        await self._init_pytalk_bot()
+
+        # 4. Initialize Telegram Bot
+        await self._init_telegram_bot()
+
+        # 5. Start FastAPI server (if enabled)
+        await self._start_fastapi_server()
+
+        # 6. Start TeamTalk Service
+        await self._start_teamtalk_service()
+
+        # 7. Start Telegram Polling
+        await self._start_telegram_polling()
+
+        # 8. Start periodic database cleanup task
+        await self._start_periodic_database_cleanup()
 
         self.startup_event.set()  # Signal that all core components are started
 

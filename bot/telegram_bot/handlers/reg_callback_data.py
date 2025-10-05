@@ -24,7 +24,8 @@ class AdminVerificationCallback(
     """Callback data for admin verification."""
 
     action: str  # e.g., "verify", "reject"
-    request_key: str  # Corresponds to the string key in pending_telegram_registrations table
+    request_key: str  # Corresponds to the string key in
+    # pending_telegram_registrations table
 
 
 class TTAccountTypeCallback(CallbackData, prefix="reg_tt_type"):  # Changed prefix

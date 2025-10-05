@@ -38,7 +38,7 @@ def run_command(command: list[str]) -> None:
     print(f"▶️  Executing: {' '.join(command)}")
     try:
         # Explicit and safe subprocess call
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603
             command,
             check=True,  # Raise an exception on error
             text=True,

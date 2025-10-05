@@ -25,7 +25,8 @@ async def run_telegram_bot(
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
     dp["dispatcher"] = dp
-    dp["pytalk_bot_instance"] = pytalk_bot_instance  # Pass pytalk_bot_instance to dispatcher context
+    dp["pytalk_bot_instance"] = pytalk_bot_instance  # Pass pytalk_bot_instance
+    # to dispatcher context
 
     # Register DbSessionMiddleware
     dp.update.outer_middleware(DbSessionMiddleware())
