@@ -1,3 +1,4 @@
+"""This module is the main entry point for the application."""
 import argparse
 import asyncio
 import functools
@@ -78,7 +79,8 @@ class Application:
     FastAPI server, TeamTalk connection, and background tasks.
     """
 
-    def __init__(self, test_run: bool = False):
+    def __init__(self, *, test_run: bool = False) -> None:
+        """Initializes the application."""
         self.test_run = test_run
         self.telegram_bot: AiogramBot | None = None
         self.dispatcher: Dispatcher | None = None
@@ -87,8 +89,9 @@ class Application:
         self.tasks: list[asyncio.Task] = []
         self.startup_event = asyncio.Event() # Event to signal successful startup
 
-    async def _remove_admin_ids_from_registrations(self):
+    async def _remove_admin_ids_from_registrations(self) -> None:
         """Checks for any admin IDs in the TelegramRegistration table on startup
+
         and removes them.
         """
         logger.info(
@@ -107,38 +110,42 @@ class Application:
                 for admin_id in settings.admin_ids:
                     if await is_telegram_id_registered(session, admin_id):
                         logger.info(
-                            f"Admin ID {admin_id} found in TelegramRegistration table. Attempting removal."
+                            "Admin ID %s found in TelegramRegistration table. Attempting removal.",
+                            admin_id,
                         )
                         deleted = await delete_telegram_registration_by_id(
                             session, admin_id
                         )
                         if deleted:
                             logger.info(
-                                f"Admin ID {admin_id} successfully removed from TelegramRegistration table."
+                                "Admin ID %s successfully removed from TelegramRegistration table.",
+                                admin_id,
                             )
                             removed_count += 1
                         else:
                             logger.warning(
-                                f"Admin ID {admin_id} was reported as registered, but removal failed or found no rows to delete."
+                                "Admin ID %s was reported as registered, but removal failed or found no rows to delete.",
+                                admin_id,
                             )
 
                 if removed_count > 0:
                     logger.info(
-                        f"Startup check completed. Removed {removed_count} admin ID(s) from TelegramRegistration table."
+                        "Startup check completed. Removed %s admin ID(s) from TelegramRegistration table.",
+                        removed_count,
                     )
                     await session.commit()
                 else:
                     logger.info(
                         "Startup check completed. No admin IDs found/removed from TelegramRegistration table."
                     )
-            except Exception as e:
-                logger.error(
-                    f"Error during startup check for admin registrations: {e}",
-                    exc_info=True,
+            except Exception:
+                logger.exception(
+                    "Error during startup check for admin registrations:"
                 )
                 await session.rollback()
 
-    async def startup(self):
+    async def startup(self) -> None:
+        """Starts up the application."""
         logger.info("Starting application components...")
 
         # 1. Initialize Database
@@ -154,15 +161,29 @@ class Application:
 
         # Register PyTalk event handlers
         self.pytalk_bot.on_ready = functools.partial(on_ready, self.pytalk_bot)
-        self.pytalk_bot.on_my_login = functools.partial(on_my_login, self.pytalk_bot)
+        self.pytalk_bot.on_my_login = functools.partial(
+            on_my_login, self.pytalk_bot
+        )
         self.pytalk_bot.on_message = functools.partial(on_message, self.pytalk_bot)
         self.pytalk_bot.on_error = functools.partial(on_error, self.pytalk_bot)
-        self.pytalk_bot.on_my_connect = functools.partial(on_my_connect, self.pytalk_bot)
-        self.pytalk_bot.on_my_disconnect = functools.partial(on_my_disconnect, self.pytalk_bot)
-        self.pytalk_bot.on_my_connection_lost = functools.partial(on_my_connection_lost, self.pytalk_bot)
-        self.pytalk_bot.on_my_kicked_from_channel = functools.partial(on_my_kicked_from_channel, self.pytalk_bot)
-        self.pytalk_bot.on_user_account_new = functools.partial(on_user_account_new, self.pytalk_bot)
-        self.pytalk_bot.on_user_account_remove = functools.partial(on_user_account_remove, self.pytalk_bot)
+        self.pytalk_bot.on_my_connect = functools.partial(
+            on_my_connect, self.pytalk_bot
+        )
+        self.pytalk_bot.on_my_disconnect = functools.partial(
+            on_my_disconnect, self.pytalk_bot
+        )
+        self.pytalk_bot.on_my_connection_lost = functools.partial(
+            on_my_connection_lost, self.pytalk_bot
+        )
+        self.pytalk_bot.on_my_kicked_from_channel = functools.partial(
+            on_my_kicked_from_channel, self.pytalk_bot
+        )
+        self.pytalk_bot.on_user_account_new = functools.partial(
+            on_user_account_new, self.pytalk_bot
+        )
+        self.pytalk_bot.on_user_account_remove = functools.partial(
+            on_user_account_remove, self.pytalk_bot
+        )
         logger.info("PyTalk event handlers registered.")
 
         # 4. Initialize Telegram Bot
@@ -175,15 +196,18 @@ class Application:
                 bot_info = await self.telegram_bot.get_me()
                 self.telegram_bot.username = bot_info.username
                 logger.info(
-                    f"Telegram bot username '{bot_info.username}' cached successfully."
+                    "Telegram bot username '%s' cached successfully.",
+                    bot_info.username,
                 )
-            except Exception as e:
-                logger.error(
-                    f"Could not get Telegram bot info on startup. Deeplinks may not work. Error: {e}"
+            except Exception:
+                logger.exception(
+                    "Could not get Telegram bot info on startup. Deeplinks may not work."
                 )
                 self.telegram_bot.username = None
         else:
-            logger.warning("Aiogram bot instance was not available. Telegram polling will not start.")
+            logger.warning(
+                "Aiogram bot instance was not available. Telegram polling will not start."
+            )
 
         # 5. Start FastAPI server (if enabled)
         if settings.web_registration_enabled:
@@ -194,10 +218,16 @@ class Application:
                 if key_path.exists() and cert_path.exists():
                     ssl_config["ssl_keyfile"] = str(key_path)
                     ssl_config["ssl_certfile"] = str(cert_path)
-                    logger.info(f"SSL enabled for FastAPI. Key: {key_path}, Cert: {cert_path}")
+                    logger.info(
+                        "SSL enabled for FastAPI. Key: %s, Cert: %s",
+                        key_path,
+                        cert_path,
+                    )
                 else:
                     logger.warning(
-                        f"SSL enabled in config, but key/cert files not found. Key: {key_path}, Cert: {cert_path}. FastAPI will run without SSL."
+                        "SSL enabled in config, but key/cert files not found. Key: %s, Cert: %s. FastAPI will run without SSL.",
+                        key_path,
+                        cert_path,
                     )
 
             uvicorn_config = uvicorn.Config(
@@ -211,18 +241,27 @@ class Application:
                 **ssl_config,
             )
             self.fastapi_server = uvicorn.Server(config=uvicorn_config)
-            self.tasks.append(asyncio.create_task(self.fastapi_server.serve(), name="FastAPIServer"))
+            self.tasks.append(
+                asyncio.create_task(
+                    self.fastapi_server.serve(), name="FastAPIServer"
+                )
+            )
             logger.info(
-                f"FastAPI app starting on http{'s' if ssl_config else ''}://{settings.web_app_host}:{settings.web_app_port}"
+                "FastAPI app starting on http%s://%s:%s",
+                "s" if ssl_config else "",
+                settings.web_app_host,
+                settings.web_app_port,
             )
         else:
-            logger.info("WEB_REGISTRATION_ENABLED is false. FastAPI server will not be started.")
+            logger.info(
+                "WEB_REGISTRATION_ENABLED is false. FastAPI server will not be started."
+            )
 
         # 6. Start TeamTalk Service
         self.tasks.append(
             asyncio.create_task(
                 launch_teamtalk_service(
-                    pytalk_bot_instance=self.pytalk_bot, # Pass the instance
+                    pytalk_bot_instance=self.pytalk_bot,  # Pass the instance
                     host_name=settings.host_name,
                     tcp_port=settings.port,
                     udp_port=settings.udp_port,
@@ -248,26 +287,29 @@ class Application:
                 )
             )
         else:
-            logger.error("Telegram Bot or Dispatcher not initialized. Telegram polling will not start.")
+            logger.error(
+                "Telegram Bot or Dispatcher not initialized. Telegram polling will not start."
+            )
 
         # 7. Start periodic database cleanup task
         self.tasks.append(
             asyncio.create_task(
-                periodic_database_cleanup(), # No db_ready_event needed now
+                periodic_database_cleanup(),  # No db_ready_event needed now
                 name="DatabaseCleanupTask",
             )
         )
         logger.info("Periodic database cleanup task created.")
 
-        self.startup_event.set() # Signal that all core components are started
+        self.startup_event.set()  # Signal that all core components are started
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
+        """Shuts down the application."""
         logger.info("Shutting down application components...")
 
         # 1. Cancel all running tasks
         for task in self.tasks:
             if not task.done():
-                logger.info(f"Cancelling task: {task.get_name()}")
+                logger.info("Cancelling task: %s", task.get_name())
                 task.cancel()
 
         # Await tasks to allow them to handle cancellation
@@ -284,7 +326,7 @@ class Application:
 
         # 3. Close TeamTalk connection
         if self.pytalk_bot:
-            await close_teamtalk_connection(self.pytalk_bot) # Pass the instance
+            await close_teamtalk_connection(self.pytalk_bot)  # Pass the instance
             logger.info("PyTalk bot connection closed.")
         else:
             logger.info("PyTalk bot instance not initialized, no need to close.")
@@ -295,7 +337,8 @@ class Application:
 
         logger.info("Application shutdown complete.")
 
-    async def run(self):
+    async def run(self) -> None:
+        """Runs the application."""
         try:
             await self.startup()
             if self.test_run:
@@ -307,15 +350,16 @@ class Application:
 
         except asyncio.CancelledError:
             logger.info("Application run cancelled.")
-        except Exception as e:
-            logger.exception(f"Unhandled exception during application run: {e}")
+        except Exception:
+            logger.exception("Unhandled exception during application run:")
         finally:
             await self.shutdown()
 
 
-async def main():
-    logger.info(f"Application starting with arguments: {sys.argv}")
-    logger.info(f"NICK_NAME from config: {settings.nick_name}")
+async def main() -> None:
+    """The main function of the application."""
+    logger.info("Application starting with arguments: %s", sys.argv)
+    logger.info("NICK_NAME from config: %s", settings.nick_name)
 
     app = Application(test_run=args.test_run)
     await app.run()
@@ -328,15 +372,19 @@ if __name__ == "__main__":
             uvloop.install()
             logger.info("uvloop installed as the asyncio event loop policy.")
         except ImportError:
-            logger.warning("uvloop could not be imported. Using default asyncio event loop.")
-        except Exception as e:
-            logger.warning(f"Failed to install uvloop: {e}")
+            logger.warning(
+                "uvloop could not be imported. Using default asyncio event loop."
+            )
+        except Exception:
+            logger.exception("Failed to install uvloop:")
     else:
-        logger.info("uvloop is not installed/used on Windows. Using default asyncio event loop.")
+        logger.info(
+            "uvloop is not installed/used on Windows. Using default asyncio event loop."
+        )
 
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         print("Application terminated by user (Ctrl+C).")
-    except Exception as e:
-        print(f"CRITICAL: Critical error during asyncio.run: {e}", file=sys.stderr)
+    except Exception:
+        logger.exception("CRITICAL: Critical error during asyncio.run:")

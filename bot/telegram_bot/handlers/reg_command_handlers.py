@@ -1,3 +1,4 @@
+"""This module handles commands for the registration flow."""
 import logging
 
 from aiogram import Bot as AiogramBot
@@ -29,13 +30,25 @@ def get_language_keyboard_builder() -> InlineKeyboardBuilder:
     if available_langs:
         for lang_info in available_langs:
             button_text = lang_info['native_name'] if lang_info['native_name'] else lang_info['code'].upper()
-            builder.button(text=button_text, callback_data=LanguageCallback(action="select", language_code=lang_info['code']))
+            builder.button(
+                text=button_text,
+                callback_data=LanguageCallback(
+                    action="select", language_code=lang_info["code"]
+                ),
+            )
     else: # Fallback if no languages are configured
-        logger.error("No languages discovered for Telegram language selection. Defaulting to English for keyboard.")
-        builder.button(text="English", callback_data=LanguageCallback(action="select", language_code="en"))
+        logger.error(
+            "No languages discovered for Telegram language selection. Defaulting to English for keyboard."
+        )
+        builder.button(
+            text="English",
+            callback_data=LanguageCallback(action="select", language_code="en"),
+        )
     return builder
 
-async def determine_user_language(telegram_id: int, state: FSMContext, db_session: AsyncSession) -> str:
+async def determine_user_language(
+    telegram_id: int, state: FSMContext, db_session: AsyncSession
+) -> str:
     """Determines user language, falling back to Telegram's lang_code or admin default."""
     # This is a simplified version. A more robust version might query user preferences from DB.
     data = await state.get_data()
@@ -46,8 +59,9 @@ async def determine_user_language(telegram_id: int, state: FSMContext, db_sessio
         # This helper might be called from contexts where it's not.
         # Let's assume if no selected_language, we default to admin lang for now or a broad default.
         # In start_command_handler, message.from_user.language_code can be used before calling this.
-        user_lang_code = settings.bot_admin_lang # Fallback, should be improved if user-specific preferred lang is available
-        # logger.info(f"User language not in state for {telegram_id}, defaulting to {user_lang_code}.")
+        user_lang_code = (
+            settings.bot_admin_lang
+        )  # Fallback, should be improved if user-specific preferred lang is available
     return user_lang_code
 
 
@@ -58,7 +72,8 @@ async def start_command_handler(
     state: FSMContext,
     bot: AiogramBot,
     db_session: AsyncSession,
-):
+) -> None:
+    """Handles the /start command."""
     args = command.args
     user = message.from_user
     telegram_id = user.id
@@ -70,7 +85,11 @@ async def start_command_handler(
     )
     _ = get_translator(initial_lang_code)
 
-    logger.info("User %s initiated /start command. Args: '%s'", telegram_id, args if args else None)
+    logger.info(
+        "User %s initiated /start command. Args: '%s'",
+        telegram_id,
+        args if args else None,
+    )
 
     state_data = RegistrationStateData(
         registrant_telegram_id=telegram_id, selected_language=initial_lang_code
@@ -79,7 +98,9 @@ async def start_command_handler(
     if args:  # A token is present in the /start command (deeplink)
         if not settings.telegram_deeplink_registration_enabled:
             logger.info(
-                "User %s attempted to use deeplink '%s' but feature is disabled.", telegram_id, args
+                "User %s attempted to use deeplink '%s' but feature is disabled.",
+                telegram_id,
+                args,
             )
             return
 
@@ -91,7 +112,9 @@ async def start_command_handler(
 
             if await is_telegram_id_registered(db_session, telegram_id):
                 await message.answer(
-                    _("You have already registered. This link cannot be used to register again.")
+                    _(
+                        "You have already registered. This link cannot be used to register again."
+                    )
                 )
                 await state.clear()
                 return
@@ -102,7 +125,10 @@ async def start_command_handler(
             await state.set_data(state_data.model_dump())
 
             logger.info(
-                "Deeplink registration started for user %s with token %s. Language set to %s.", telegram_id, token_str, initial_lang_code
+                "Deeplink registration started for user %s with token %s. Language set to %s.",
+                telegram_id,
+                token_str,
+                initial_lang_code,
             )
 
             await state.set_state(RegistrationStates.choosing_language)
@@ -112,7 +138,11 @@ async def start_command_handler(
             )
             return
 
-            logger.warning("User %s used invalid/expired/used deeplink token: %s", telegram_id, token_str)
+        logger.warning(
+            "User %s used invalid/expired/used deeplink token: %s",
+            telegram_id,
+            token_str,
+        )
         await message.answer(
             _("This registration link is invalid, expired, or has already been used.")
         )
@@ -121,13 +151,19 @@ async def start_command_handler(
 
     if not settings.telegram_public_registration_enabled:
         logger.info(
-            "User %s attempted public /start but feature is disabled. Ignoring.", telegram_id
+            "User %s attempted public /start but feature is disabled. Ignoring.",
+            telegram_id,
         )
         return
 
     state_data.is_admin_registrar = telegram_id in settings.admin_ids
     await state.set_data(state_data.model_dump())
-    logger.info("User %s starting public registration. Admin registrar: %s. Language set to %s.", telegram_id, state_data.is_admin_registrar, initial_lang_code)
+    logger.info(
+        "User %s starting public registration. Admin registrar: %s. Language set to %s.",
+        telegram_id,
+        state_data.is_admin_registrar,
+        initial_lang_code,
+    )
 
     if not state_data.is_admin_registrar and await is_telegram_id_registered(
         db_session, telegram_id
@@ -147,7 +183,11 @@ async def start_command_handler(
         translated_prompt = _f(prompt_key)
 
         if translated_prompt != prompt_key or forced_lang_code == "en":
-            logger.info("Forcing language to '%s' for user %s (public start) based on config.", forced_lang_code, telegram_id)
+            logger.info(
+                "Forcing language to '%s' for user %s (public start) based on config.",
+                forced_lang_code,
+                telegram_id,
+            )
             state_data.selected_language = forced_lang_code
             await state.set_data(state_data.model_dump())
             _ = _f
@@ -155,7 +195,8 @@ async def start_command_handler(
             await state.set_state(RegistrationStates.awaiting_username)
             return
         logger.warning(
-            "FORCE_USER_LANG was set to '%s', but this language pack seems unavailable or incomplete. Proceeding with language selection for public start.", forced_lang_code
+            "FORCE_USER_LANG was set to '%s', but this language pack seems unavailable or incomplete. Proceeding with language selection for public start.",
+            forced_lang_code,
         )
 
     await message.reply(
@@ -165,4 +206,6 @@ async def start_command_handler(
     await state.set_state(RegistrationStates.choosing_language)
 
 
-logger.info("Registration command handlers configured with CommandStart and deeplink logic.")
+logger.info(
+    "Registration command handlers configured with CommandStart and deeplink logic."
+)

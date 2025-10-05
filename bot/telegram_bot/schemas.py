@@ -1,3 +1,4 @@
+"""This module contains the Pydantic models for the Telegram bot."""
 from pydantic import BaseModel
 
 

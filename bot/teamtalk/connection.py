@@ -60,7 +60,8 @@ async def initialize_teamtalk_connection(
         await pytalk_bot_instance.add_server(server_info_pytalk)
 
         if not (
-            pytalk_bot_instance.teamtalks and pytalk_bot_instance.teamtalks[-1].logged_in
+            pytalk_bot_instance.teamtalks
+            and pytalk_bot_instance.teamtalks[-1].logged_in
         ):
             logger.error(
                 "Failed to connect or login to TeamTalk server: %s",
@@ -255,7 +256,10 @@ async def launch_teamtalk_service(
 
 
 async def _shutdown_and_remove_instance(
-    pytalk_bot_instance: pytalk.TeamTalkBot, server_key: str, host_name: str, tcp_port: int
+    pytalk_bot_instance: pytalk.TeamTalkBot,
+    server_key: str,
+    host_name: str,
+    tcp_port: int,
 ) -> None:
     """Finds, shuts down, and removes a specific TeamTalk instance."""
     instance_to_remove_idx = -1
@@ -342,7 +346,9 @@ async def force_restart_instance_on_event(
         )
         return
 
-    logger.info("Starting forceful instance restart process for server %s...", server_key)
+    logger.info(
+        "Starting forceful instance restart process for server %s...", server_key
+    )
 
     async def restart_task() -> None:
         await _shutdown_and_remove_instance(

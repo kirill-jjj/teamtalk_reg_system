@@ -270,7 +270,8 @@ def create_client_zip_for_user(
                     TEAMTALK_INI_FILENAME_IN_ZIP,
                 )
                 final_zip_out.writestr(
-                    TEAMTALK_INI_FILENAME_IN_ZIP, modified_ini_content.encode('utf-8-sig')
+                    TEAMTALK_INI_FILENAME_IN_ZIP,
+                    modified_ini_content.encode('utf-8-sig'),
                 )
 
             # Add the user's .tt file. Determine target path within ZIP.

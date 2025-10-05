@@ -1,3 +1,4 @@
+"""This module defines the FSM states for the Telegram bot."""
 from aiogram.fsm.state import State, StatesGroup
 
 

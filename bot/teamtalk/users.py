@@ -1,9 +1,10 @@
+"""This module contains functions for interacting with TeamTalk users."""
 import logging
 from typing import Any  # Added List
 
 import pytalk
 from pytalk.enums import UserType as PyTalkUserType
-from pytalk.implementation.TeamTalkPy import TeamTalk5 as sdk
+from pytalk.implementation.TeamTalkPy import TeamTalk5
 from pytalk.instance import TeamTalkInstance
 from pytalk.permission import Permission as PyTalkPermission
 
@@ -18,47 +19,66 @@ def _calculate_pytalk_user_rights(teamtalk_default_user_rights_list: list[str]) 
             permission_flag = getattr(PyTalkPermission, right_string.upper())
             pytalk_user_rights |= permission_flag
         except AttributeError:
-            logger.warning("Invalid user right string '%s' in provided list. Skipping.", right_string)
-        except Exception as e_perm:
-            logger.error("Error processing permission string '%s': %s", right_string, e_perm)
+            logger.warning(
+                "Invalid user right string '%s' in provided list. Skipping.", right_string
+            )
+        except Exception:
+            logger.exception(
+                "Error processing permission string '%s':", right_string
+            )
     return pytalk_user_rights
 
-async def _send_broadcast_message_directly(pytalk_bot_instance: pytalk.TeamTalkBot, active_server_instance: TeamTalkInstance, content: str):
+async def _send_broadcast_message_directly(
+    active_server_instance: TeamTalkInstance, content: str
+) -> None:
     """Workaround function to send a broadcast message by calling the SDK directly.
+
     This fixes the issue on Linux where the string is not correctly encoded.
     """
     try:
-        msg = sdk.TextMessage()
-        msg.nMsgType = sdk.TextMsgType.MSGTYPE_BROADCAST
+        msg = TeamTalk5.TextMessage()
+        msg.nMsgType = TeamTalk5.TextMsgType.MSGTYPE_BROADCAST
 
-        if hasattr(active_server_instance, 'cached_my_user_id') and active_server_instance.cached_my_user_id is not None:
+        if (
+            hasattr(active_server_instance, "cached_my_user_id")
+            and active_server_instance.cached_my_user_id is not None
+        ):
             msg.nFromUserID = active_server_instance.cached_my_user_id
         else:
-            logger.warning("Bot UserID not found in cache. Fetching from server (fallback).")
+            logger.warning(
+                "Bot UserID not found in cache. Fetching from server (fallback)."
+            )
             msg.nFromUserID = active_server_instance.getMyUserID()
 
-        if hasattr(active_server_instance, 'cached_my_user_account') and active_server_instance.cached_my_user_account:
+        if (
+            hasattr(active_server_instance, "cached_my_user_account")
+            and active_server_instance.cached_my_user_account
+        ):
             my_account = active_server_instance.cached_my_user_account
             msg.szFromUsername = my_account.szUsername
         else:
-            logger.warning("Bot UserAccount not found in cache. Fetching from server (fallback).")
+            logger.warning(
+                "Bot UserAccount not found in cache. Fetching from server (fallback)."
+            )
             my_account = active_server_instance.getMyUserAccount()
             if my_account:
                 msg.szFromUsername = my_account.szUsername
             else:
-                logger.error("Could not retrieve own user account for broadcast message (cache and fallback failed). Using default 'Bot'.")
-                msg.szFromUsername = sdk.ttstr("Bot")
+                logger.error(
+                    "Could not retrieve own user account for broadcast message (cache and fallback failed). Using default 'Bot'."
+                )
+                msg.szFromUsername = TeamTalk5.ttstr("Bot")
 
         msg.nToUserID = 0
         msg.nChannelID = 0
-        msg.szMessage = sdk.ttstr(content)
+        msg.szMessage = TeamTalk5.ttstr(content)
         msg.bMore = False
 
         active_server_instance.doTextMessage(msg)
         logger.info("Broadcast message for user sent directly via SDK: '%s'", content)
 
-    except Exception as e:
-        logger.error("Failed to send broadcast message directly via SDK: %s", e, exc_info=True)
+    except Exception:
+        logger.exception("Failed to send broadcast message directly via SDK:")
 
 
 async def _handle_registration_broadcast(

@@ -34,11 +34,7 @@ except NameError:
     POT_FILE = LOCALE_DIR / f"{LOCALE_DOMAIN}.pot"
 
 def run_command(command: list[str]) -> None:
-    """Executes an external command and handles errors. (DRY principle)
-
-    Args:
-        command: The command and its arguments as a list.
-    """
+    """Executes an external command and handles errors. (DRY principle)."""
     print(f"▶️  Executing: {' '.join(command)}")
     try:
         # Explicit and safe subprocess call
@@ -47,8 +43,9 @@ def run_command(command: list[str]) -> None:
             check=True,  # Raise an exception on error
             text=True,
             capture_output=True,
-            encoding='utf-8',
-            cwd=BASE_DIR # Ensure commands run from project root
+            encoding="utf-8",
+            cwd=BASE_DIR,  # Ensure commands run from project root
+            shell=False,
         )
         # Print stdout if it exists (useful for compile --statistics)
         if result.stdout:
@@ -60,7 +57,8 @@ def run_command(command: list[str]) -> None:
             f"❌ Error: Command '{command[0]}' not found.",
             "Ensure that Babel is installed (`pip install Babel`)",
             "and that the path to 'pybabel' is in the PATH environment variable.",
-            sep="\n", file=sys.stderr
+            sep="\n",
+            file=sys.stderr,
         )
         sys.exit(1)
     except subprocess.CalledProcessError as e:
@@ -70,7 +68,8 @@ def run_command(command: list[str]) -> None:
             "--- stderr output: ---",
             e.stderr.strip(),
             "-----------------------",
-            sep="\n", file=sys.stderr
+            sep="\n",
+            file=sys.stderr,
         )
         sys.exit(1)
 
@@ -93,7 +92,10 @@ def update_catalogs() -> None:
     # Ensure LOCALE_DIR exists before trying to update,
     # though Babel might create it for 'init' but not always for 'update'.
     if not LOCALE_DIR.exists():
-        print(f"ℹ️ Locale directory '{LOCALE_DIR.relative_to(BASE_DIR)}' does not exist. Skipping update or create it and language subdirectories.")
+        print(
+            f"ℹ️ Locale directory '{LOCALE_DIR.relative_to(BASE_DIR)}' does not exist. "
+            "Skipping update or create it and language subdirectories."
+        )
         return
 
     command = [
@@ -110,7 +112,10 @@ def update_catalogs() -> None:
 def compile_catalogs() -> None:
     """Compiles .po files into binary .mo files."""
     if not LOCALE_DIR.exists():
-        print(f"ℹ️ Locale directory '{LOCALE_DIR.relative_to(BASE_DIR)}' does not exist. Skipping compilation.")
+        print(
+            f"ℹ️ Locale directory '{LOCALE_DIR.relative_to(BASE_DIR)}' does not exist. "
+            "Skipping compilation."
+        )
         return
 
     command = [
