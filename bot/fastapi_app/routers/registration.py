@@ -1,10 +1,11 @@
 """FastAPI routes for user registration."""
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 import logging
 from typing import Any
 
+import aiofiles
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from pytalk.enums import UserType as PyTalkUserType
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -104,7 +105,7 @@ async def _prepare_downloadables_for_web(
     artefact_data: TeamTalkRegistrationArtefacts,
     db: AsyncSession,
 ) -> dict[str, Any]:
-        user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
+    user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     connection_info = TTConnectionInfo(
         server_name=artefact_data.server_name,
         host=artefact_data.effective_hostname,
@@ -222,7 +223,7 @@ async def set_language_and_reload(
 
 
 @router.get("/register")
-async def register_page_get(request: Request) -> templates.TemplateResponse:
+async def register_page_get(request: Request) -> Response:
     """Displays the registration page."""
     effective_lang_code = DEFAULT_LANG_CODE
     language_is_forced = False
@@ -276,7 +277,7 @@ async def register_page_post(
     username: str = Form(...),
     password: str = Form(...),
     nickname: str | None = Form(None),
-) -> templates.TemplateResponse:
+) -> Response:
     payload = RegistrationPayload(
         username=username, password=password, nickname=nickname
     )

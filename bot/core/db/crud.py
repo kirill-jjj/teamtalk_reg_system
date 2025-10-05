@@ -59,7 +59,7 @@ async def add_telegram_registration(
         )
         await session.rollback()  # Rollback before re-raising for clarity
         raise
-    except Exception as e:
+    except Exception:
         logger.exception(
             "Error adding Telegram registration to session for %s (username: %s):",
             telegram_id, teamtalk_username

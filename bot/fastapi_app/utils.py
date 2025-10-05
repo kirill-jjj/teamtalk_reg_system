@@ -1,5 +1,6 @@
 """Utility functions for the FastAPI application."""
 import configparser  # For modify_teamtalk_ini_from_template
+import contextlib
 import io  # For modify_teamtalk_ini_from_template
 import logging
 import os
@@ -9,6 +10,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import (
     FastAPI,
+    Request,
 )
 
 from bot.core.config import settings
