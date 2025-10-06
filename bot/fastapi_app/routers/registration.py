@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 import logging
 
 import aiofiles
+import pytalk
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from pytalk.enums import UserType as PyTalkUserType
@@ -22,12 +23,7 @@ from bot.core.localization import (
     get_available_languages_for_display,
     get_translator,
 )
-from bot.fastapi_app.schemas import (
-    Downloadables,
-    RegistrationPayload,
-    TeamTalkRegistrationArtefacts,
-)
-from bot.fastapi_app.utils import (
+from bot.fastapi_app.helpers import (
     create_client_zip_for_user,
     generate_random_token,
     get_generated_files_path,
@@ -35,9 +31,18 @@ from bot.fastapi_app.utils import (
     get_user_ip_fastapi,
     schedule_temp_file_deletion,
 )
+from bot.fastapi_app.schemas import (
+    Downloadables,
+    RegistrationPayload,
+)
 from bot.teamtalk import users as teamtalk_users_service
 from bot.utils.file_generator import generate_tt_file_content, generate_tt_link
-from bot.utils.schemas import TTConnectionInfo, TTUserInfo, WebSourceInfo
+from bot.utils.schemas import (
+    TeamTalkRegistrationArtefacts,
+    TTConnectionInfo,
+    TTUserInfo,
+    WebSourceInfo,
+)
 
 # Import DB dependency and CRUD functions
 from ..dependencies import get_db_session
@@ -52,6 +57,7 @@ async def _execute_tt_registration_for_web(
     password: str,
     nickname: str | None,
     source_info_data: dict,
+    pytalk_bot_instance: pytalk.TeamTalkBot,
 ) -> tuple[bool, TeamTalkRegistrationArtefacts | None]:
     # Return success status and artefact_data
     try:
@@ -65,6 +71,7 @@ async def _execute_tt_registration_for_web(
 
         reg_success_bool, _msg_key, tt_artefact_data = (
             await teamtalk_users_service.perform_teamtalk_registration(
+                pytalk_bot_instance,
                 username_str=username,
                 password_str=password,
                 usertype_to_create=PyTalkUserType.DEFAULT,  # Explicitly default for web
@@ -88,14 +95,15 @@ async def _execute_tt_registration_for_web(
                 username,
             )
             return False, None
-        logger.info("TeamTalk registration successful for user %s via web.", username)
-        return True, TeamTalkRegistrationArtefacts(**tt_artefact_data)
     except Exception:
         logger.exception(
             "Exception during TeamTalk registration for web user %s:",
             username,
         )
         return False, None
+    else:
+        logger.info("TeamTalk registration successful for user %s via web.", username)
+        return True, tt_artefact_data
 
 
 
@@ -121,7 +129,7 @@ async def _prepare_downloadables_for_web(
 
     tt_content = generate_tt_file_content(connection_info, user_info)
     tt_file_name_for_user = f"{artefact_data.server_name}.tt"
-    tt_file_path = get_generated_files_path(request.app) / tt_file_name_for_user
+    tt_file_path = get_generated_files_path() / tt_file_name_for_user
 
     try:
         async with aiofiles.open(tt_file_path, mode="w", encoding="utf-8") as f:
@@ -300,7 +308,7 @@ async def register_page_post(
 
     try:
         username_exists = await teamtalk_users_service.check_username_exists(
-            username=payload.username
+            pytalk_bot_instance, username=payload.username
         )
         if username_exists is True:
             logger.warning(
@@ -349,6 +357,7 @@ async def register_page_post(
         user_lang=user_lang_code,
         nickname=final_nickname,
     )
+    pytalk_bot_instance = request.app.state.pytalk_bot_instance
 
     (
         registration_successful,
@@ -358,6 +367,7 @@ async def register_page_post(
         password=payload.password,
         nickname=final_nickname,
         source_info_data=source_info_data.model_dump(exclude_unset=True),
+        pytalk_bot_instance=pytalk_bot_instance,
     )
 
     if not registration_successful or not tt_artefact_data_from_reg:
@@ -457,7 +467,7 @@ async def download_tt_file(
     if token_info_model and token_info_model.token_type == "tt_config":  # noqa: S105
         server_filename = token_info_model.filepath_on_server
         user_download_filename = token_info_model.original_filename
-        file_path = get_generated_files_path(request.app) / server_filename
+        file_path = get_generated_files_path() / server_filename
 
         if file_path.exists():
             await mark_fastapi_download_token_used(db, token)
@@ -487,7 +497,7 @@ async def download_client_zip_file(
     if token_info_model and token_info_model.token_type == "client_zip":  # noqa: S105
         server_filename = token_info_model.filepath_on_server
         user_download_filename = token_info_model.original_filename
-        file_path = get_generated_zips_path(request.app) / server_filename
+        file_path = get_generated_zips_path() / server_filename
 
         if file_path.exists():
             await mark_fastapi_download_token_used(db, token)

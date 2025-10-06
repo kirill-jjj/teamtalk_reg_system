@@ -312,6 +312,7 @@ class Application:
 
         # 3. Initialize PyTalk Bot
         await self._init_pytalk_bot()
+        fastapi_app.state.pytalk_bot_instance = self.pytalk_bot
 
         # 4. Initialize Telegram Bot
         await self._init_telegram_bot()

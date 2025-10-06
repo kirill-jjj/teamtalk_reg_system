@@ -9,18 +9,6 @@ class RegistrationPayload(BaseModel):
     nickname: str | None = None
 
 
-class TeamTalkRegistrationArtefacts(BaseModel):
-    """Schema for data returned after a successful TeamTalk registration."""
-    username: str
-    password: str
-    final_nickname: str
-    effective_hostname: str
-    server_name: str
-    tcp_port: int
-    udp_port: int
-    encrypted: bool
-
-
 class Downloadables(BaseModel):
     """Schema for downloadable artefacts after registration."""
 

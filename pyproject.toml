@@ -139,3 +139,17 @@ files = [
     "run.py",
     "manage-locales.py"
 ]
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = [
+    "pytalk",
+    "pytalk.*",
+    "aiofiles",
+    "pydantic_settings",
+    "fastapi",
+    "fastapi.*",
+    "sqlmodel",
+    "uvicorn"
+]
+ignore_missing_imports = true

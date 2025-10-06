@@ -3,6 +3,7 @@
 from datetime import UTC, datetime, timedelta
 import logging
 
+from sqlalchemy import desc
 from sqlalchemy.exc import IntegrityError as SQLAlchemyIntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import delete, select
@@ -524,7 +525,7 @@ async def is_user_banned(db_session: AsyncSession, telegram_id: int) -> bool:
 
 async def get_banned_users(db_session: AsyncSession) -> list[BannedUser]:
     """Retrieves all banned users from the database."""
-    stmt = select(BannedUser).order_by(BannedUser.banned_at.desc())
+    stmt = select(BannedUser).order_by(desc(BannedUser.banned_at))
     result = await db_session.execute(stmt)
     return list(result.scalars().all()) # Ensure it's a list, not just an iterable
 

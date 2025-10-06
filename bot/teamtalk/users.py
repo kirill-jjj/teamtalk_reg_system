@@ -1,12 +1,13 @@
 """This module contains functions for interacting with TeamTalk users."""
 import logging
-from typing import Any  # Added List
 
 import pytalk
 from pytalk.enums import UserType as PyTalkUserType
 from pytalk.implementation.TeamTalkPy import TeamTalk5
 from pytalk.instance import TeamTalkInstance
 from pytalk.permission import Permission as PyTalkPermission
+
+from bot.utils.schemas import TeamTalkRegistrationArtefacts
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +186,7 @@ async def perform_teamtalk_registration(
     nickname_str: str | None = None,
     source_info: dict | None = None,
     broadcast_message_text: str | None = None,
-) -> tuple[bool, str | None, dict[str, Any] | None]:
+) -> tuple[bool, str | None, TeamTalkRegistrationArtefacts | None]:
     """Performs the TeamTalk registration."""
     if not pytalk_bot_instance.teamtalks:
         logger.error(
@@ -253,16 +254,16 @@ async def perform_teamtalk_registration(
         effective_hostname = (
             teamtalk_public_hostname if teamtalk_public_hostname else host_name
         )
-        artefact_data = {
-            "username": username_str,
-            "password": password_str,
-            "final_nickname": final_nickname,
-            "effective_hostname": effective_hostname,
-            "server_name": server_name,
-            "tcp_port": tcp_port,
-            "udp_port": udp_port,
-            "encrypted": encrypted,
-        }
+        artefact_data = TeamTalkRegistrationArtefacts(
+            username=username_str,
+            password=password_str,
+            final_nickname=final_nickname,
+            effective_hostname=effective_hostname,
+            server_name=server_name,
+            tcp_port=tcp_port,
+            udp_port=udp_port,
+            encrypted=encrypted,
+        )
 
     except IndexError:  # Should be caught by the initial check, but as a safeguard
         logger.exception(

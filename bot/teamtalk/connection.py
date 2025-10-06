@@ -4,10 +4,12 @@ from collections.abc import Coroutine
 import logging
 
 import pytalk
-from pytalk.enums import Status, TeamTalkServerInfo
+from pytalk.enums import Status
+from pytalk.enums import TeamTalkServerInfo as PyTalkTeamTalkServerInfo
 
 from bot.core.config import settings
 
+from ..utils.schemas import TeamTalkServerInfo
 from .backoff import Backoff
 
 logger = logging.getLogger(__name__)
@@ -31,7 +33,7 @@ async def initialize_teamtalk_connection(
     bot_status_text: str,
 ) -> bool:
     """Initializes the TeamTalk connection for the bot."""
-    server_info_pytalk = TeamTalkServerInfo(
+    server_info_pytalk = PyTalkTeamTalkServerInfo(
         host=host_name,
         tcp_port=tcp_port,
         udp_port=udp_port,
@@ -43,18 +45,18 @@ async def initialize_teamtalk_connection(
         join_channel_password="",
     )
     try:
-        current_server_info_tuple = (
-            host_name,
-            tcp_port,
-            udp_port,
-            user_name,
-            password,
-            nickname,
-            encrypted,
-            join_channel_path,
-            join_channel_pass,
-            bot_gender,
-            bot_status_text,
+        server_info_model = TeamTalkServerInfo(
+            host_name=host_name,
+            tcp_port=tcp_port,
+            udp_port=udp_port,
+            user_name=user_name,
+            password=password,
+            nickname=nickname,
+            encrypted=encrypted,
+            join_channel_path=join_channel_path,
+            join_channel_pass=join_channel_pass,
+            bot_gender=bot_gender,
+            bot_status_text=bot_status_text,
         )
 
         await pytalk_bot_instance.add_server(server_info_pytalk)
@@ -102,7 +104,7 @@ async def initialize_teamtalk_connection(
             host_name,
         )
         active_server_instance = pytalk_bot_instance.teamtalks[-1]
-        active_server_instance.server_info_tuple = current_server_info_tuple
+        active_server_instance.server_info_model = server_info_model
 
         if active_server_instance.server:
             active_server_instance.server.teamtalk_instance = active_server_instance
@@ -162,8 +164,8 @@ async def close_teamtalk_connection(pytalk_bot_instance: pytalk.TeamTalkBot) -> 
     for i in range(len(pytalk_bot_instance.teamtalks) - 1, -1, -1):
         tt_instance = pytalk_bot_instance.teamtalks[i]
         host_display = "Unknown Host"
-        if hasattr(tt_instance, "server_info_tuple") and tt_instance.server_info_tuple:
-            host_display = tt_instance.server_info_tuple[0]
+        if hasattr(tt_instance, "server_info_model") and tt_instance.server_info_model:
+            host_display = tt_instance.server_info_model.host_name
         elif (
             hasattr(tt_instance, "server_info")
             and tt_instance.server_info
@@ -265,9 +267,9 @@ async def _shutdown_and_remove_instance(
     instance_to_remove_idx = -1
     for i, tt_instance in enumerate(list(pytalk_bot_instance.teamtalks)):
         instance_matches = False
-        if (hasattr(tt_instance, "server_info_tuple") and (
-            tt_instance.server_info_tuple[0] == host_name
-            and tt_instance.server_info_tuple[1] == tcp_port
+        if (hasattr(tt_instance, "server_info_model") and (
+            tt_instance.server_info_model.host_name == host_name
+            and tt_instance.server_info_model.tcp_port == tcp_port
         )) or (hasattr(tt_instance, "server_info") and (
             tt_instance.server_info.host == host_name
             and tt_instance.server_info.tcp_port == tcp_port
@@ -319,24 +321,13 @@ async def _shutdown_and_remove_instance(
 
 async def force_restart_instance_on_event(
     pytalk_bot_instance: pytalk.TeamTalkBot,
-    host_name: str,
-    tcp_port: int,
-    udp_port: int,
-    user_name: str,
-    password: str,
-    nickname: str,
-    *,
-    encrypted: bool,
-    join_channel_path: str | None,
-    join_channel_pass: str,
-    bot_gender: str,
-    bot_status_text: str,
+    server_info: TeamTalkServerInfo,
 ) -> None:
     """Forcefully restarts a TeamTalk connection instance.
 
     Typically triggered by a disconnection event.
     """
-    server_key = f"{host_name}:{tcp_port}"
+    server_key = f"{server_info.host_name}:{server_info.tcp_port}"
     if (
         server_key in active_instance_restarts
         and not active_instance_restarts[server_key].done()
@@ -352,7 +343,7 @@ async def force_restart_instance_on_event(
 
     async def restart_task() -> None:
         await _shutdown_and_remove_instance(
-            pytalk_bot_instance, server_key, host_name, tcp_port
+            pytalk_bot_instance, server_key, server_info.host_name, server_info.tcp_port
         )
 
         base_delay = getattr(settings, "TT_RECONNECT_BASE_DELAY", 5)
@@ -387,17 +378,17 @@ async def force_restart_instance_on_event(
 
             success = await initialize_teamtalk_connection(
                 pytalk_bot_instance,
-                host_name,
-                tcp_port,
-                udp_port,
-                user_name,
-                password,
-                nickname,
-                encrypted=encrypted,
-                join_channel_path=join_channel_path,
-                join_channel_pass=join_channel_pass,
-                bot_gender=bot_gender,
-                bot_status_text=bot_status_text,
+                host_name=server_info.host_name,
+                tcp_port=server_info.tcp_port,
+                udp_port=server_info.udp_port,
+                user_name=server_info.user_name,
+                password=server_info.password,
+                nickname=server_info.nickname,
+                encrypted=server_info.encrypted,
+                join_channel_path=server_info.join_channel_path,
+                join_channel_pass=server_info.join_channel_pass,
+                bot_gender=server_info.bot_gender,
+                bot_status_text=server_info.bot_status_text,
             )
 
             if success:

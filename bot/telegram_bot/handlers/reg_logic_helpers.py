@@ -1,6 +1,5 @@
 """This module contains helper functions for the registration logic."""
 import logging
-from typing import Any
 import uuid
 
 from aiogram import Bot as AiogramBot
@@ -17,7 +16,12 @@ from ...core.db import add_pending_telegram_registration, add_telegram_registrat
 from ...core.localization import get_admin_lang_code, get_translator
 from ...teamtalk import users as tt_users_service
 from ...utils.file_generator import generate_tt_file_content, generate_tt_link
-from ...utils.schemas import TelegramSourceInfo, TTConnectionInfo, TTUserInfo
+from ...utils.schemas import (
+    TeamTalkRegistrationArtefacts,
+    TelegramSourceInfo,
+    TTConnectionInfo,
+    TTUserInfo,
+)
 from ..schemas import RegistrationStateData
 from ..states import RegistrationStates
 from .reg_callback_data import AdminVerificationCallback, NicknameChoiceCallback
@@ -70,30 +74,29 @@ async def _send_tt_credentials_to_user(
     bot: AiogramBot,
     user_id_val: int,
     user_lang_code: str,
-    artefact_data: dict[str, Any],  # This comes from teamtalk_service,
-    # can be refactored later
+    artefact_data: TeamTalkRegistrationArtefacts,  # This comes from teamtalk_service,
 ) -> None:
     """Sends the .tt file and connection link to the user."""
     _ = get_translator(user_lang_code)
 
     connection_info = TTConnectionInfo(
-        server_name=artefact_data["server_name"],
-        host=artefact_data["effective_hostname"],
-        tcpport=artefact_data["tcp_port"],
-        udpport=artefact_data["udp_port"],
-        encrypted=artefact_data["encrypted"],
+        server_name=artefact_data.server_name,
+        host=artefact_data.effective_hostname,
+        tcpport=artefact_data.tcp_port,
+        udpport=artefact_data.udp_port,
+        encrypted=artefact_data.encrypted,
     )
     user_info = TTUserInfo(
-        username=artefact_data["username"],
-        password=artefact_data["password"],
-        nickname=artefact_data["final_nickname"],
+        username=artefact_data.username,
+        password=artefact_data.password,
+        nickname=artefact_data.final_nickname,
     )
 
     tt_file_content_str = generate_tt_file_content(connection_info, user_info)
     tt_link_str = generate_tt_link(connection_info, user_info)
 
     tt_file_bytes = bytes(tt_file_content_str, encoding="utf-8")
-    server_name_for_file = artefact_data["server_name"]
+    server_name_for_file = artefact_data.server_name
     safe_server_name = "".join(
         c if c.isalnum() or c in (" ", "_", "-") else "_" for c in server_name_for_file
     ).rstrip()
@@ -127,7 +130,7 @@ async def _handle_successful_registration_actions(
     db_session: AsyncSession,
     state_data: RegistrationStateData,
     source_info: dict,
-    artefact_data_val: dict[str, Any],
+    artefact_data_val: TeamTalkRegistrationArtefacts,
     user_lang_code: str,
 ) -> None:
     """Handles actions after a successful TeamTalk registration."""
@@ -238,7 +241,7 @@ async def _process_actual_registration(
     source_info: dict,
     state: FSMContext | None,
     bot: AiogramBot,
-) -> tuple[bool, str | None, dict[str, Any] | None]:
+) -> tuple[bool, str | None, TeamTalkRegistrationArtefacts | None]:
     """Processes and notifies about TeamTalk registration."""
     user_lang_code = state_data.selected_language or settings.bot_admin_lang
     _ = get_translator(user_lang_code)

@@ -261,10 +261,10 @@ async def on_my_connection_lost(
     host = "Unknown Server"
     if (
         tt_instance
-        and hasattr(tt_instance, "server_info_tuple")
-        and tt_instance.server_info_tuple
+        and hasattr(tt_instance, "server_info_model")
+        and tt_instance.server_info_model
     ):
-        host = tt_instance.server_info_tuple[0]
+        host = tt_instance.server_info_model.host_name
     elif server and hasattr(server, "info") and server.info:
         host = server.info.host
     logger.warning(
@@ -274,12 +274,12 @@ async def on_my_connection_lost(
     )
     if (
         tt_instance
-        and hasattr(tt_instance, "server_info_tuple")
-        and tt_instance.server_info_tuple
+        and hasattr(tt_instance, "server_info_model")
+        and tt_instance.server_info_model
     ):
         task = asyncio.create_task(
             force_restart_instance_on_event(
-                pytalk_bot_instance, *tt_instance.server_info_tuple
+                pytalk_bot_instance, tt_instance.server_info_model
             )
         )
         # To suppress the warning about the task not being awaited, you can store it.
@@ -288,7 +288,7 @@ async def on_my_connection_lost(
     else:
         logger.error(
             "Could not trigger instance restart for server %s after connection lost: "
-            "server_info_tuple not found.",
+            "server_info_model not found.",
             host,
         )
 
@@ -303,10 +303,10 @@ async def on_my_kicked_from_channel(
     tt_instance = getattr(channel.server, "teamtalk_instance", None)
     if (
         tt_instance
-        and hasattr(tt_instance, "server_info_tuple")
-        and tt_instance.server_info_tuple
+        and hasattr(tt_instance, "server_info_model")
+        and tt_instance.server_info_model
     ):
-        server_host = tt_instance.server_info_tuple[0]
+        server_host = tt_instance.server_info_model.host_name
     logger.warning(
         "EVENT: on_my_kicked_from_channel - Kicked from '%s' on %s. "
         "Triggering forceful instance restart.",
@@ -315,19 +315,19 @@ async def on_my_kicked_from_channel(
     )
     if (
         tt_instance
-        and hasattr(tt_instance, "server_info_tuple")
-        and tt_instance.server_info_tuple
+        and hasattr(tt_instance, "server_info_model")
+        and tt_instance.server_info_model
     ):
         task = asyncio.create_task(
             force_restart_instance_on_event(
-                pytalk_bot_instance, *tt_instance.server_info_tuple
+                pytalk_bot_instance, tt_instance.server_info_model
             )
         )
         _ = task
     else:
         logger.error(
             "Could not trigger instance restart for server %s after kick: "
-            "server_info_tuple not found.",
+            "server_info_model not found.",
             server_host,
         )
 

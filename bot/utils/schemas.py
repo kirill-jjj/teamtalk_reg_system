@@ -50,3 +50,31 @@ SourceInfo = Annotated[
     TelegramSourceInfo | WebSourceInfo,
     Field(discriminator="type"),
 ]
+
+
+class TeamTalkRegistrationArtefacts(BaseModel):
+    """Schema for data returned after a successful TeamTalk registration."""
+
+    username: str
+    password: str
+    final_nickname: str
+    effective_hostname: str
+    server_name: str
+    tcp_port: int
+    udp_port: int
+    encrypted: bool
+
+
+class TeamTalkServerInfo(BaseModel):
+    """Pydantic model for TeamTalk server connection information."""
+    host_name: str
+    tcp_port: int
+    udp_port: int
+    user_name: str
+    password: str
+    nickname: str
+    encrypted: bool
+    join_channel_path: str | None
+    join_channel_pass: str
+    bot_gender: str
+    bot_status_text: str

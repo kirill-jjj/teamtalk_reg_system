@@ -1,4 +1,5 @@
 """Utility functions for the FastAPI application."""
+import asyncio
 import configparser  # For modify_teamtalk_ini_from_template
 import contextlib
 import io  # For modify_teamtalk_ini_from_template
@@ -9,11 +10,13 @@ import secrets
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import (
-    FastAPI,
+    BackgroundTasks,
     Request,
 )
 
 from bot.core.config import settings
+from bot.core.db import remove_fastapi_download_token
+from bot.core.db.session import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +86,7 @@ def modify_teamtalk_ini_from_template(
     config = configparser.ConfigParser(
         interpolation=None, comment_prefixes=(';', '#'), allow_no_value=True
     )
-    config.optionxform = str
+    config.optionxform = lambda option: option
 
     try:
         with ini_template_path.open(encoding='utf-8-sig') as f:
@@ -302,3 +305,47 @@ def get_user_ip_fastapi(request: Request) -> str:
     # X-Forwarded-For
     # or if the server is not configured to use it.
     return request.client.host if request.client else "unknown_ip"
+
+
+async def _delete_file_and_token(filepath: Path, token: str) -> None:
+    """Deletes a file and its associated download token from the database."""
+    try:
+        if filepath.exists():
+            filepath.unlink()
+            logger.info("Deleted temporary file: %s", filepath)
+    except OSError as e:
+        logger.exception("Error deleting temporary file %s: %s", filepath, e)
+
+    async with AsyncSessionLocal() as db:
+        await remove_fastapi_download_token(db, token)
+        await db.commit()
+
+def schedule_temp_file_deletion(
+    background_tasks: BackgroundTasks,
+    filename: str,
+    directory_type: str, # "files" or "zips"
+    token: str,
+    delay_seconds: int,
+) -> None:
+    """Schedules a temporary file for deletion."""
+    if directory_type == "files":
+        dir_path = get_generated_files_path()
+    elif directory_type == "zips":
+        dir_path = get_generated_zips_path()
+    else:
+        logger.error(
+            "Invalid directory type for temp file deletion: %s", directory_type
+        )
+        return
+
+    file_path = dir_path / filename
+
+    async def delete_task_wrapper() -> None:
+        await asyncio.sleep(delay_seconds)
+        await _delete_file_and_token(file_path, token)
+
+    background_tasks.add_task(delete_task_wrapper)
+    logger.info(
+        "Scheduled deletion for file %s in %s seconds.", file_path, delay_seconds
+    )
+
