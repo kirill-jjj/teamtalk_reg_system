@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 
 class RegistrationStateData(BaseModel):
-    """A Pydantic model to structure the data stored in the FSM context during registration."""
+    """A Pydantic model for FSM context data during registration."""
 
     is_deeplink_registration: bool = False
     registrant_telegram_id: int | None = None

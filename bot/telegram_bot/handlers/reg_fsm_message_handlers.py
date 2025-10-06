@@ -44,7 +44,10 @@ async def awaiting_username_handler(
     if not pytalk_bot_instance:
         logger.error("pytalk_bot_instance not found in dispatcher context.")
         await message.reply(
-            _("Internal error: TeamTalk bot instance not available. Please contact an administrator.")
+            _(
+                "Internal error: TeamTalk bot instance not available. "
+                "Please contact an administrator."
+            )
         )
         await state.clear()
         return
@@ -64,13 +67,19 @@ async def awaiting_username_handler(
                 user_input,
             )
             await message.reply(
-                _("An error occurred while checking the username. Please try again later.")
+                _(
+                    "An error occurred while checking the username. "
+                    "Please try again later."
+                )
             )
             return
     except Exception:
         logger.exception("Error checking username existence for %s:", user_input)
         await message.reply(
-            _("An error occurred while checking the username. Please try again later.")
+            _(
+                "An error occurred while checking the username. "
+                "Please try again later."
+            )
         )
         return
 
@@ -105,7 +114,11 @@ async def awaiting_password_handler(message: types.Message, state: FSMContext) -
 
 @fsm_router.message(RegistrationStates.awaiting_nickname, F.text)
 async def awaiting_nickname_handler(
-    message: types.Message, state: FSMContext, db_session: AsyncSession, bot: AiogramBot, dispatcher: Dispatcher
+    message: types.Message,
+    state: FSMContext,
+    db_session: AsyncSession,
+    bot: AiogramBot,
+    dispatcher: Dispatcher,
 ) -> None:
     """Handles the nickname input from the user."""
     user_input = message.text.strip()
@@ -149,7 +162,10 @@ async def awaiting_nickname_handler(
         if not pytalk_bot_instance:
             logger.error("pytalk_bot_instance not found in dispatcher context.")
             await message.answer(
-                _("Internal error: TeamTalk bot instance not available. Please contact an administrator.")
+                _(
+                    "Internal error: TeamTalk bot instance not available. "
+                    "Please contact an administrator."
+                )
             )
             await state.clear()
             return

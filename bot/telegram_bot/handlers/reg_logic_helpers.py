@@ -239,8 +239,7 @@ async def _process_actual_registration(
     state: FSMContext | None,
     bot: AiogramBot,
 ) -> tuple[bool, str | None, dict[str, Any] | None]:
-    """Processes the actual registration with TeamTalk and notifies the user"""
-    """and admins."""
+    """Processes and notifies about TeamTalk registration."""
     user_lang_code = state_data.selected_language or settings.bot_admin_lang
     _ = get_translator(user_lang_code)
 
@@ -290,7 +289,10 @@ async def _process_actual_registration(
         )
         await bot.send_message(
             registrant_user_id,
-            _("Registration error. Please try again later or contact an administrator."),
+            _(
+                "Registration error. Please try again later or contact an "
+                "administrator."
+            ),
         )
 
     if state:
@@ -453,7 +455,8 @@ async def _notify_admins_about_decision(
     decision_text = _("approved") if decision == "approved" else _("rejected")
     notification_message = _(
         "Admin {admin_name} ({admin_id}) has {decision_text} the registration "
-        "request for TeamTalk user '{teamtalk_username}' (Telegram ID: {registrant_telegram_id})."
+        "request for TeamTalk user '{teamtalk_username}' "
+        "(Telegram ID: {registrant_telegram_id})."
     ).format(
         admin_name=acting_admin_name,
         admin_id=acting_admin_id,
@@ -463,9 +466,9 @@ async def _notify_admins_about_decision(
     )
 
     if registrant_tg_username:
-        notification_message += _(" Telegram Username: @{registrant_tg_username}").format(
-            registrant_tg_username=registrant_tg_username
-        )
+        notification_message += _(
+            " Telegram Username: @{registrant_tg_username}"
+        ).format(registrant_tg_username=registrant_tg_username)
 
     for admin_id in settings.admin_ids:
         if admin_id != acting_admin_id:  # Don't send to the admin who made the decision
@@ -473,7 +476,8 @@ async def _notify_admins_about_decision(
                 await bot.send_message(admin_id, notification_message)
             except Exception:
                 logger.exception(
-                    "Failed to send admin notification to %s about registration decision:",
+                    "Failed to send admin notification to %s about "
+                    "registration decision:",
                     admin_id,
                 )
 

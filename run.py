@@ -60,7 +60,7 @@ if args.config:
     os.environ["CONFIG_FILE"] = args.config
     print(f"INFO: Using config file specified via --config: '{args.config}'")
 
-# Configure logging AFTER .env load, as .env might contain logging settings in a real app
+# Configure logging AFTER .env load, as .env might contain logging settings.
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -75,8 +75,10 @@ logger = logging.getLogger(__name__)
 
 
 class Application:
-    """Manages the lifecycle of the entire application, including Telegram bot,
-    FastAPI server, TeamTalk connection, and background tasks.
+    """Manages the application lifecycle.
+
+    This includes the Telegram bot, FastAPI server, TeamTalk connection,
+    and background tasks.
     """
 
     def __init__(self, *, test_run: bool = False) -> None:
@@ -90,7 +92,7 @@ class Application:
         self.startup_event = asyncio.Event() # Event to signal successful startup
 
     async def _remove_admin_ids_from_registrations(self) -> None:
-        """Checks for any admin IDs in the TelegramRegistration table on startup and removes them."""
+        """Checks for and removes admin IDs from the registration table on startup."""
         logger.info(
             "Performing startup check: Verifying admin IDs are not in "
             "TelegramRegistration table..."
