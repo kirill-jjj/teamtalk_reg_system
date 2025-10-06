@@ -2,13 +2,13 @@
 
 from datetime import UTC, datetime, timedelta
 import logging
-from typing import Any
 
 from sqlalchemy.exc import IntegrityError as SQLAlchemyIntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import delete, select
 
 from bot.core.config import settings
+from bot.utils.schemas import SourceInfo
 
 from .models import (
     BannedUser,  # Added BannedUser import
@@ -186,7 +186,7 @@ async def add_pending_telegram_registration(
     username: str,
     password_cleartext: str,
     nickname: str,
-    source_info: dict[str, Any]
+    source_info: "SourceInfo",
 ) -> PendingTelegramRegistration:
     """Adds a new pending Telegram registration to the database."""
     pending_reg = PendingTelegramRegistration(
@@ -195,7 +195,7 @@ async def add_pending_telegram_registration(
         username=username,
         password_cleartext=password_cleartext,
         nickname=nickname,
-        source_info=source_info
+        source_info=source_info.model_dump(exclude_unset=True),
     )
     db.add(pending_reg)
     await db.flush() # To ensure it's added and get ID, or raise error

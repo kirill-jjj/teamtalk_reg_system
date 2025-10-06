@@ -1,20 +1,26 @@
 """This module handles callbacks for the registration flow."""
+import contextlib
 import logging
 
 from aiogram import Bot as AiogramBot
 from aiogram import Dispatcher, F, Router, types
 from aiogram.fsm.context import FSMContext
+from pydantic import parse_obj_as
+import pytalk
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.config import settings
 from ...core.db import (
+    get_and_remove_pending_telegram_registration,
     is_telegram_id_registered,
 )
 from ...core.db.models import PendingTelegramRegistration
 from ...core.localization import get_translator
+from ...utils.schemas import TelegramSourceInfo
 from ..schemas import RegistrationStateData
 from ..states import RegistrationStates
 from .reg_callback_data import (
+    AdminVerificationCallback,
     LanguageCallback,
     NicknameChoiceCallback,
     TTAccountTypeCallback,
@@ -118,7 +124,8 @@ async def _handle_verification_approve(
     db_session: AsyncSession,
     pending_reg_data_model: "PendingTelegramRegistration",
     state_data_from_pending: "RegistrationStateData",
-    source_info_from_request: dict
+    source_info_from_request: dict,
+    pytalk_bot_instance: "pytalk.TeamTalkBot",
 ) -> None:
     user_lang_code = state_data_from_pending.selected_language or \
         settings.bot_admin_lang
@@ -133,6 +140,7 @@ async def _handle_verification_approve(
     source_info_from_request["approved_by_admin_id"] = callback_query.from_user.id
 
     reg_success, __, __ = await _process_actual_registration(
+        pytalk_bot_instance=pytalk_bot_instance,
         db_session=db_session,
         state_data=state_data_from_pending,
         source_info=source_info_from_request,
@@ -230,6 +238,77 @@ async def _handle_verification_reject(
         teamtalk_username=state_data_from_pending.name,
         decision="rejected",
     )
+
+
+
+
+@callback_router.callback_query(AdminVerificationCallback.filter())
+async def admin_verification_handler(
+    callback_query: types.CallbackQuery,
+    callback_data: AdminVerificationCallback,
+    bot: AiogramBot,
+    db_session: AsyncSession,
+    dispatcher: Dispatcher,
+) -> None:
+    """Handles an admin's decision on a registration request."""
+    request_key = callback_data.request_key
+    action = callback_data.action
+    _ = get_translator(settings.bot_admin_lang)
+
+    pending_reg_data_model = await get_and_remove_pending_telegram_registration(
+        db_session, request_key
+    )
+
+    if not pending_reg_data_model:
+        await callback_query.answer(
+            _("Registration request not found, outdated, or already processed."),
+            show_alert=True,
+        )
+        with contextlib.suppress(Exception):  # Ignore if message can't be edited
+            await callback_query.message.edit_text(
+                _("This registration request has already been handled.")
+            )
+        return
+
+    source_info = parse_obj_as(TelegramSourceInfo, pending_reg_data_model.source_info)
+
+    state_data_from_pending = RegistrationStateData(
+        registrant_telegram_id=pending_reg_data_model.registrant_telegram_id,
+        name=pending_reg_data_model.username,
+        password=pending_reg_data_model.password_cleartext,
+        nickname=pending_reg_data_model.nickname,
+        selected_language=source_info.selected_language,
+        is_admin_registrar=source_info.is_admin_registrar,
+        tt_account_type=source_info.tt_account_type,
+        is_deeplink_registration=source_info.is_deeplink_registration,
+    )
+
+    pytalk_bot_instance = dispatcher["pytalk_bot_instance"]
+
+    if action == "verify":
+        await _handle_verification_approve(
+            callback_query,
+            bot,
+            db_session,
+            pending_reg_data_model,
+            state_data_from_pending,
+            pending_reg_data_model.source_info,
+            pytalk_bot_instance=pytalk_bot_instance,
+        )
+    elif action == "reject":
+        await _handle_verification_reject(
+            callback_query,
+            bot,
+            pending_reg_data_model,
+            state_data_from_pending,
+            pending_reg_data_model.source_info,
+        )
+
+    # Clean up the original verification message
+    try:
+        await callback_query.message.delete()
+    except Exception:
+        logger.debug("Could not delete admin verification message.")
 
 
 @callback_router.callback_query(

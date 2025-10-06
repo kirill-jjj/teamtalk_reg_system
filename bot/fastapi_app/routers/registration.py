@@ -1,7 +1,6 @@
 """FastAPI routes for user registration."""
 from datetime import UTC, datetime, timedelta
 import logging
-from typing import Any
 
 import aiofiles
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request
@@ -24,6 +23,7 @@ from bot.core.localization import (
     get_translator,
 )
 from bot.fastapi_app.schemas import (
+    Downloadables,
     RegistrationPayload,
     TeamTalkRegistrationArtefacts,
 )
@@ -37,7 +37,7 @@ from bot.fastapi_app.utils import (
 )
 from bot.teamtalk import users as teamtalk_users_service
 from bot.utils.file_generator import generate_tt_file_content, generate_tt_link
-from bot.utils.schemas import TTConnectionInfo, TTUserInfo
+from bot.utils.schemas import TTConnectionInfo, TTUserInfo, WebSourceInfo
 
 # Import DB dependency and CRUD functions
 from ..dependencies import get_db_session
@@ -104,7 +104,7 @@ async def _prepare_downloadables_for_web(
     background_tasks: BackgroundTasks,
     artefact_data: TeamTalkRegistrationArtefacts,
     db: AsyncSession,
-) -> dict[str, Any]:
+) -> Downloadables:
     user_lang_code = request.cookies.get("user_web_lang", DEFAULT_LANG_CODE)
     connection_info = TTConnectionInfo(
         server_name=artefact_data.server_name,
@@ -128,14 +128,14 @@ async def _prepare_downloadables_for_web(
             await f.write(tt_content)
     except OSError:
         logger.exception("Failed to write .tt file %s:", tt_file_path)
-        return {
-            "tt_download_link_token": None,
-            "tt_file_name_for_user": None,
-            "client_zip_token": None,
-            "client_zip_filename_for_user": None,
-            "tt_quick_link": None,
-            "file_generation_error": True,
-        }
+        return Downloadables(
+            tt_download_link_token=None,
+            tt_file_name_for_user=None,
+            client_zip_token=None,
+            client_zip_filename_for_user=None,
+            tt_quick_link=None,
+            file_generation_error=True,
+        )
 
     tt_token = generate_random_token()
     expires_at_dt = datetime.now(UTC) + timedelta(
@@ -200,14 +200,14 @@ async def _prepare_downloadables_for_web(
                 "Failed to create client ZIP for web user %s", artefact_data.username
             )
 
-    return {
-        "tt_download_link_token": tt_token,
-        "tt_file_name_for_user": tt_file_name_for_user,
-        "client_zip_token": zip_token,
-        "client_zip_filename_for_user": actual_client_zip_filename_for_user,
-        "tt_quick_link": tt_quick_link,
-        "file_generation_error": False,
-    }
+    return Downloadables(
+        tt_download_link_token=tt_token,
+        tt_file_name_for_user=tt_file_name_for_user,
+        client_zip_token=zip_token,
+        client_zip_filename_for_user=actual_client_zip_filename_for_user,
+        tt_quick_link=tt_quick_link,
+        file_generation_error=False,
+    )
 
 
 @router.post("/set_lang_and_reload")
@@ -344,12 +344,11 @@ async def register_page_post(
         if payload.nickname and payload.nickname.strip()
         else payload.username
     )
-    source_info_data = {
-        "type": "web",
-        "ip_address": user_ip,
-        "user_lang": user_lang_code,
-        "nickname": final_nickname,
-    }
+    source_info_data = WebSourceInfo(
+        ip_address=user_ip,
+        user_lang=user_lang_code,
+        nickname=final_nickname,
+    )
 
     (
         registration_successful,
@@ -358,7 +357,7 @@ async def register_page_post(
         username=payload.username,
         password=payload.password,
         nickname=final_nickname,
-        source_info_data=source_info_data,
+        source_info_data=source_info_data.model_dump(exclude_unset=True),
     )
 
     if not registration_successful or not tt_artefact_data_from_reg:
@@ -398,7 +397,7 @@ async def register_page_post(
         db=db,
     )
 
-    if downloadables_context.get("file_generation_error"):
+    if downloadables_context.file_generation_error:
         message = translator(
             "Registration was successful, but there was an error generating "
             "the connection files. Please contact an administrator."
@@ -434,15 +433,13 @@ async def register_page_post(
         "current_lang": user_lang_code,
         "server_name_from_env": request.app.state.cached_server_name,
         "available_languages": available_languages,
-        "tt_link": downloadables_context["tt_quick_link"],
-        "download_tt_token": downloadables_context["tt_download_link_token"],
-        "actual_tt_filename_for_user": downloadables_context[
-            "tt_file_name_for_user"
-        ],
-        "download_client_zip_token": downloadables_context["client_zip_token"],
-        "actual_client_zip_filename_for_user": downloadables_context[
-            "client_zip_filename_for_user"
-        ],
+        "tt_link": downloadables_context.tt_quick_link,
+        "download_tt_token": downloadables_context.tt_download_link_token,
+        "actual_tt_filename_for_user": downloadables_context.tt_file_name_for_user,
+        "download_client_zip_token": downloadables_context.client_zip_token,
+        "actual_client_zip_filename_for_user": (
+            downloadables_context.client_zip_filename_for_user
+        ),
     }
     return request.app.state.templates.TemplateResponse("register.html", final_context)
 

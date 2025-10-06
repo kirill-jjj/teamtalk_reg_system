@@ -19,3 +19,14 @@ class TeamTalkRegistrationArtefacts(BaseModel):
     tcp_port: int
     udp_port: int
     encrypted: bool
+
+
+class Downloadables(BaseModel):
+    """Schema for downloadable artefacts after registration."""
+
+    tt_download_link_token: str | None
+    tt_file_name_for_user: str | None
+    client_zip_token: str | None
+    client_zip_filename_for_user: str | None
+    tt_quick_link: str | None
+    file_generation_error: bool

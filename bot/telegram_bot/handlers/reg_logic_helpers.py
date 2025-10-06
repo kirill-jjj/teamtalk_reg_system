@@ -17,7 +17,7 @@ from ...core.db import add_pending_telegram_registration, add_telegram_registrat
 from ...core.localization import get_admin_lang_code, get_translator
 from ...teamtalk import users as tt_users_service
 from ...utils.file_generator import generate_tt_file_content, generate_tt_link
-from ...utils.schemas import TTConnectionInfo, TTUserInfo
+from ...utils.schemas import TelegramSourceInfo, TTConnectionInfo, TTUserInfo
 from ..schemas import RegistrationStateData
 from ..states import RegistrationStates
 from .reg_callback_data import AdminVerificationCallback, NicknameChoiceCallback
@@ -315,17 +315,17 @@ async def _handle_registration_continuation(
     user_full_name = user_object.full_name
     telegram_username = user_object.username
 
-    source_info = {
-        "type": "telegram",
-        "telegram_id": state_data.registrant_telegram_id,
-        "telegram_full_name": user_full_name,
-        "telegram_username": telegram_username,
-        "selected_language": state_data.selected_language,
-        "nickname": state_data.nickname,
-        "is_admin_registrar": state_data.is_admin_registrar,
-        "tt_account_type": state_data.tt_account_type,
-        "registrar_telegram_id": user_object.id,
-    }
+    source_info = TelegramSourceInfo(
+        telegram_id=state_data.registrant_telegram_id,
+        telegram_full_name=user_full_name,
+        telegram_username=telegram_username,
+        selected_language=state_data.selected_language,
+        nickname=state_data.nickname,
+        is_deeplink_registration=state_data.is_deeplink_registration,
+        is_admin_registrar=state_data.is_admin_registrar,
+        tt_account_type=state_data.tt_account_type,
+        registrar_telegram_id=user_object.id,
+    )
     _ = get_translator(state_data.selected_language or settings.bot_admin_lang)
 
     if settings.verify_registration and not state_data.is_admin_registrar:
@@ -434,7 +434,7 @@ async def _handle_registration_continuation(
             pytalk_bot_instance,  # New argument
             db_session=db_session,
             state_data=state_data,
-            source_info=source_info,
+            source_info=source_info.model_dump(exclude_unset=True),
             state=state,
             bot=bot,
         )
