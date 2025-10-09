@@ -3,9 +3,9 @@ from datetime import UTC, datetime, timedelta
 import logging
 
 import aiofiles
-import pytalk
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response
+import pytalk
 from pytalk.enums import UserType as PyTalkUserType
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -294,6 +294,7 @@ async def register_page_post(
     translator = get_translator(user_lang_code)
     user_ip = get_user_ip_fastapi(request)
 
+    pytalk_bot_instance = request.app.state.pytalk_bot_instance
     if await is_fastapi_ip_registered(db, user_ip):
         logger.warning(
             "Validation failed for IP %s (Username: %s): IP already registered.",

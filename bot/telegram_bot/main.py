@@ -1,5 +1,6 @@
 """This module contains the main function for running the Telegram bot."""
 import logging
+from typing import Any
 
 from aiogram import Bot as AiogramBot
 from aiogram import Dispatcher
@@ -19,14 +20,21 @@ logger = logging.getLogger(__name__)
 
 async def run_telegram_bot(
     pytalk_bot_instance: pytalk.TeamTalkBot,
+    application: Any,  # Pass the Application instance here
 ) -> tuple[AiogramBot, Dispatcher]:
     """Initializes and returns the Aiogram bot and dispatcher."""
     bot_instance = AiogramBot(token=settings.tg_bot_token)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
     dp["dispatcher"] = dp
-    dp["pytalk_bot_instance"] = pytalk_bot_instance  # Pass pytalk_bot_instance
-    # to dispatcher context
+    dp["pytalk_bot_instance"] = pytalk_bot_instance
+    dp["application"] = application  # Store application in context if needed
+
+    # --- REGISTER LIFECYCLE EVENTS ---
+    # on_startup will be called before polling starts
+    dp.startup.register(application.on_telegram_startup)
+    # on_shutdown will be called after polling stops
+    dp.shutdown.register(application.on_telegram_shutdown)
 
     # Register DbSessionMiddleware
     dp.update.outer_middleware(DbSessionMiddleware())
@@ -38,20 +46,10 @@ async def run_telegram_bot(
     dp.include_router(registration_router)
     dp.include_router(admin_router)
 
-    logger.info("Telegram Bot Dispatcher configured with routers.")
+    logger.info(
+        "Telegram Bot Dispatcher configured with routers and startup/shutdown hooks."
+    )
 
     return bot_instance, dp
-
-
-async def start_telegram_polling(bot_instance: AiogramBot, dp: Dispatcher) -> None:
-    """Starts the Telegram bot polling."""
-    try:
-        logger.info("Starting Telegram Bot polling...")
-        await dp.start_polling(
-            bot_instance, allowed_updates=dp.resolve_used_update_types()
-        )
-    finally:
-        # Bot session closure is now handled by Application.shutdown
-        logger.info("Telegram Bot polling stopped.")
 
 

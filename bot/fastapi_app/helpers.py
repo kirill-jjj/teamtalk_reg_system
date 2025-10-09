@@ -11,6 +11,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import (
     BackgroundTasks,
+    FastAPI,
     Request,
 )
 
@@ -313,8 +314,8 @@ async def _delete_file_and_token(filepath: Path, token: str) -> None:
         if filepath.exists():
             filepath.unlink()
             logger.info("Deleted temporary file: %s", filepath)
-    except OSError as e:
-        logger.exception("Error deleting temporary file %s: %s", filepath, e)
+    except OSError:
+        logger.exception("Error deleting temporary file %s:", filepath)
 
     async with AsyncSessionLocal() as db:
         await remove_fastapi_download_token(db, token)

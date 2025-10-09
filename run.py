@@ -37,7 +37,7 @@ from bot.teamtalk.events import (
     on_user_account_new,
     on_user_account_remove,
 )
-from bot.telegram_bot.main import run_telegram_bot, start_telegram_polling
+from bot.telegram_bot.main import run_telegram_bot
 
 # --- Argument parsing for config file ---
 # This is done before importing the settings module to ensure the environment
@@ -182,7 +182,10 @@ class Application:
         logger.info("PyTalk event handlers registered.")
 
     async def _init_telegram_bot(self) -> None:
-        self.telegram_bot, self.dispatcher = await run_telegram_bot(self.pytalk_bot)
+        # Now pass self (the Application instance) to run_telegram_bot
+        self.telegram_bot, self.dispatcher = await run_telegram_bot(
+            self.pytalk_bot, self
+        )
         if self.telegram_bot:
             # Pass the Aiogram bot instance to the pytalk_bot
             self.pytalk_bot.aiogram_bot_ref = self.telegram_bot
@@ -276,20 +279,6 @@ class Application:
             )
         )
 
-    async def _start_telegram_polling(self) -> None:
-        if self.telegram_bot and self.dispatcher:
-            self.tasks.append(
-                asyncio.create_task(
-                    start_telegram_polling(self.telegram_bot, self.dispatcher),
-                    name="TelegramBotPolling",
-                )
-            )
-        else:
-            logger.error(
-                "Telegram Bot or Dispatcher not initialized. "
-                "Telegram polling will not start."
-            )
-
     async def _start_periodic_database_cleanup(self) -> None:
         self.tasks.append(
             asyncio.create_task(
@@ -299,8 +288,8 @@ class Application:
         )
         logger.info("Periodic database cleanup task created.")
 
-    async def startup(self) -> None:
-        """Starts up the application."""
+    async def on_telegram_startup(self, dispatcher: Dispatcher) -> None:  # noqa: ARG002
+        """Handles the startup logic, called by aiogram."""
         logger.info("Starting application components...")
 
         # 1. Initialize Database
@@ -310,79 +299,65 @@ class Application:
         # 2. Run admin ID cleanup
         await self._remove_admin_ids_from_registrations()
 
-        # 3. Initialize PyTalk Bot
-        await self._init_pytalk_bot()
+        # 3. Initialize PyTalk and start its service
         fastapi_app.state.pytalk_bot_instance = self.pytalk_bot
-
-        # 4. Initialize Telegram Bot
-        await self._init_telegram_bot()
-
-        # 5. Start FastAPI server (if enabled)
-        await self._start_fastapi_server()
-
-        # 6. Start TeamTalk Service
         await self._start_teamtalk_service()
 
-        # 7. Start Telegram Polling
-        await self._start_telegram_polling()
+        # 4. Start FastAPI server (if enabled)
+        await self._start_fastapi_server()
 
-        # 8. Start periodic database cleanup task
+        # 5. Start periodic database cleanup task
         await self._start_periodic_database_cleanup()
 
-        self.startup_event.set()  # Signal that all core components are started
+        logger.info("All background services started.")
 
-    async def shutdown(self) -> None:
-        """Shuts down the application."""
+
+    async def on_telegram_shutdown(self, dispatcher: Dispatcher) -> None:  # noqa: ARG002
+        """Handles the shutdown logic, called by aiogram."""
         logger.info("Shutting down application components...")
 
-        # 1. Cancel all running tasks
+        # 1. Cancel all running background tasks
         for task in self.tasks:
             if not task.done():
                 logger.info("Cancelling task: %s", task.get_name())
                 task.cancel()
-
-        # Await tasks to allow them to handle cancellation
         await asyncio.gather(*self.tasks, return_exceptions=True)
         logger.info("All application tasks cancelled and awaited.")
 
-        # 2. Close Aiogram dispatcher and bot session
-        if self.dispatcher:
-            self.dispatcher.shutdown()
-            logger.info("Aiogram dispatcher shut down.")
-        if self.telegram_bot:
-            await self.telegram_bot.session.close()
-            logger.info("Aiogram bot session closed.")
-
-        # 3. Close TeamTalk connection
+        # 2. Close TeamTalk connection
         if self.pytalk_bot:
-            await close_teamtalk_connection(self.pytalk_bot)  # Pass the instance
+            await close_teamtalk_connection(self.pytalk_bot)
             logger.info("PyTalk bot connection closed.")
-        else:
-            logger.info("PyTalk bot instance not initialized, no need to close.")
 
-        # 4. Close database engine
+        # 3. Close database engine
         await close_db_engine()
         logger.info("Database engine closed.")
 
         logger.info("Application shutdown complete.")
 
+
     async def run(self) -> None:
         """Runs the application."""
-        try:
-            await self.startup()
-            if self.test_run:
-                logger.info("Test run: Initializations complete. Exiting.")
-                return
+        # Create PyTalk and Telegram Bot instances
+        await self._init_pytalk_bot()
+        await self._init_telegram_bot()
 
-            # Keep the application running until interrupted
-            await asyncio.gather(*self.tasks, return_exceptions=True)
+        if self.test_run:
+            logger.info("Test run: Initializations complete. Exiting.")
+            return
 
-        except asyncio.CancelledError:
-            logger.info("Application run cancelled.")
-        except Exception:
-            logger.exception("Unhandled exception during application run:")
-        finally:
-            await self.shutdown()
+        if self.telegram_bot and self.dispatcher:
+            try:
+                # This call will now manage the entire lifecycle
+                await self.dispatcher.start_polling(self.telegram_bot)
+            finally:
+                logger.info("Polling stopped. Closing bot session.")
+                await self.telegram_bot.session.close()
+                logger.info("Aiogram bot session closed.")
+        else:
+            logger.error(
+                "Telegram Bot or Dispatcher not initialized. Cannot start polling."
+            )
 
 
 async def main() -> None:

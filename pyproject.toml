@@ -113,6 +113,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 "bot/telegram_bot/handlers/*" = ["ARG001"]
 "bot/telegram_bot/handlers/reg_logic_helpers.py" = ["ARG001"]
 "bot/telegram_bot/middlewares/*" = ["ARG001"]
+"bot/telegram_bot/main.py" = ["ANN401"]
 "bot/telegram_bot/callbacks/*" = ["D101"]
 "bot/telegram_bot/states.py" = ["D101"]
 
