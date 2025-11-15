@@ -33,17 +33,32 @@ async def initialize_teamtalk_connection(
     bot_status_text: str,
 ) -> bool:
     """Initializes the TeamTalk connection for the bot."""
-    server_info_pytalk = PyTalkTeamTalkServerInfo(
-        host=host_name,
-        tcp_port=tcp_port,
-        udp_port=udp_port,
-        username=user_name,
-        password=password,
-        nickname=nickname,
-        encrypted=encrypted,
-        join_channel_id=-1,
-        join_channel_password="",
-    )
+    join_channel_id = -1
+    if join_channel_path and join_channel_path.strip():
+        channel_to_join_str = join_channel_path.strip()
+        try:
+            join_channel_id = int(channel_to_join_str)
+        except ValueError:
+            # This part of the logic is problematic as we can't resolve the path to an ID before connecting.
+            # For now, we will log a warning and not join the channel.
+            # A more advanced implementation would require connecting, resolving the path, and then re-connecting or joining.
+            logger.warning(
+                "Joining channel by path is not supported in this version of the library. "
+                "Please use a channel ID for 'tt_join_channel'."
+            )
+
+    server_info_dict = {
+        "host": host_name,
+        "tcp_port": tcp_port,
+        "udp_port": udp_port,
+        "username": user_name,
+        "password": password,
+        "nickname": nickname,
+        "encrypted": encrypted,
+        "join_channel_id": join_channel_id,
+        "join_channel_password": join_channel_pass or "",
+    }
+    server_info_pytalk = PyTalkTeamTalkServerInfo(server_info_dict)
     try:
         server_info_model = TeamTalkServerInfo(
             host_name=host_name,
@@ -71,7 +86,7 @@ async def initialize_teamtalk_connection(
             )
             if (
                 pytalk_bot_instance.teamtalks
-                and pytalk_bot_instance.teamtalks[-1].server_info.host == host_name
+                and pytalk_bot_instance.teamtalks[-1].server_info.hostname == host_name
                 and pytalk_bot_instance.teamtalks[-1].server_info.tcp_port == tcp_port
             ):
                 pytalk_bot_instance.teamtalks.pop()
@@ -88,7 +103,7 @@ async def initialize_teamtalk_connection(
             last_instance = pytalk_bot_instance.teamtalks[-1]
             if (
                 hasattr(last_instance, "server_info")
-                and last_instance.server_info.host == host_name
+                and last_instance.server_info.hostname == host_name
                 and last_instance.server_info.tcp_port == tcp_port
             ):
                 pytalk_bot_instance.teamtalks.pop()
@@ -109,40 +124,13 @@ async def initialize_teamtalk_connection(
         if active_server_instance.server:
             active_server_instance.server.teamtalk_instance = active_server_instance
 
-        if join_channel_path and join_channel_path.strip():
-            channel_to_join_str = join_channel_path.strip()
-            join_password = join_channel_pass or ""
-            try:
-                channel_id_int = int(channel_to_join_str)
-                logger.info("Attempting to join channel by ID: %s", channel_id_int)
-                active_server_instance.join_channel_by_id(
-                    id=channel_id_int, password=join_password
-                )
-            except ValueError:
-                logger.info(
-                    "Attempting to join channel by path: '%s'", channel_to_join_str
-                )
-                try:
-                    channel_obj = active_server_instance.get_channel_from_path(
-                        channel_to_join_str
-                    )
-                    if channel_obj and channel_obj.id is not None:
-                        active_server_instance.join_channel_by_id(
-                            id=channel_obj.id, password=join_password
-                        )
-                    else:
-                        logger.warning(
-                            "Channel path '%s' not found.", channel_to_join_str
-                        )
-                except Exception:
-                    logger.exception("Error joining by path '%s':", channel_to_join_str)
         gender_map = {
-            "male": Status.online.male,
-            "female": Status.online.female,
-            "neutral": Status.online.neutral,
+            "male": Status.online().male,
+            "female": Status.online().female,
+            "neutral": Status.online().neutral,
         }
         mapped_gender_status = gender_map.get(
-            bot_gender.lower(), Status.online.neutral
+            bot_gender.lower(), Status.online().neutral
         )
         active_server_instance.change_status(
             status_flags=mapped_gender_status, status_message=bot_status_text
@@ -169,9 +157,9 @@ async def close_teamtalk_connection(pytalk_bot_instance: pytalk.TeamTalkBot) -> 
         elif (
             hasattr(tt_instance, "server_info")
             and tt_instance.server_info
-            and hasattr(tt_instance.server_info, "host")
+            and hasattr(tt_instance.server_info, "hostname")
         ):
-            host_display = tt_instance.server_info.host
+            host_display = tt_instance.server_info.hostname
 
         logger.debug("Processing instance for host: %s for shutdown.", host_display)
         try:
@@ -271,7 +259,7 @@ async def _shutdown_and_remove_instance(
             tt_instance.server_info_model.host_name == host_name
             and tt_instance.server_info_model.tcp_port == tcp_port
         )) or (hasattr(tt_instance, "server_info") and (
-            tt_instance.server_info.host == host_name
+            tt_instance.server_info.hostname == host_name
             and tt_instance.server_info.tcp_port == tcp_port
         )):
             instance_matches = True
